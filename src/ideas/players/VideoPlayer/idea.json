@@ -1,0 +1,70 @@
+{
+  "id": "0ce9f747-f1bd-41c0-982a-a60f8ade47fc",
+  "name": "Video Player",
+  "predecessor": "4e40d91f-3ef2-431a-8e4e-9d9cc4f7322a",
+  "purpose": "exist. manifest the Video Player. get proper world position. mute on mobile leave. fix placeholder Doubleside.",
+  "schema": [
+    {
+      "name": "position",
+      "type": "position"
+    },
+    {
+      "name": "rotation",
+      "type": "rotation"
+    },
+    {
+      "name": "scale",
+      "type": "scale"
+    },
+    {
+      "name": "videoSrc",
+      "type": "video"
+    },
+    {
+      "name": "videoDistance",
+      "type": "radius"
+    },
+    {
+      "name": "framed",
+      "type": "boolean"
+    },
+    {
+      "name": "volume",
+      "type": "number"
+    },
+    {
+      "name": "restartOnEnter",
+      "type": "boolean"
+    },
+    {
+      "name": "audioDistance",
+      "type": "radius"
+    },
+    {
+      "name": "frameColor",
+      "type": "color"
+    },
+    {
+      "name": "previewColor",
+      "type": "color"
+    },
+    {
+      "name": "previewText",
+      "type": "string"
+    },
+    {
+      "name": "previewTextColor",
+      "type": "color"
+    },
+    {
+      "name": "previewTextFont",
+      "type": "font"
+    },
+    {
+      "name": "previewTextSize",
+      "type": "number"
+    }
+  ],
+  "npm_dependencies": {},
+  "data_url": null
+}
