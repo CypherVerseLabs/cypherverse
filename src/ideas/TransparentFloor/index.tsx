@@ -7,7 +7,7 @@ type TransparentFloorProps = {
 
 export default function TransparentFloor({
   opacity = 0.6,
-  color = "white",
+  color="#ffffff",
 }: TransparentFloorProps) {
   return (
     <group name="transparent-floor">

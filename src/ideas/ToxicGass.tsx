@@ -8,7 +8,7 @@ type RainProps = {
   size?: number; // Size of raindrops
 };
 
-export function Rain({ count = 5000, color = "white", size = 0.1 }: RainProps) {
+export function Rain({ count = 5000, color="#ffffff", size = 0.1 }: RainProps) {
   const { scene } = useThree();
 
   useEffect(() => {

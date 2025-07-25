@@ -4,15 +4,10 @@ import { extend, ReactThreeFiber } from "@react-three/fiber";
 import { useState } from "react";
 import { Vector2 } from "three";
 
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      unrealBloomPass: ReactThreeFiber.Node<
-        UnrealBloomPass,
-        typeof UnrealBloomPass
-      >;
-    }
+// ✅ Correct module name for augmentation
+declare module '@react-three/fiber' {
+  interface ThreeElements {
+    unrealBloomPass: ReactThreeFiber.Node<UnrealBloomPass, typeof UnrealBloomPass>;
   }
 }
 

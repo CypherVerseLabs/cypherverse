@@ -1,48 +1,112 @@
- 🚀 Cypherverse
+🌐 Cypherverse
+A full-stack Web3 application and immersive 3D web experience starter built by CypherVerse Labs.
 
-A starter repository to quickly build immersive 3D web experiences using [Cypherverse](https://github.com/CypherVerseLabs/cyengine).
+This project combines:
 
----
+A Next.js frontend with React and Three.js for 3D experiences
 
-## 📦 How to Use
+An Express backend (TypeScript) supporting Ethereum interaction via ethers.js and JWT authentication
 
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/CypherVerseLabs/cypherverse.git
-   cd cypherverse
+The Cypherverse CyEngine for 3D environment and input abstraction
+
+📁 Project Structure
+bash
+Copy code
+cypherverse/
+├── server/           # Express + TypeScript backend
+├── frontend/         # Next.js frontend with Three.js + React
+├── package.json      # Root package.json (manages frontend + backend)
+└── README.md         # You are here
+📦 How to Use
+Clone the repo
+
+bash
+Copy code
+git clone https://github.com/CypherVerseLabs/cypherverse.git
+cd cypherverse
 Install dependencies
 
 bash
 Copy code
+# Install root dependencies (handles frontend if using workspaces)
 yarn install
-🛠 Scripts
+
+# Install backend dependencies separately (if needed)
+cd server && yarn install
+🔧 Environment Setup
+Create a .env file inside the server/ directory:
+
+env
+Copy code
+PORT=5000
+JWT_SECRET="mykey"
+Make sure the backend port (PORT) doesn’t conflict with the frontend’s default 3000.
+
+🚀 Running the App (Dev Mode)
+From the project root:
+
+bash
+Copy code
+yarn dev
+This concurrently runs:
+
+Backend server (Express) at http://localhost:5000
+
+Frontend app (Next.js + 3D world) at http://localhost:3000
+
+🛠️ Useful Scripts
 Command	Description
-yarn dev	Start local development server
-yarn start	Start local production server (after build)
-yarn build	Export the site to static files
+yarn dev	Start both frontend and backend
+yarn server	Start backend only
+yarn frontend	Start frontend only
+yarn build	Build frontend for production
+yarn start	Start frontend production server
+yarn lint	Fix lint issues
+yarn prettier	Check formatting
 
 ✨ Features
-✅ TypeScript out of the box
+Full-stack Web3: Ethereum integration via ethers.js
 
-✅ Clean code with ESLint and Prettier
+JWT-based authentication on backend
 
-✅ Starter world
+3D immersive world with React and Three.js
 
-✅ Example components with common patterns
+CyEngine: Environment + input abstraction layer for Web3 3D apps
+
+Physics integration: via @react-three/cannon
+
+Animations: with react-spring
+
+TypeScript out of the box
+
+Clean code enforced with ESLint and Prettier
 
 🧱 Tech Stack
-🎮 Three.js + React
+Frontend:
 
-🧠 CyEngine — environment + input abstraction
+Next.js (React framework)
 
-🧵 @react-three/fiber — React renderer for Three.js
+Three.js + React (@react-three/fiber)
 
-🧰 @react-three/drei — helpers and ready-made components
+Helpers: @react-three/drei
 
-🧱 @react-three/cannon — physics integration
+Physics: @react-three/cannon
 
-🌿 react-spring — animations
+Animations: react-spring
+
+Cypherverse CyEngine (3D environment abstraction)
+
+Backend:
+
+Express.js (TypeScript)
+
+JWT authentication
+
+Ethereum interaction via ethers.js
 
 🧪 Status
-This is an active repo maintained by CypherVerse Labs.
+This repository is actively maintained by CypherVerse Labs.
+
+📄 License
+MIT © 2025 CypherVerse Labs
 

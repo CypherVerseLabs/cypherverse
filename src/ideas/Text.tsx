@@ -25,7 +25,7 @@ export default function Test(props: TestProps) {
         {children}
         <mesh>
           <boxBufferGeometry args={[sideLength, sideLength, sideLength]} />
-          <meshBasicMaterial color="black" wireframe />
+          <meshBasicMaterial color="#000000" wireframe />
         </mesh>
       </group>
       <group
@@ -36,7 +36,7 @@ export default function Test(props: TestProps) {
       >
         <mesh>
           <planeBufferGeometry args={[sideLength, FONT_SIZE + 0.1]} />
-          <meshBasicMaterial color="black" side={DoubleSide} />
+          <meshBasicMaterial color="#000000" side={DoubleSide} />
         </mesh>
         <Text
           color="white"

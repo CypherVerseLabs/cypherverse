@@ -1,8 +1,8 @@
-// ideas/Ground.tsx
-import { useThree } from "@react-three/fiber";
+
 import { useGridMap } from "../hooks/useGridMap";
 import { worldToGrid } from "./utils/grid";
 import { useCallback } from "react";
+
 
 type GroundProps = {
   size?: number;       // world size (default 500)
@@ -10,7 +10,6 @@ type GroundProps = {
 };
 
 export default function Ground({ size = 500, gridSize = 100 }: GroundProps) {
-  const { camera } = useThree();
   const { get, set } = useGridMap(gridSize);
 
   const handleClick = useCallback((e: any) => {
@@ -18,9 +17,11 @@ export default function Ground({ size = 500, gridSize = 100 }: GroundProps) {
     const [gx, gz] = worldToGrid(x, z, gridSize, size);
 
     const current = get(gx, gz);
-set(gx, gz, current === 0 ? 1 : 0);
-    console.log(`Clicked grid cell: (${gx}, ${gz}) =`, get(gx, gz));
-  }, [get, set]);
+    const newValue = current === 0 ? 1 : 0;
+    set(gx, gz, newValue);
+
+    console.log(`Clicked grid cell: (${gx}, ${gz}) = ${newValue}`);
+  }, [get, set, gridSize, size]);
 
   return (
     <mesh

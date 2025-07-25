@@ -29,9 +29,9 @@ export default function VideoPlayer(props: VideoPlayerProps) {
     restartOnEnter = false,
     audioDistance = 5,
     frameColor = "#888",
-    previewColor = "black",
+    previewColor = "#000000",
     previewText = "",
-    previewTextColor = "white",
+    previewTextColor = "#ffffff",
     previewTextFont = "https://d27rt3a60hh1lx.cloudfront.net/fonts/Quicksand_Bold.otf",
     previewTextSize = 0.05,
     ...rest

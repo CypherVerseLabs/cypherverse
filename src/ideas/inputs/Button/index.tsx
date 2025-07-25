@@ -15,7 +15,7 @@ type ButtonProps = {
 } & GroupProps;
 
 export default function Button(props: ButtonProps) {
-  const { link, text = "click me", color = "black", ...restProps } = props;
+  const { link, text = "click me", color="#000000", ...restProps } = props;
 
   const buttonLengthFactor = text.length * 0.04 + 0.13;
   const restColor = "#fff";

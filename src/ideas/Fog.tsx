@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useThree } from "@react-three/fiber";
 import { Color, ColorRepresentation, Fog as ThreeFog } from "three";
 
@@ -8,17 +8,21 @@ type FogProps = {
   far?: number;
 };
 
-export function Fog({ color = "white", near = 10, far = 80 }: FogProps) {
+export function Fog({ color = "#ffffff", near = 10, far = 80 }: FogProps) {
   const { scene } = useThree();
 
+  const fogColor = useMemo(() => new Color(color), [color]);
+
   useEffect(() => {
-    const col = color instanceof Color ? color : new Color(color);
-    scene.fog = new ThreeFog(col, near, far);
+    const fog = new ThreeFog(fogColor, near, far);
+    scene.fog = fog;
 
     return () => {
-      scene.fog = null;
+      if (scene.fog === fog) {
+        scene.fog = null;
+      }
     };
-  }, [color, near, far]); // no need for `scene` here
+  }, [fogColor, near, far, scene]);
 
   return null;
 }
