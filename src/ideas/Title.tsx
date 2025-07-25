@@ -25,7 +25,7 @@ export default function Title(props: TitleProps) {
           fontSize={0.2}
           // Optional outline or shadow (adjust as needed)
           strokeWidth={0.02}
-          strokeColor="#ffffff"
+          strokeColor="#030303"
         >
           {children}
         </Text>

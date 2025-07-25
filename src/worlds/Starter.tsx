@@ -47,7 +47,7 @@ export default function Starter() {
           welcome to cypherverse
         </Title>
 
-        <Model position={[0, 2.0, -1.5]} src="./cyLogo.glb" />
+        <Model position={[0, 2.0, -1.5]} src="./cyLogoGold.glb" />
 
         <group position-y={0.8}>
           <Link href="/multiplayer" position-x={-1.5} position-z={0.75}>
