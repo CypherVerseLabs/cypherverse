@@ -17,7 +17,7 @@ export function useAuth() {
       return;
     }
 
-    fetch("http://localhost:3000/auth/me", {
+    fetch("http://localhost:5000/auth/me", {
       headers: {
         Authorization: `Bearer ${storedToken}`,
       },
@@ -51,7 +51,7 @@ export function useAuth() {
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
 
-      const nonceRes = await fetch("http://localhost:3000/auth/nonce", {
+      const nonceRes = await fetch("http://localhost:5000/auth/nonce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address }),
@@ -66,7 +66,7 @@ export function useAuth() {
 
       const signature = await signer.signMessage(`Sign this message to log in: ${nonce}`);
 
-      const verifyRes = await fetch("http://localhost:3000/auth/verify", {
+      const verifyRes = await fetch("http://localhost:5000/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, signature }),

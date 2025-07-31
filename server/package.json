@@ -22,7 +22,7 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "dev": "nodemon",
-  "start": "node --loader ts-node/esm index.ts"
+    "dev": "nodemon --watch . --ext ts --exec node --loader ts-node/esm index.ts",
+    "start": "node --loader ts-node/esm index.ts"
   }
 }

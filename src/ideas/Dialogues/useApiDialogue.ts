@@ -145,22 +145,23 @@ export function useApiDialogue({ loginWithWallet }: { loginWithWallet: () => Pro
 
     // ==== WALLET LOGIN FLOW ====
     {
-      key: "login_wallet",
-      text: "Connecting your wallet...",
-      effect: async () => {
-        try {
-          if (typeof window === "undefined" || !window.ethereum) {
-            throw new Error("MetaMask not found");
-          }
-          await loginWithWallet();
-          setIsLoggedIn(true);
-        } catch (e: any) {
-          alert(e.message || "Wallet login failed");
-          setIsLoggedIn(false);
-        }
-      },
-      decisions: [{ name: "Continue", nextKey: "menu" }],
-    },
+  key: "login_wallet",
+  text: isLoggedIn ? "You're all good to go!" : "Connecting your wallet...",
+  effect: async () => {
+    try {
+      if (typeof window === "undefined" || !window.ethereum) {
+        throw new Error("MetaMask not found");
+      }
+      await loginWithWallet();
+      setIsLoggedIn(true);
+    } catch (e: any) {
+      alert(e.message || "Wallet login failed");
+      setIsLoggedIn(false);
+    }
+  },
+  decisions: [{ name: "Continue", nextKey: "menu" }],
+},
+
 
     // ==== LOGOUT ====
     {

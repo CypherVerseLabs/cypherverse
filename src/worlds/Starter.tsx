@@ -1,4 +1,5 @@
-import { Spinning, StandardReality, Button, Model, LostWorld, Fog, Dialogue } from "cyengine";
+import React from "react";
+import { Spinning, StandardReality, Button, Model, LostWorld, Fog, Dialogue, Camera } from "cyengine";
 import CloudySky from "ideas/CloudySky";
 import Link from "../ideas/Link";
 import PreloadImage from "ideas/PreloadImage";
@@ -9,86 +10,109 @@ import Title from "ideas/Title";
 import Ground from "ideas/Ground";
 import Bloom from "ideas/Bloom";
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
-import { useWeb3Login } from "../ideas/hooks/useWeb3Login"; // ✅ import hook
+import { useAuth } from "ideas/hooks/useAuth";
 
-export default function Starter() {
-  const { loginWithWallet } = useWeb3Login();             // ✅ use hook
-  const dialogue = useApiDialogue({ loginWithWallet });   // ✅ pass it in
+export default function Home() {
+  const { walletAddress, loginWithWallet } = useAuth();
+  const dialogue = useApiDialogue({ loginWithWallet });
 
   return (
-    <StandardReality
-      environmentProps={{
-        dev: process.env.NODE_ENV === "development",
-        canvasProps: {
-          frameloop: "demand",
-        },
-      }}
-      playerProps={{ flying: false }}
-    >
-      <Analytics />
-      <LostWorld />
+    <>
+      {/* Friendly Welcome Message */}
+      {walletAddress && (
+        <div
+          style={{
+            position: "fixed",
+            top: 10,
+            left: 10,
+            color: "#fff",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            padding: "8px 12px",
+            borderRadius: "8px",
+            fontFamily: "monospace",
+            fontWeight: "bold",
+            zIndex: 9999,
+            userSelect: "none",
+          }}
+        >
+          Welcome, {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+        </div>
+      )}
 
-      <CloudySky
-        position={[0, 0, 0]}
-        colors={[
-          0.7, 0.85, 1,
-          0.4, 0.65, 0.9,
-          0.2, 0.45, 0.7,
-          0.1, 0.2, 0.5,
-        ]}
-      />
+      <StandardReality
+        environmentProps={{
+          dev: process.env.NODE_ENV === "development",
+          canvasProps: {
+            frameloop: "demand",
+          },
+        }}
+        playerProps={{ flying: false }}
+      >
+        <Analytics />
+        <LostWorld />
 
-      <Rain color={"#140c65"} />
-      <Fog color="#b9b2b2" near={10} far={50} />
-      <ambientLight />
+        <CloudySky
+          position={[0, 0, 0]}
+          colors={[
+            0.7, 0.85, 1,
+            0.4, 0.65, 0.9,
+            0.2, 0.45, 0.7,
+            0.1, 0.2, 0.5,
+          ]}
+        />
 
-      <group position-z={-2.25}>
-        <Title position-y={1.2} position-z={-0.75}>
-          welcome to cypherverse
-        </Title>
+        <Rain color={"#140c65"} />
+        <Fog color="#b9b2b2" near={10} far={50} />
+        <ambientLight />
 
-        <Model position={[0, 2.0, -1.5]} src="./cyLogoGold.glb" />
+        <group position-z={-2.25}>
+          <Title position-y={1.2} position-z={-0.75}>
+            welcome to Bitconi
+          </Title>
 
-        <group position-y={0.8}>
-          <Link href="/multiplayer" position-x={-1.5} position-z={0.75}>
-            visit multiplayer page
-          </Link>
+          <Model position={[0, 2.0, -1.5]} src="./cyLogoGold.glb" />
 
-          <Link href="/decentral_station" position-x={-1}>
-            Decentral Station
-          </Link>
+          <group position-y={0.8}>
+            <Link href="/multiplayer" position-x={-1.5} position-z={0.75}>
+              visit multiplayer page
+            </Link>
 
-          <Link href="/bitconi" position-x={1}>
-            visit Bitconi
-          </Link>
+            <Link href="/decentral_station" position-x={-1}>
+              Decentral Station
+            </Link>
 
-          <Button
-            onClick={() => console.log("Ive been clicked!")}
-            fontSize={0.1}
-            maxWidth={1}
-            textColor="#ff0000"
-            color="#b9c1f3"
-            outline={false}
-            outlineColor="#9f9f9f"
-          >
-            Visit GitHub
-          </Button>
+            <Link href="/workshop" position-x={1}>
+              visit workshop page
+            </Link>
 
-          <Spinning xSpeed={0} ySpeed={1} zSpeed={0}>
-            <Model position={[0, 0.2, 1.5]} src="./cyLogo.glb" />
-          </Spinning>
+            <Button
+              onClick={() => console.log("Ive been clicked!")}
+              fontSize={0.1}
+              maxWidth={1}
+              textColor="#ff0000"
+              color="#b9c1f3"
+              outline={false}
+              outlineColor="#9f9f9f"
+            >
+              Visit GitHub
+            </Button>
 
-          <Model position={[0, -0.2, -1.0]} src="./sector_01.2.glb" />
+            <Spinning xSpeed={0} ySpeed={1} zSpeed={0}>
+              <Model position={[0, 0.2, 1.5]} src="./cyLogoGold.glb" />
+            </Spinning>
 
-          <PreloadImage />
-          <Speaker position={[1, 0.0, -4.0]} />
-          <Bloom />
+            <Model position={[0, -0.2, -1.0]} src="./sector_01.2.glb" />
 
-          <Dialogue dialogue={dialogue} side="right" face enabled />
+            <PreloadImage />
+            <Speaker position={[1, 0.0, -4.0]} />
+            <Bloom />
+            <Ground />
+            <Dialogue dialogue={dialogue} side="right" face enabled />
+          </group>
         </group>
-      </group>
 
-      <Ground size={500} gridSize={100} />
-    </StandardReality>
+        <Camera/>
+      </StandardReality>
+    </>
   );
 }
