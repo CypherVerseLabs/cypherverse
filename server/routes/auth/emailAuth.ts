@@ -21,6 +21,9 @@ router.post("/signup", async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, 10);
   users.set(email, hashedPassword);
 
+
+
+  
   const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "1h" });
   res.json({ token });
 });

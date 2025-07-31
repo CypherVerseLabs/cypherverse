@@ -76,7 +76,7 @@ export function useApiDialogue({ loginWithWallet }: { loginWithWallet: () => Pro
       text: "Logging in...",
       effect: async () => {
         try {
-          const res = await fetch("http://localhost:3000/api/login", {
+          const res = await fetch("http://localhost:5000/api/login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: loginEmail, password: loginPassword }),
@@ -126,7 +126,7 @@ export function useApiDialogue({ loginWithWallet }: { loginWithWallet: () => Pro
       text: "Creating your account...",
       effect: async () => {
         try {
-          const res = await fetch("http://localhost:3000/api/signup", {
+          const res = await fetch("http://localhost:5000/api/signup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: signupEmail, password: signupPassword }),
