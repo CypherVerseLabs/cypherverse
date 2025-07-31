@@ -13,8 +13,10 @@ import { useApiDialogue } from "../../ideas/Dialogues/useApiDialogue";
 import { useAuth } from "ideas/hooks/useAuth";
 
 export default function Bitconi() {
-  const { walletAddress, loginWithWallet } = useAuth();
-  const dialogue = useApiDialogue({ loginWithWallet });
+  const { walletAddress } = useAuth();
+
+  const dialogue = useApiDialogue();
+
 
   return (
     <>

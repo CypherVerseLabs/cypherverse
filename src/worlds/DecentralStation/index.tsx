@@ -1,5 +1,5 @@
 import React from "react";
-import { Spinning, StandardReality, Button, Model, LostWorld, Fog, Dialogue, Camera } from "cyengine";
+import { Spinning, StandardReality, Button, Model, LostWorld, Fog,  } from "cyengine";
 import CloudySky from "ideas/CloudySky";
 import Link from "../../ideas/Link";
 import PreloadImage from "ideas/PreloadImage";
@@ -9,12 +9,12 @@ import Analytics from "ideas/Analytics";
 import Title from "ideas/Title";
 import Ground from "ideas/Ground";
 import Bloom from "ideas/Bloom";
-import { useApiDialogue } from "../../ideas/Dialogues/useApiDialogue";
 import { useAuth } from "ideas/hooks/useAuth";
 
 export default function Home() {
-  const { walletAddress, loginWithWallet } = useAuth();
-  const dialogue = useApiDialogue({ loginWithWallet });
+  const { walletAddress } = useAuth();
+
+  
 
   return (
     <>
@@ -107,11 +107,10 @@ export default function Home() {
             <Speaker position={[1, 0.0, -4.0]} />
             <Bloom />
             <Ground />
-            <Dialogue dialogue={dialogue} side="right" face enabled />
           </group>
         </group>
 
-        <Camera/>
+        
       </StandardReality>
     </>
   );

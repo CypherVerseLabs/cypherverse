@@ -1,3 +1,4 @@
+import { AuthProvider } from "ideas/context/AuthContext";
 import type { AppProps } from "next/app";
 import Head from "next/head";
 
@@ -53,7 +54,9 @@ function Cypherverse({ Component, pageProps }: AppProps) {
         <meta name="msapplication-TileColor" content="#da532c" />
         <meta name="theme-color" content="#ffffff" />
       </Head>
+      <AuthProvider>
       <Component {...pageProps} />
+    </AuthProvider>
     </>
   );
 }
