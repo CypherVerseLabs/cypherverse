@@ -1,6 +1,6 @@
 {
   "name": "cypherverse",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "license": "MIT",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run frontend\"",
