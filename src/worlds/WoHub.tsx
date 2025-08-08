@@ -8,7 +8,6 @@ import {
   Fog,
   Dialogue,
   VisualWorld,
-  Floating,
 } from "cyengine";
 import CloudySky from "ideas/CloudySky";
 import Link from "../ideas/Link";
@@ -20,13 +19,12 @@ import Ground from "ideas/Ground";
 import Bloom from "ideas/Bloom";
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";
+import Clue from "ideas/Clue";
+import { MyTool } from "tools/myTool";
+import { worldNameMap } from "./WorldDir/worldNameMap";
 import anotherWorld from "./WorldDir/decentralStation";
 import world from "./WorldDir/Bitconi";
 import wuHub from "./WorldDir/wuHub";
-import Bitconi from "./WorldDir/Bitconi";
-import decentralStation from "./WorldDir/decentralStation";
-import { worldNameMap } from "./WorldDir/worldNameMap";
-import Probe from "ideas/Probe";
 
 
 
@@ -34,6 +32,8 @@ export default function Home() {
   const { walletAddress, loginWithWallet, logout, loading } = useAuthContext();
   const dialogue = useApiDialogue();
   const worlds = [world, anotherWorld, wuHub ];
+
+
 
   console.log("Wallet Address:", walletAddress);
 
@@ -105,61 +105,23 @@ export default function Home() {
                 </Button>
                 
                 <Speaker position={[1, 0.0, -4.0]} />
-
-        {/* Bitconi */}
-        <group position={[4, 3, 2]}>
-          <VisualWorld world={Bitconi} radius={1.25} />
-          <Title position-y={-0.3}>
-            {worldNameMap.get(Bitconi) || "Unnamed World"}
-          </Title>
-        </group>
-
-        {/* Decentral Station */}
-        <group position={[3, 4, 3]}>
-          <VisualWorld world={decentralStation} radius={1.25} />
-          <Title position-y={-0.3}>
-           {worldNameMap.get(decentralStation) || "Unnamed World"}
-          </Title>
-       </group>
-
-        {/* WuHub */}
-        <group position={[4, 2, 3.2]}>
-         <VisualWorld world={wuHub} radius={1.25} />
-            <Title position-y={-0.3}>
-           {worldNameMap.get(wuHub) || "Unnamed World"}
-            </Title>
-        </group>
               </>
             )}
 
             <Spinning xSpeed={0} ySpeed={1} zSpeed={0}>
               <Model position={[0, 0.2, 1.5]} src="./cyLogoGold.glb" />
             </Spinning>
-            <Model position={[-5, 0.90, -1.0]} src="./hall-transformed.glb" />
-
-            <Floating height={0.2} speed={1}>
-              <Probe position={[8, 0.4, -7]} scale={0.1} />
-            </Floating>
-
-            <Floating height={0.6} speed={1}>
-              <Probe position={[8, 0.4, -7]} scale={0.05} rotation={[0, Math.PI / 2, 0]} />
-            </Floating>
-
+            <Model position={[0, -0.2, -1.0]} src="./sector_01.2.glb" />
+            <Model position={[4, 0.0, -1.5]} src="./portal.glb" />
             <Bloom />
-            
-            
-            <Ground y={-0.50} />    
+            < Clue  />
+            < MyTool />
+            <Ground />
           </group>
         </group>
 
-
-<group>
-  
-  {/* Shared portal model */}
-  <Model position={[4, 0.0, 3.5]} src="./portal.glb" />
-
-  <Dialogue
-  position={[9, 1.3, 4.3]}
+        <Dialogue
+  position={[3, 1.1, 1.0]}
   dialogue={dialogue}
   side="right"
   face
@@ -170,8 +132,24 @@ export default function Home() {
   ) : (
     <Button onClick={loginWithWallet}>Sign In</Button>
   )}
+
+
 </Dialogue>
-</group>
+
+
+<Spinning xSpeed={0} ySpeed={1} zSpeed={0}>
+      {worlds.map((w, i) => (
+  <group key={i} position={[i * 2.5 - 6, 3, -2]}>
+    <VisualWorld world={w} />
+
+    <Title position-y={-1.0}  color="#ffffff">
+      {worldNameMap.get(w) || "Unnamed World"}
+    </Title>
+  </group>
+))}
+</Spinning>
+
+
 
       </StandardReality>
     </>

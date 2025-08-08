@@ -1255,7 +1255,7 @@ culori@^0.18.2:
 
 "cyengine@github:CypherVerseLabs/cyengine":
   version "1.0.2"
-  resolved "https://codeload.github.com/CypherVerseLabs/cyengine/tar.gz/c0fcfdec0a422ec92564bc329fdf65b16aaf8311"
+  resolved "https://codeload.github.com/CypherVerseLabs/cyengine/tar.gz/f00e57f10305b7ce93e0126d2043dd2fa775812a"
   dependencies:
     "@emotion/react" "^11.4.0"
     "@emotion/styled" "^11.3.0"

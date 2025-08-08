@@ -71,6 +71,7 @@ export default function Home() {
           </Title>
 
           <Model position={[0, 2.0, -1.5]} src="./cyLogoGold.glb" />
+          <Model position={[4, 0.0, -1.5]} src="./portal.glb" />
 
           <group position-y={0.8}>
             <Link href="/multiplayer" position-x={-1.5} position-z={0.75}>
