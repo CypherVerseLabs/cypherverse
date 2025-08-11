@@ -20,8 +20,6 @@ import Ground from "ideas/Ground";
 import Bloom from "ideas/Bloom";
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";
-import anotherWorld from "./WorldDir/decentralStation";
-import world from "./WorldDir/Bitconi";
 import wuHub from "./WorldDir/wuHub";
 import Bitconi from "./WorldDir/Bitconi";
 import decentralStation from "./WorldDir/decentralStation";
@@ -33,7 +31,7 @@ import Probe from "ideas/Probe";
 export default function Home() {
   const { walletAddress, loginWithWallet, logout, loading } = useAuthContext();
   const dialogue = useApiDialogue();
-  const worlds = [world, anotherWorld, wuHub ];
+  const worlds = [Bitconi, decentralStation, wuHub ];
 
   console.log("Wallet Address:", walletAddress);
 
@@ -89,6 +87,14 @@ export default function Home() {
                 <Link href="/decentral_station" position-x={-1}>
                   Decentral Station
                 </Link>
+
+                <Link href="/tower" position-x={-3}>
+                  Tower
+                </Link>
+                <Link href="/basketBallCourt" position-x={-4}>
+                  B-BallCourt
+                </Link>
+
                 <Link href="/woHub" position-x={1}>
                   visit worldHub page
                 </Link>
@@ -108,7 +114,7 @@ export default function Home() {
 
         {/* Bitconi */}
         <group position={[4, 3, 2]}>
-          <VisualWorld world={Bitconi} radius={1.25} />
+          <VisualWorld world={Bitconi} />
           <Title position-y={-0.3}>
             {worldNameMap.get(Bitconi) || "Unnamed World"}
           </Title>
@@ -116,7 +122,7 @@ export default function Home() {
 
         {/* Decentral Station */}
         <group position={[3, 4, 3]}>
-          <VisualWorld world={decentralStation} radius={1.25} />
+          <VisualWorld world={decentralStation}  />
           <Title position-y={-0.3}>
            {worldNameMap.get(decentralStation) || "Unnamed World"}
           </Title>
@@ -124,7 +130,7 @@ export default function Home() {
 
         {/* WuHub */}
         <group position={[4, 2, 3.2]}>
-         <VisualWorld world={wuHub} radius={1.25} />
+         <VisualWorld world={wuHub}  />
             <Title position-y={-0.3}>
            {worldNameMap.get(wuHub) || "Unnamed World"}
             </Title>
