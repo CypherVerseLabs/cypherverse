@@ -10,7 +10,6 @@
     "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "downlevelIteration": true,
@@ -21,7 +20,8 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "baseUrl": "src",
-    "incremental": true
+    "incremental": true,
+    "noEmit": true
   },
   "exclude": [
     "node_modules",
@@ -30,6 +30,7 @@
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx"
-, "src/worlds/BuildMe"  ]
+    "**/*.tsx",
+    "src/worlds/BuildMe"
+  ]
 }

@@ -1,19 +1,24 @@
-import { Router } from "express";
-import nonces from "../../stores/nonceStore.js"; // 👈 shared
+import { Router, Request, Response } from "express";
 import crypto from "crypto";
+import nonces from "../../stores/nonceStore.js";
 
 const router = Router();
 
-router.post("/nonce", (req, res) => {
+interface NonceRequest {
+  address: string;
+}
+
+router.post("/nonce", (req: Request<{}, {}, NonceRequest>, res: Response) => {
   const { address } = req.body;
-  if (!address) {
-    return res.status(400).json({ error: "No address provided" });
+
+  if (!address || typeof address !== "string") {
+    return res.status(400).json({ error: "A valid wallet address is required" });
   }
 
-  const nonce = Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
+  const nonce = crypto.randomBytes(16).toString("hex"); // Secure nonce
   nonces.set(address.toLowerCase(), nonce);
+
   res.json({ nonce });
 });
 
 export default router;
-

@@ -23,10 +23,7 @@ import { useAuthContext } from "ideas/context/AuthContext"
 import Link from "../ideas/Link"
 import Speaker from "ideas/players/Speaker"
 import Analytics from "ideas/Analytics"
-import Bitconi from "./WorldDir/Bitconi"
-import decentralStation from "./WorldDir/decentralStation"
-import wuHub from "./WorldDir/wuHub"
-import { worldNameMap } from "./WorldDir/worldNameMap"
+
 import Probe from "ideas/Probe"
 
 export default function SceneContent() {

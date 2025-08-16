@@ -1,5 +1,5 @@
 // MyTool.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Tool, useToolbelt, useEnvironment, useHudDims } from "cyengine";
 import { animated, useSpring, config } from "@react-spring/three";
 import { useKeypress, isTyping } from "cyengine"; // adjust path if needed

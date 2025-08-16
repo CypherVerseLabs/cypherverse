@@ -1,10 +1,16 @@
 import React from "react";
+import { extend } from "@react-three/fiber";
+import { SphereGeometry } from "three";
+
+extend({ SphereGeometry });
+
 import {
   Spinning,
   StandardReality,
   Button,
   Model,
   LostWorld,
+  Image,
   Fog,
   Dialogue,
   VisualWorld,
@@ -20,20 +26,19 @@ import Ground from "ideas/Ground";
 import Bloom from "ideas/Bloom";
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";
-import anotherWorld from "./WorldDir/decentralStation";
-import world from "./WorldDir/Bitconi";
 import wuHub from "./WorldDir/wuHub";
 import Bitconi from "./WorldDir/Bitconi";
 import decentralStation from "./WorldDir/decentralStation";
 import { worldNameMap } from "./WorldDir/worldNameMap";
 import Probe from "ideas/Probe";
+import bitconi from "./WorldDir/Bitconi";
 
 
 
 export default function Home() {
   const { walletAddress, loginWithWallet, logout, loading } = useAuthContext();
   const dialogue = useApiDialogue();
-  const worlds = [world, anotherWorld, wuHub ];
+  const worlds = [bitconi, decentralStation, wuHub ];
 
   console.log("Wallet Address:", walletAddress);
 
@@ -89,26 +94,37 @@ export default function Home() {
                 <Link href="/decentral_station" position-x={-1}>
                   Decentral Station
                 </Link>
+                <Link href="/basketBallCourt" position-x={-3}>
+                  B-BallCourt
+                </Link>
+
+                <Link href="/tower" position-x={-4}>
+                  Tower
+                </Link>
+
                 <Link href="/woHub" position-x={1}>
                   visit worldHub page
                 </Link>
-                <Button
-                  onClick={loginWithWallet}
-                  fontSize={0.1}
-                  maxWidth={1}
-                  textColor="#00ff00"
-                  color="#222"
-                  outline={true}
-                  outlineColor="#222"
-                >
-                  Connect Wallet
-                </Button>
+
+                {!walletAddress && (
+  <Button
+    onClick={loginWithWallet}
+    fontSize={0.1}
+    maxWidth={1}
+    textColor="#00ff00"
+    color="#222"
+    outline={true}
+    outlineColor="#222"
+  >
+    Connect Wallet
+  </Button>
+)}
                 
                 <Speaker position={[1, 0.0, -4.0]} />
 
         {/* Bitconi */}
         <group position={[4, 3, 2]}>
-          <VisualWorld world={Bitconi} radius={1.25} />
+          <VisualWorld world={Bitconi}  />
           <Title position-y={-0.3}>
             {worldNameMap.get(Bitconi) || "Unnamed World"}
           </Title>
@@ -116,7 +132,7 @@ export default function Home() {
 
         {/* Decentral Station */}
         <group position={[3, 4, 3]}>
-          <VisualWorld world={decentralStation} radius={1.25} />
+          <VisualWorld world={decentralStation}  />
           <Title position-y={-0.3}>
            {worldNameMap.get(decentralStation) || "Unnamed World"}
           </Title>
@@ -124,7 +140,7 @@ export default function Home() {
 
         {/* WuHub */}
         <group position={[4, 2, 3.2]}>
-         <VisualWorld world={wuHub} radius={1.25} />
+         <VisualWorld world={wuHub}  />
             <Title position-y={-0.3}>
            {worldNameMap.get(wuHub) || "Unnamed World"}
             </Title>
@@ -147,7 +163,12 @@ export default function Home() {
 
             <Bloom />
             
-            
+            <Image
+        src="https://uploads.codesandbox.io/uploads/user/b3e56831-8b98s-4fee-b941-0e27f39883ab/I9vI-RoNmD7W.png"
+        position={[-8, 2, 6.4]}
+        rotation={[0, Math.PI, 0]}
+        framed
+      />
             <Ground y={-0.50} />    
           </group>
         </group>
@@ -165,11 +186,10 @@ export default function Home() {
   face
   enabled
 >
-  {walletAddress ? (
-    <Button onClick={logout}>Log Out</Button>
-  ) : (
-    <Button onClick={loginWithWallet}>Sign In</Button>
-  )}
+  <Button onClick={walletAddress ? logout : loginWithWallet}>
+  {walletAddress ? "Log Out" : "Sign In"}
+</Button>
+
 </Dialogue>
 </group>
 

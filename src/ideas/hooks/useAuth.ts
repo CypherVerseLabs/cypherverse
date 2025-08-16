@@ -1,47 +1,97 @@
 import { useEffect, useState } from "react";
 import { BrowserProvider } from "ethers";
 
-const JWT_KEY = "jwt";
-const USER_ADDR_KEY = "walletAddress";
+const API_URL = "http://localhost:5000";
 
 export function useAuth() {
   const [jwt, setJwt] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [user, setUser] = useState<{ email?: string; username?: string; address?: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check token and restore session on load
-  useEffect(() => {
-    const storedToken = localStorage.getItem(JWT_KEY);
-    if (!storedToken) {
-      setLoading(false);
-      return;
+  // Helper: fetch with access token
+  const authFetch = async (input: RequestInfo, init?: RequestInit) => {
+    if (!jwt) throw new Error("No JWT token");
+
+    const res = await fetch(input, {
+      ...init,
+      headers: {
+        ...(init?.headers || {}),
+        Authorization: `Bearer ${jwt}`,
+      },
+      credentials: "include",
+    });
+
+    if (res.status === 401) {
+      const refreshed = await refreshToken();
+      if (refreshed) {
+        return authFetch(input, init);
+      } else {
+        logout();
+        throw new Error("Session expired");
+      }
     }
 
-    fetch("http://localhost:5000/auth/me", {
-      headers: {
-        Authorization: `Bearer ${storedToken}`,
-      },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Token invalid or expired");
-        return res.json();
-      })
-      .then((data) => {
-        if (data.user?.address) {
-          setJwt(storedToken);
-          setWalletAddress(data.user.address);
-        } else {
-          logout(); // fallback
-        }
-      })
-      .catch(() => {
-        logout(); // remove bad token
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+    return res;
+  };
 
+  // Refresh token
+  const refreshToken = async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        setJwt(null);
+        setWalletAddress(null);
+        setUser(null);
+        return false;
+      }
+
+      const data = await res.json();
+      setJwt(data.token);
+      return true;
+    } catch {
+      setJwt(null);
+      setWalletAddress(null);
+      setUser(null);
+      return false;
+    }
+  };
+
+  // On mount: restore session and user info
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const refreshed = await refreshToken();
+      if (refreshed) {
+        try {
+          const meRes = await fetch(`${API_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+            credentials: "include",
+          });
+          if (meRes.ok) {
+            const data = await meRes.json();
+            setWalletAddress(data.user.address);
+            setUser({
+              email: data.user.email,
+              username: data.user.username,
+              address: data.user.address,
+            });
+          } else {
+            logout();
+          }
+        } catch {
+          logout();
+        }
+      }
+      setLoading(false);
+    })();
+  }, [jwt]);
+
+  // Wallet login (unchanged)
   const loginWithWallet = async () => {
     try {
       if (!(window as any).ethereum) throw new Error("MetaMask not found");
@@ -51,7 +101,7 @@ export function useAuth() {
       const signer = await provider.getSigner();
       const address = await signer.getAddress();
 
-      const nonceRes = await fetch("http://localhost:5000/auth/nonce", {
+      const nonceRes = await fetch(`${API_URL}/auth/nonce`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address }),
@@ -66,10 +116,11 @@ export function useAuth() {
 
       const signature = await signer.signMessage(`Sign this message to log in: ${nonce}`);
 
-      const verifyRes = await fetch("http://localhost:5000/auth/verify", {
+      const verifyRes = await fetch(`${API_URL}/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, signature }),
+        credentials: "include",
       });
 
       if (!verifyRes.ok) {
@@ -77,23 +128,26 @@ export function useAuth() {
         throw new Error(`Verification failed: ${verifyRes.status} - ${errorText}`);
       }
 
-      const { token } = await verifyRes.json();
+      const { token, user: verifiedUser } = await verifyRes.json();
 
-      localStorage.setItem(JWT_KEY, token);
-      localStorage.setItem(USER_ADDR_KEY, address);
       setJwt(token);
       setWalletAddress(address);
+      setUser({
+        email: verifiedUser.email,
+        username: verifiedUser.username,
+        address: verifiedUser.address,
+      });
     } catch (err: any) {
       alert(err.message || "Wallet login failed");
     }
   };
 
   const logout = () => {
-    localStorage.removeItem(JWT_KEY);
-    localStorage.removeItem(USER_ADDR_KEY);
     setJwt(null);
     setWalletAddress(null);
+    setUser(null);
+    // Optionally call backend logout to clear cookie
   };
 
-  return { jwt, walletAddress, loginWithWallet, logout, loading };
+  return { jwt, walletAddress, user, setUser, loginWithWallet, logout, loading, authFetch };
 }
