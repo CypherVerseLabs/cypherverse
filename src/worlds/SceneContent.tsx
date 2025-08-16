@@ -10,12 +10,9 @@ import Title from "../ideas/Title";
 
 import Bloom from "../ideas/Bloom";
 
-import {Rain} from "../ideas/Rain";
-
-
 import {
   LostWorld,   Fog, Spinning,
-  Model,  Button, VisualWorld, Dialogue,
+  Model,  Button, Dialogue,
    Floating
 } from 'cyengine'
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue"
@@ -23,7 +20,6 @@ import { useAuthContext } from "ideas/context/AuthContext"
 import Link from "../ideas/Link"
 import Speaker from "ideas/players/Speaker"
 import Analytics from "ideas/Analytics"
-
 import Probe from "ideas/Probe"
 
 export default function SceneContent() {

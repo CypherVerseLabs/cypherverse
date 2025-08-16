@@ -38,7 +38,7 @@ import bitconi from "./WorldDir/Bitconi";
 export default function Home() {
   const { walletAddress, loginWithWallet, logout, loading } = useAuthContext();
   const dialogue = useApiDialogue();
-  const worlds = [bitconi, decentralStation, wuHub ];
+  const worlds = [Bitconi, decentralStation, wuHub ];
 
   console.log("Wallet Address:", walletAddress);
 
@@ -94,12 +94,12 @@ export default function Home() {
                 <Link href="/decentral_station" position-x={-1}>
                   Decentral Station
                 </Link>
-                <Link href="/basketBallCourt" position-x={-3}>
-                  B-BallCourt
-                </Link>
 
-                <Link href="/tower" position-x={-4}>
+                <Link href="/tower" position-x={-3}>
                   Tower
+                </Link>
+                <Link href="/basketBallCourt" position-x={-4}>
+                  B-BallCourt
                 </Link>
 
                 <Link href="/woHub" position-x={1}>
@@ -124,7 +124,7 @@ export default function Home() {
 
         {/* Bitconi */}
         <group position={[4, 3, 2]}>
-          <VisualWorld world={Bitconi}  />
+          <VisualWorld world={Bitconi} />
           <Title position-y={-0.3}>
             {worldNameMap.get(Bitconi) || "Unnamed World"}
           </Title>
