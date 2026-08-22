@@ -1,0 +1,47 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(uuid())
+  /// *
+  ///    * Wallet authentication
+  ///    * Stored normalized/lowercase.
+  address      String?   @unique
+  /// *
+  ///    * Email authentication
+  ///    * Stored normalized/lowercase.
+  email        String?   @unique
+  passwordHash String?
+  /// *
+  ///    * Profile
+  username     String?
+  /// *
+  ///    * Timestamps
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  /// *
+  ///    * Permanent owner identity.
+  ownerId     String
+  /// *
+  ///    * Project information.
+  name        String
+  description String?
+  /// *
+  ///    * Timestamps.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}

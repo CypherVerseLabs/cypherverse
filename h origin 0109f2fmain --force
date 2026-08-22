@@ -1,0 +1,20 @@
+[33mf38726e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m refs/remotes/origin/main@{0}: update by push
+[33mf38726e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m refs/heads/main@{0}: Branch: renamed refs/heads/main to refs/heads/main
+[33mf38726e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{0}: Branch: renamed refs/heads/main to refs/heads/main
+[33mf38726e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m refs/heads/main@{1}: commit: Initial commit
+[33mf38726e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{2}: commit: Initial commit
+[33m0109f2f[m refs/remotes/origin/main@{1}: update by push
+[33m0109f2f[m refs/heads/main@{2}: commit: Update editor
+[33m0109f2f[m HEAD@{3}: commit: Update editor
+[33m961fc8e[m refs/remotes/origin/main@{2}: update by push
+[33m961fc8e[m refs/heads/main@{3}: commit: Fix asset filename sanitization
+[33m961fc8e[m HEAD@{4}: commit: Fix asset filename sanitization
+[33maa2a76c[m refs/remotes/origin/main@{3}: update by push
+[33maa2a76c[m refs/heads/main@{4}: commit: Initial commit
+[33maa2a76c[m HEAD@{5}: commit: Initial commit
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m refs/heads/main@{5}: Branch: renamed refs/heads/main to refs/heads/main
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{6}: Branch: renamed refs/heads/main to refs/heads/main
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m refs/remotes/origin/main@{4}: update by push
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m refs/heads/main@{6}: Branch: renamed refs/heads/master to refs/heads/main
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{8}: Branch: renamed refs/heads/master to refs/heads/main
+[33mda7f17f[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m refs/heads/main@{7}: clone: from https://github.com/CypherVerseLabs/cyengine-starter.git
