@@ -359,10 +359,10 @@ export default function Orientation() {
             ]}
           >
             <Title
-              position-y={-0.6}
-              position-z={-0.75}
+            position-y={-0.6}
+            position-z={-0.75}
             >
-              {worldName}
+            {worldName ?? ""}
             </Title>
 
             <Button
