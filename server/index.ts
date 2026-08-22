@@ -21,6 +21,7 @@ import verifyRouter from "./routes/auth/verify.js";
 import refreshRouter from "./routes/auth/refresh.js";
 import emailAuthRouter from "./routes/auth/emailAuth.js";
 import projectRouter from "./routes/auth/projects.js";
+import aiRouter from "./routes/auth/ai.js";
 
 // =========================================================
 // AUTH MIDDLEWARE
@@ -182,6 +183,8 @@ app.use(
   emailAuthRouter
 );
 
+
+
 /*
  * =========================================================
  * PROJECT ROUTES
@@ -206,6 +209,22 @@ app.use(
 app.use(
   "/api/projects",
   projectRouter
+);
+
+/*
+ * =========================================================
+ * AI SCENE BUILDER
+ * =========================================================
+ *
+ * POST /api/ai
+ *
+ * Converts a natural-language scene request into
+ * an array of validated AI scene actions.
+ */
+
+app.use(
+  "/api/ai",
+  aiRouter
 );
 
 /*

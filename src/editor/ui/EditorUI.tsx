@@ -1089,54 +1089,36 @@ export default function EditorUI() {
                           {ideas.map(
                             (definition) => (
                               <button
-                                key={
-                                  definition.type
-                                }
+                                key={definition.id}
                                 onClick={() =>
                                   addIdea(
-                                    definition.type
+                                    definition.id as SceneObject["type"]
                                   )
                                 }
                                 style={{
-                                  display:
-                                    "block",
-                                  width:
-                                    "100%",
-                                  padding:
-                                    "8px 9px",
-                                  marginBottom:
-                                    4,
+                                  display: "block",
+                                  width: "100%",
+                                  padding: "8px 9px",
+                                  marginBottom: 4,
                                   border: 0,
-                                  borderRadius:
-                                    6,
-                                  background:
-                                    "#292930",
-                                  color:
-                                    "#ffffff",
-                                  textAlign:
-                                    "left",
-                                  cursor:
-                                    "pointer",
-                                  fontSize:
-                                    11,
+                                  borderRadius: 6,
+                                  background: "#292930",
+                                  color: "#ffffff",
+                                  textAlign: "left",
+                                  cursor: "pointer",
+                                  fontSize: 11,
                                 }}
                               >
-
                                 <span
                                   style={{
-                                    opacity:
-                                      0.5,
-                                    marginRight:
-                                      6,
+                                    opacity: 0.5,
+                                    marginRight: 6,
                                   }}
                                 >
                                   +
                                 </span>
 
-                                {
-                                  definition.name
-                                }
-
+                                {definition.name}
                               </button>
                             )
                           )}

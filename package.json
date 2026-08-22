@@ -1,5 +1,5 @@
 {
-  "name": "cybuilder",
+  "name": "cypherverse",
   "version": "0.0.4",
   "private": false,
   "description": "A visual scene builder for the 3D Web.",
@@ -15,7 +15,7 @@
   "homepage": "https://cypherverse.space",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/CypherVerseLabs/cybuilder.git"
+    "url": "git+https://github.com/CypherVerseLabs/cypherverse.git"
   },
   "scripts": {
     "dev": "next dev",
