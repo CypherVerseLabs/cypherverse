@@ -19,8 +19,10 @@ import { useAuthContext } from "ideas/context/AuthContext";
  * =========================================================
  */
 
+type TemplateId = "editor" | "found";
+
 type Template = {
-  id: "editor" | "found";
+  id: TemplateId;
   name: string;
   description: string;
   route: string;
@@ -31,11 +33,38 @@ type CreatedProject = {
   id: string;
   ownerId?: string;
   name: string;
-  template: "editor" | "found";
+  template: TemplateId;
   description?: string;
   createdAt?: string;
   updatedAt?: string;
 };
+
+/*
+ * =========================================================
+ * SESSION STORAGE KEYS
+ * =========================================================
+ *
+ * Keep these keys centralized so TemplateSelector and
+ * Orientation use the exact same creation-session contract.
+ */
+
+const SESSION_KEYS = {
+  projectId: "cypherverse-project-id",
+  template: "cypherverse-template",
+  templateRoute: "cypherverse-template-route",
+  worldName: "cypherverse-world-name",
+  creationSession: "cypherverse-creation-session",
+} as const;
+
+/*
+ * =========================================================
+ * API CONFIGURATION
+ * =========================================================
+ */
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000";
 
 /*
  * =========================================================
@@ -62,6 +91,102 @@ const TEMPLATES: Template[] = [
     previewImage: "/found_preview.png",
   },
 ];
+
+/*
+ * =========================================================
+ * SESSION HELPERS
+ * =========================================================
+ *
+ * These helpers make the creation handoff explicit and
+ * consistent.
+ */
+
+const clearCreationSession = () => {
+  sessionStorage.removeItem(
+    SESSION_KEYS.projectId
+  );
+
+  sessionStorage.removeItem(
+    SESSION_KEYS.template
+  );
+
+  sessionStorage.removeItem(
+    SESSION_KEYS.templateRoute
+  );
+
+  sessionStorage.removeItem(
+    SESSION_KEYS.worldName
+  );
+
+  sessionStorage.removeItem(
+    SESSION_KEYS.creationSession
+  );
+};
+
+const saveCreationSession = ({
+  projectId,
+  template,
+  worldName,
+}: {
+  projectId: string;
+  template: Template;
+  worldName: string;
+}) => {
+  /*
+   * Project ID
+   */
+
+  sessionStorage.setItem(
+    SESSION_KEYS.projectId,
+    projectId
+  );
+
+  /*
+   * IMPORTANT:
+   *
+   * Store the template ID here:
+   *
+   *   "editor"
+   *   "found"
+   *
+   * NOT:
+   *
+   *   "/editor"
+   *   "/found"
+   */
+
+  sessionStorage.setItem(
+    SESSION_KEYS.template,
+    template.id
+  );
+
+  /*
+   * Keep the route separately for consumers that need it.
+   */
+
+  sessionStorage.setItem(
+    SESSION_KEYS.templateRoute,
+    template.route
+  );
+
+  /*
+   * World / project name
+   */
+
+  sessionStorage.setItem(
+    SESSION_KEYS.worldName,
+    worldName
+  );
+
+  /*
+   * Explicitly mark this as an active creation session.
+   */
+
+  sessionStorage.setItem(
+    SESSION_KEYS.creationSession,
+    "true"
+  );
+};
 
 /*
  * =========================================================
@@ -221,6 +346,13 @@ export default function TemplateSelector() {
    */
 
   const useTemplate = () => {
+    /*
+     * Clear any stale creation session before starting a
+     * completely new project flow.
+     */
+
+    clearCreationSession();
+
     setSelectedTemplate(
       template
     );
@@ -241,6 +373,12 @@ export default function TemplateSelector() {
    */
 
   const cancel = () => {
+    /*
+     * Do not leave an old project/template handoff behind.
+     */
+
+    clearCreationSession();
+
     setSelectedTemplate(
       null
     );
@@ -259,22 +397,12 @@ export default function TemplateSelector() {
    * CREATE PROJECT
    * =========================================================
    *
-   * THIS is where the actual Neon database creation happens.
-   *
-   * The request:
+   * Creates the actual project in Neon.
    *
    * POST /api/projects
    *
-   * sends:
-   *
-   * {
-   *   name,
-   *   template
-   * }
-   *
-   * The server determines ownerId from the JWT.
-   *
-   * The client NEVER sends ownerId.
+   * The authenticated server determines the owner from
+   * the JWT. The client does NOT send ownerId.
    * =========================================================
    */
 
@@ -287,6 +415,10 @@ export default function TemplateSelector() {
       worldName.trim();
 
     if (!name) {
+      setError(
+        "Please enter a website name."
+      );
+
       return;
     }
 
@@ -303,7 +435,7 @@ export default function TemplateSelector() {
     }
 
     /*
-     * Prevent duplicate clicks.
+     * Prevent duplicate requests.
      */
 
     if (creating) {
@@ -316,7 +448,7 @@ export default function TemplateSelector() {
     try {
       const response =
         await authFetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/projects`,
+          `${API_URL}/api/projects`,
           {
             method: "POST",
 
@@ -327,6 +459,13 @@ export default function TemplateSelector() {
 
             body: JSON.stringify({
               name,
+
+              /*
+               * Server expects the template ID.
+               *
+               * "editor"
+               * "found"
+               */
 
               template:
                 selectedTemplate.id,
@@ -352,8 +491,7 @@ export default function TemplateSelector() {
       }
 
       /*
-       * Server must return the
-       * newly created project.
+       * Server must return the created project.
        */
 
       if (!data?.project) {
@@ -366,29 +504,42 @@ export default function TemplateSelector() {
         data.project as CreatedProject;
 
       /*
-       * =====================================================
-       * SAVE CREATION STATE
-       * =====================================================
-       *
-       * We keep these values in sessionStorage so the next
-       * page in the creation flow knows which project the
-       * user is working on.
+       * Validate the important server response fields.
        */
 
-      sessionStorage.setItem(
-        "cypherverse-project-id",
-        project.id
-      );
+      if (
+        !project.id ||
+        !project.name
+      ) {
+        throw new Error(
+          "The server returned an invalid project."
+        );
+      }
 
-      sessionStorage.setItem(
-        "cypherverse-template",
-        selectedTemplate.route
-      );
+      /*
+       * =====================================================
+       * SAVE CREATION SESSION
+       * =====================================================
+       *
+       * This is the handoff:
+       *
+       * TemplateSelector
+       *        ↓
+       * Orientation
+       *
+       * Orientation will read these exact values.
+       */
 
-      sessionStorage.setItem(
-        "cypherverse-world-name",
-        project.name
-      );
+      saveCreationSession({
+        projectId:
+          project.id,
+
+        template:
+          selectedTemplate,
+
+        worldName:
+          project.name,
+      });
 
       /*
        * Project successfully exists in Neon.
@@ -418,12 +569,12 @@ export default function TemplateSelector() {
    * CREATE WEBSITE
    * =========================================================
    *
-   * At this point the project already exists in Neon.
+   * At this point the project already exists.
    *
-   * This button does NOT create another project.
+   * This function does NOT create another project.
    *
-   * It moves the user into the actual website/world
-   * creation experience.
+   * It refreshes the creation-session handoff and sends the
+   * user to Orientation.
    * =========================================================
    */
 
@@ -436,27 +587,25 @@ export default function TemplateSelector() {
     }
 
     /*
-     * Make absolutely sure the next page has the
-     * information it needs.
+     * Refresh the complete creation session.
+     *
+     * This makes the flow resilient even if something
+     * modified sessionStorage while the user was here.
      */
 
-    sessionStorage.setItem(
-      "cypherverse-project-id",
-      createdProject.id
-    );
+    saveCreationSession({
+      projectId:
+        createdProject.id,
 
-    sessionStorage.setItem(
-      "cypherverse-template",
-      selectedTemplate.route
-    );
+      template:
+        selectedTemplate,
 
-    sessionStorage.setItem(
-      "cypherverse-world-name",
-      createdProject.name
-    );
+      worldName:
+        createdProject.name,
+    });
 
     /*
-     * Continue into orientation.
+     * Continue into Orientation.
      */
 
     window.location.href =
