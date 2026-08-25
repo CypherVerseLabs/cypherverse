@@ -13,9 +13,9 @@ enum ProjectTemplate {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  address      String?   @unique
-  email        String?   @unique
+  id           String  @id @default(uuid())
+  address      String? @unique
+  email        String? @unique
   passwordHash String?
   username     String?
 
@@ -26,7 +26,7 @@ model User {
 }
 
 model Project {
-  id          String @id @default(uuid())
+  id          String  @id @default(uuid())
   ownerId     String
   name        String
   description String?
@@ -35,10 +35,36 @@ model Project {
 
   scene Json?
 
+  // Public publishing
+  slug        String?   @unique
+  publishedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
+  assets ProjectAsset[]
+
   @@index([ownerId])
+  @@index([publishedAt])
+}
+
+model ProjectAsset {
+  id String @id @default(uuid())
+
+  projectId String
+
+  originalName String
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@unique([projectId, storageKey])
 }

@@ -32,13 +32,15 @@
     "@react-spring/three": "^10.0.1",
     "@react-three/cannon": "^6.6.0",
     "@react-three/drei": "9.65.3",
+    "@react-three/flex": "^1.0.1",
     "cyengine": "^2.0.7",
     "ethers": "6.15.0",
     "jszip": "^3.10.1",
     "next": "^12.1.6",
     "posthog-js": "^1.257.0",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "react-spring": "^10.0.4"
   },
   "devDependencies": {
     "@types/node": "17.0.40",

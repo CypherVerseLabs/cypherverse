@@ -4,19 +4,16 @@ import SceneObject from "./SceneObject";
 export default function Scene() {
   const { scene } = useEditor();
 
-  /*
-   * Only render hierarchy roots here.
-   *
-   * SceneObject is responsible for recursively
-   * rendering its children.
-   */
+  const objectIds = new Set(
+    scene.objects.map(
+      (object) => object.id
+    )
+  );
+
   const roots = scene.objects.filter(
     (object) =>
       object.parentId === undefined ||
-      !scene.objects.some(
-        (parent) =>
-          parent.id === object.parentId
-      )
+      !objectIds.has(object.parentId)
   );
 
   return (

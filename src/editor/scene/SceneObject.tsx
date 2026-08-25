@@ -21,6 +21,7 @@ import {
 
 import {
   SceneObject as SceneObjectData,
+  Transform,
 } from "./objectTypes";
 
 import SceneObjectContent from "./SceneObjectContent";
@@ -124,27 +125,29 @@ export default function SceneObject({
       return;
     }
 
+    const transform: Transform = {
+      position: [
+        group.position.x,
+        group.position.y,
+        group.position.z,
+      ],
+
+      rotation: [
+        group.rotation.x,
+        group.rotation.y,
+        group.rotation.z,
+      ],
+
+      scale: [
+        group.scale.x,
+        group.scale.y,
+        group.scale.z,
+      ],
+    };
+
     updateTransform(
       object.id,
-      {
-        position: [
-          group.position.x,
-          group.position.y,
-          group.position.z,
-        ],
-
-        rotation: [
-          group.rotation.x,
-          group.rotation.y,
-          group.rotation.z,
-        ],
-
-        scale: [
-          group.scale.x,
-          group.scale.y,
-          group.scale.z,
-        ],
-      }
+      transform
     );
   };
 
@@ -224,26 +227,20 @@ export default function SceneObject({
 
 
   return (
-    <TransformControls
-      mode={transformMode}
-
-      onMouseDown={() => {
-        beginTransform(
-          object.id
-        );
-      }}
-
-      onObjectChange={
-        handleObjectChange
-      }
-
-      onMouseUp={() => {
-        endTransform();
-      }}
-    >
-      {content}
-    </TransformControls>
-  );
+  <TransformControls
+    mode={transformMode}
+    enabled={editorActive && isSelected && !object.locked}
+    onMouseDown={() => {
+      beginTransform(object.id);
+    }}
+    onObjectChange={handleObjectChange}
+    onMouseUp={() => {
+      endTransform();
+    }}
+  >
+    {content}
+  </TransformControls>
+);
 }
 
 

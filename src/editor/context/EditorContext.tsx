@@ -31,6 +31,7 @@ import {
   sanitizeAssetFileName,
 } from "./AssetManager";
 
+import { useAuthContext } from "../../ideas/context/AuthContext";
 
 /* =========================================
    TYPES
@@ -41,15 +42,22 @@ type SceneObjectUpdate = {
 
   props?: Record<string, unknown>;
 
-  parentId?: string;
+  parentId?: string | undefined;
 
-  name?: string;
+  name?: string | undefined;
 
-  visible?: boolean;
+  visible?: boolean | undefined;
 
-  locked?: boolean;
+  locked?: boolean | undefined;
 };
 
+type SceneFile = {
+  format: string;
+
+  version: number;
+
+  scene: Scene;
+};
 
 /* =========================================
    SCENE FILE
@@ -61,15 +69,14 @@ export const SCENE_FILE_FORMAT =
 export const SCENE_FILE_VERSION =
   2;
 
+/* =========================================
+   CONSTANTS
+========================================= */
 
-type SceneFile = {
-  format: string;
+const MAX_HISTORY_SIZE = 100;
 
-  version: number;
-
-  scene: Scene;
-};
-
+const MAX_SCENE_FILE_SIZE =
+  50 * 1024 * 1024;
 
 /* =========================================
    CONTEXT VALUE
@@ -83,7 +90,6 @@ type EditorContextValue = {
   transformMode: TransformMode;
 
   editorActive: boolean;
-
 
   /* =======================================
      ASSETS
@@ -99,7 +105,6 @@ type EditorContextValue = {
     id: string
   ) => void;
 
-
   /* =======================================
      UNDO / REDO
   ======================================= */
@@ -112,7 +117,6 @@ type EditorContextValue = {
 
   redo: () => void;
 
-
   /* =======================================
      SELECTION
   ======================================= */
@@ -120,7 +124,6 @@ type EditorContextValue = {
   select: (
     id?: string
   ) => void;
-
 
   /* =======================================
      TRANSFORM
@@ -136,7 +139,6 @@ type EditorContextValue = {
 
   endTransform: () => void;
 
-
   /* =======================================
      EDITOR
   ======================================= */
@@ -146,7 +148,6 @@ type EditorContextValue = {
   ) => void;
 
   toggleEditor: () => void;
-
 
   /* =======================================
      SCENE
@@ -174,7 +175,6 @@ type EditorContextValue = {
     transform: Partial<Transform>
   ) => void;
 
-
   /* =======================================
      HIERARCHY
   ======================================= */
@@ -184,18 +184,25 @@ type EditorContextValue = {
     parentId?: string
   ) => void;
 
-
   /* =======================================
-     SAVE / LOAD
-  ======================================= */
+   SAVE / LOAD
+======================================= */
 
-  saveScene: () => Promise<void>;
+saveScene: () => Promise<void>;
 
-  loadScene: (
-    file: File
-  ) => Promise<void>;
+loadScene: (
+  file: File
+) => Promise<void>;
+
+loadProject: (
+  projectId: string
+) => Promise<void>;
+
+saveProject: (
+  projectId: string
+) => Promise<void>;
+
 };
-
 
 /* =========================================
    INITIAL SCENE
@@ -205,14 +212,6 @@ const emptyScene: Scene = {
   objects: [],
 };
 
-
-/* =========================================
-   HISTORY
-========================================= */
-
-const MAX_HISTORY_SIZE = 100;
-
-
 /* =========================================
    CONTEXT
 ========================================= */
@@ -221,7 +220,6 @@ const EditorContext =
   createContext<
     EditorContextValue | undefined
   >(undefined);
-
 
 /* =========================================
    PROVIDER PROPS
@@ -233,30 +231,56 @@ type EditorProviderProps = {
   initialScene?: Scene;
 };
 
-
 /* =========================================
-   DEEP SCENE CLONE
+   CLONE SCENE
 ========================================= */
 
 function cloneScene(
   scene: Scene
 ): Scene {
-
-  return structuredClone(
-    scene
-  );
+  return structuredClone(scene);
 }
 
-
 /* =========================================
-   REWRITE LOCAL ASSETS FOR SAVE
+   CLONE TRANSFORM
 ========================================= */
 
+function cloneTransform(
+  transform: Transform
+): Transform {
+  return {
+    position: [
+      transform.position[0],
+      transform.position[1],
+      transform.position[2],
+    ],
+
+    rotation: [
+      transform.rotation[0],
+      transform.rotation[1],
+      transform.rotation[2],
+    ],
+
+    scale: [
+      transform.scale[0],
+      transform.scale[1],
+      transform.scale[2],
+    ],
+  };
+}
+
+/* =========================================
+   ASSET PATH HELPERS
+========================================= */
+
+/**
+ * Converts browser object URLs into
+ * portable assets/<filename> paths.
+ */
 function rewriteSceneForSave(
   scene: Scene,
   assets: LocalAsset[]
 ): Scene {
-
   const assetByUrl =
     new Map<string, LocalAsset>();
 
@@ -270,9 +294,7 @@ function rewriteSceneForSave(
   }
 
   const cloned =
-    cloneScene(
-      scene
-    );
+    cloneScene(scene);
 
   const usedNames =
     new Map<string, number>();
@@ -280,6 +302,9 @@ function rewriteSceneForSave(
   for (
     const object of cloned.objects
   ) {
+    if (!object.props) {
+      continue;
+    }
 
     const props =
       object.props as Record<
@@ -292,12 +317,12 @@ function rewriteSceneForSave(
         props
       )
     ) {
-
       const value =
         props[key];
 
       if (
-        typeof value !== "string"
+        typeof value !==
+        "string"
       ) {
         continue;
       }
@@ -339,7 +364,6 @@ function rewriteSceneForSave(
   return cloned;
 }
 
-
 /* =========================================
    PROVIDER
 ========================================= */
@@ -350,14 +374,24 @@ export function EditorProvider({
 }: EditorProviderProps) {
 
   /* =======================================
+     AUTH
+  ======================================= */
+
+  const {
+    authFetch,
+  } = useAuthContext();
+
+  /* =======================================
      SCENE
   ======================================= */
 
   const [scene, setScene] =
-    useState<Scene>(
-      initialScene ?? emptyScene
+    useState<Scene>(() =>
+      cloneScene(
+        initialScene ??
+          emptyScene
+      )
     );
-
 
   /* =======================================
      HISTORY
@@ -369,7 +403,6 @@ export function EditorProvider({
   const [future, setFuture] =
     useState<Scene[]>([]);
 
-
   /* =======================================
      ASSETS
   ======================================= */
@@ -379,17 +412,11 @@ export function EditorProvider({
     setAssets,
   ] = useState<LocalAsset[]>([]);
 
-
-  /* =======================================
-     ASSET REF
-  ======================================= */
-
   const assetsRef =
     useRef<LocalAsset[]>([]);
 
   assetsRef.current =
     assets;
-
 
   /* =======================================
      TRANSFORM TRANSACTION
@@ -398,10 +425,8 @@ export function EditorProvider({
   const transformTransaction =
     useRef<{
       id: string;
-
       scene: Scene;
     } | null>(null);
-
 
   /* =======================================
      SELECTION
@@ -411,7 +436,6 @@ export function EditorProvider({
     selectedId,
     setSelectedId,
   ] = useState<string>();
-
 
   /* =======================================
      TRANSFORM MODE
@@ -424,7 +448,6 @@ export function EditorProvider({
     "translate"
   );
 
-
   /* =======================================
      EDITOR ACTIVE
   ======================================= */
@@ -433,7 +456,6 @@ export function EditorProvider({
     editorActive,
     setEditorActiveState,
   ] = useState(true);
-
 
   /* =======================================
      ADD ASSET
@@ -444,7 +466,6 @@ export function EditorProvider({
       (
         file: File
       ): string => {
-
         const id =
           createAssetId();
 
@@ -480,18 +501,17 @@ export function EditorProvider({
       []
     );
 
-
   /* =======================================
      REMOVE ASSET
   ======================================= */
 
   const removeAsset =
     useCallback(
-      (id: string) => {
-
+      (
+        id: string
+      ) => {
         setAssets(
           (current) => {
-
             const asset =
               current.find(
                 (item) =>
@@ -499,7 +519,6 @@ export function EditorProvider({
               );
 
             if (asset) {
-
               URL.revokeObjectURL(
                 asset.objectUrl
               );
@@ -511,14 +530,12 @@ export function EditorProvider({
             );
           }
         );
-
       },
       []
     );
 
-
   /* =======================================
-     HISTORY HELPER
+     HISTORY
   ======================================= */
 
   const pushHistory =
@@ -526,26 +543,26 @@ export function EditorProvider({
       (
         previousScene: Scene
       ) => {
-
         setHistory(
           (previous) => {
-
-            const nextHistory = [
+            const next = [
               ...previous,
-              previousScene,
+              cloneScene(
+                previousScene
+              ),
             ];
 
             if (
-              nextHistory.length >
+              next.length >
               MAX_HISTORY_SIZE
             ) {
-              return nextHistory.slice(
-                nextHistory.length -
+              return next.slice(
+                next.length -
                   MAX_HISTORY_SIZE
               );
             }
 
-            return nextHistory;
+            return next;
           }
         );
 
@@ -553,7 +570,6 @@ export function EditorProvider({
       },
       []
     );
-
 
   /* =======================================
      COMMIT SCENE
@@ -566,21 +582,24 @@ export function EditorProvider({
           current: Scene
         ) => Scene
       ) => {
-
         setScene(
           (current) => {
-
             const nextScene =
               createNextScene(
                 current
               );
 
             if (
-              nextScene === current
+              nextScene ===
+              current
             ) {
               return current;
             }
 
+            /*
+             * Transform mouse movement is
+             * treated as one transaction.
+             */
             if (
               transformTransaction.current
             ) {
@@ -588,9 +607,7 @@ export function EditorProvider({
             }
 
             pushHistory(
-              cloneScene(
-                current
-              )
+              current
             );
 
             return nextScene;
@@ -600,7 +617,6 @@ export function EditorProvider({
       [pushHistory]
     );
 
-
   /* =======================================
      SAVE SCENE
   ======================================= */
@@ -608,21 +624,14 @@ export function EditorProvider({
   const saveScene =
     useCallback(
       async () => {
-
         const zip =
           new JSZip();
-
-
-        /* ---------------------------------
-           SCENE
-        --------------------------------- */
 
         const sceneForSave =
           rewriteSceneForSave(
             scene,
             assetsRef.current
           );
-
 
         const file: SceneFile = {
           format:
@@ -635,7 +644,6 @@ export function EditorProvider({
             sceneForSave,
         };
 
-
         zip.file(
           "scene.json",
           JSON.stringify(
@@ -645,7 +653,6 @@ export function EditorProvider({
           )
         );
 
-
         /* ---------------------------------
            ASSETS
         --------------------------------- */
@@ -653,11 +660,10 @@ export function EditorProvider({
         const usedNames =
           new Set<string>();
 
-
         for (
-          const asset of assetsRef.current
+          const asset of
+            assetsRef.current
         ) {
-
           const safeName =
             sanitizeAssetFileName(
               asset.name
@@ -673,7 +679,6 @@ export function EditorProvider({
               fileName
             )
           ) {
-
             fileName =
               `${counter}-${safeName}`;
 
@@ -690,7 +695,6 @@ export function EditorProvider({
           );
         }
 
-
         /* ---------------------------------
            ZIP
         --------------------------------- */
@@ -700,42 +704,40 @@ export function EditorProvider({
             type: "blob",
           });
 
-
         const url =
           URL.createObjectURL(
             blob
           );
 
+        try {
+          const anchor =
+            document.createElement(
+              "a"
+            );
 
-        const anchor =
-          document.createElement(
-            "a"
+          anchor.href =
+            url;
+
+          anchor.download =
+            "cybuilder-project.cybuilder";
+
+          document.body.appendChild(
+            anchor
           );
 
-        anchor.href =
-          url;
+          anchor.click();
 
-        anchor.download =
-          "cybuilder-project.cybuilder";
-
-        document.body.appendChild(
-          anchor
-        );
-
-        anchor.click();
-
-        document.body.removeChild(
-          anchor
-        );
-
-        URL.revokeObjectURL(
-          url
-        );
-
+          document.body.removeChild(
+            anchor
+          );
+        } finally {
+          URL.revokeObjectURL(
+            url
+          );
+        }
       },
       [scene]
     );
-
 
   /* =======================================
      LOAD SCENE
@@ -746,54 +748,87 @@ export function EditorProvider({
       async (
         projectFile: File
       ) => {
+        /* ---------------------------------
+           FILE VALIDATION
+        --------------------------------- */
+
+        if (
+          projectFile.size >
+          MAX_SCENE_FILE_SIZE
+        ) {
+          throw new Error(
+            "CyBuilder project file is too large."
+          );
+        }
+
+        if (
+          !projectFile.name
+            .toLowerCase()
+            .endsWith(
+              ".cybuilder"
+            )
+        ) {
+          throw new Error(
+            "Please select a .cybuilder project file."
+          );
+        }
+
+        /* ---------------------------------
+           ZIP
+        --------------------------------- */
 
         const zip =
           await JSZip.loadAsync(
             projectFile
           );
 
-
         const sceneEntry =
           zip.file(
             "scene.json"
           );
 
-
         if (!sceneEntry) {
-
           throw new Error(
             "Invalid CyBuilder project: scene.json is missing."
           );
         }
 
+        /* ---------------------------------
+           PARSE
+        --------------------------------- */
 
         const text =
           await sceneEntry.async(
             "text"
           );
 
+        let parsed:
+          | Partial<SceneFile>;
 
-        const parsed =
-          JSON.parse(
-            text
-          ) as Partial<SceneFile>;
-
+        try {
+          parsed =
+            JSON.parse(
+              text
+            ) as Partial<SceneFile>;
+        } catch {
+          throw new Error(
+            "Invalid CyBuilder project: scene.json is not valid JSON."
+          );
+        }
 
         if (
           parsed.format !==
           SCENE_FILE_FORMAT
         ) {
-
           throw new Error(
             "This is not a CyBuilder project."
           );
         }
 
-
         if (
-          parsed.version !== 2
+          parsed.version !==
+          SCENE_FILE_VERSION
         ) {
-
           throw new Error(
             `Unsupported CyBuilder project version: ${String(
               parsed.version
@@ -801,37 +836,19 @@ export function EditorProvider({
           );
         }
 
-
         if (
           !parsed.scene ||
           !Array.isArray(
             parsed.scene.objects
           )
         ) {
-
           throw new Error(
             "Invalid scene data."
           );
         }
 
-
         const loadedScene =
           parsed.scene;
-
-
-        /* ---------------------------------
-           RELEASE OLD ASSETS
-        --------------------------------- */
-
-        for (
-          const asset of assetsRef.current
-        ) {
-
-          URL.revokeObjectURL(
-            asset.objectUrl
-          );
-        }
-
 
         /* ---------------------------------
            LOAD ASSETS
@@ -839,7 +856,6 @@ export function EditorProvider({
 
         const loadedAssets:
           LocalAsset[] = [];
-
 
         const assetEntries =
           Object.keys(
@@ -852,32 +868,30 @@ export function EditorProvider({
               !zip.files[name].dir
           );
 
-
         for (
-          const path of assetEntries
+          const path of
+            assetEntries
         ) {
-
           const entry =
             zip.files[path];
-
 
           const blob =
             await entry.async(
               "blob"
             );
 
-
           const fileName =
             path.slice(
               "assets/".length
             );
 
+          if (!fileName) {
+            continue;
+          }
 
           const file =
             new File(
-              [
-                blob,
-              ],
+              [blob],
               fileName,
               {
                 type:
@@ -886,12 +900,10 @@ export function EditorProvider({
               }
             );
 
-
           const objectUrl =
             URL.createObjectURL(
               file
             );
-
 
           loadedAssets.push({
             id:
@@ -909,9 +921,8 @@ export function EditorProvider({
           });
         }
 
-
         /* ---------------------------------
-           REWRITE ASSET PATHS
+           ASSET MAP
         --------------------------------- */
 
         const assetByPath =
@@ -920,28 +931,32 @@ export function EditorProvider({
             LocalAsset
           >();
 
-
         for (
-          const asset of loadedAssets
+          const asset of
+            loadedAssets
         ) {
-
           assetByPath.set(
             `assets/${asset.name}`,
             asset
           );
         }
 
+        /* ---------------------------------
+           RESTORE SCENE
+        --------------------------------- */
 
         const restoredScene =
           cloneScene(
             loadedScene
           );
 
-
         for (
           const object of
             restoredScene.objects
         ) {
+          if (!object.props) {
+            continue;
+          }
 
           const props =
             object.props as Record<
@@ -949,16 +964,12 @@ export function EditorProvider({
               unknown
             >;
 
-
           for (
-            const key of Object.keys(
-              props
-            )
+            const key of
+              Object.keys(props)
           ) {
-
             const value =
               props[key];
-
 
             if (
               typeof value !==
@@ -967,23 +978,32 @@ export function EditorProvider({
               continue;
             }
 
-
             const asset =
               assetByPath.get(
                 value
               );
 
-
             if (!asset) {
               continue;
             }
-
 
             props[key] =
               asset.objectUrl;
           }
         }
 
+        /* ---------------------------------
+           RELEASE OLD ASSETS
+        --------------------------------- */
+
+        for (
+          const asset of
+            assetsRef.current
+        ) {
+          URL.revokeObjectURL(
+            asset.objectUrl
+          );
+        }
 
         /* ---------------------------------
            COMMIT
@@ -992,31 +1012,188 @@ export function EditorProvider({
         transformTransaction.current =
           null;
 
-
         setScene(
           restoredScene
         );
-
 
         setAssets(
           loadedAssets
         );
 
-
         setHistory([]);
 
-
         setFuture([]);
-
 
         setSelectedId(
           undefined
         );
-
       },
       []
     );
 
+      /* =======================================
+     LOAD PROJECT
+  ======================================= */
+
+  const loadProject =
+    useCallback(
+      async (
+        projectId: string
+      ) => {
+        if (!projectId) {
+          throw new Error(
+            "Project ID is required."
+          );
+        }
+
+        const response =
+          await authFetch(
+            `/api/projects/${encodeURIComponent(
+              projectId
+            )}`,
+            {
+              method: "GET",
+            }
+          );
+
+        const data =
+          await response
+            .json()
+            .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+              "Failed to load project."
+          );
+        }
+
+        if (!data?.project) {
+          throw new Error(
+            "Project was not returned by the server."
+          );
+        }
+
+        const project =
+          data.project;
+
+        /*
+         * The project scene is already JSON
+         * data returned by the API.
+         */
+        if (
+          !project.scene ||
+          !Array.isArray(
+            project.scene.objects
+          )
+        ) {
+          throw new Error(
+            "Project does not contain valid scene data."
+          );
+        }
+
+        const loadedScene =
+          cloneScene(
+            project.scene as Scene
+          );
+
+        /*
+         * Loading a server project replaces
+         * the current editor scene.
+         *
+         * Server projects do not contain the
+         * local File objects used by the
+         * .cybuilder ZIP format, so local
+         * assets are intentionally left alone.
+         */
+        transformTransaction.current =
+          null;
+
+        setScene(
+          loadedScene
+        );
+
+        setHistory([]);
+
+        setFuture([]);
+
+        setSelectedId(
+          undefined
+        );
+      },
+      [authFetch]
+    );
+
+  /* =======================================
+     SAVE PROJECT
+  ======================================= */
+
+  const saveProject =
+    useCallback(
+      async (
+        projectId: string
+      ) => {
+        if (!projectId) {
+          throw new Error(
+            "Project ID is required."
+          );
+        }
+
+        /*
+         * Save the scene itself.
+         *
+         * IMPORTANT:
+         *
+         * Do not use rewriteSceneForSave()
+         * here because that converts browser
+         * object URLs into ZIP asset paths.
+         *
+         * The database project stores the
+         * actual scene JSON.
+         */
+        const sceneToSave =
+          cloneScene(scene);
+
+        const response =
+          await authFetch(
+            `/api/projects/${encodeURIComponent(
+              projectId
+            )}`,
+            {
+              method: "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                scene:
+                  sceneToSave,
+              }),
+            }
+          );
+
+        const data =
+          await response
+            .json()
+            .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+              "Failed to save project."
+          );
+        }
+
+        if (!data?.project) {
+          throw new Error(
+            "Project was not returned by the server."
+          );
+        }
+      },
+      [authFetch, scene]
+    );
 
   /* =======================================
      BEGIN TRANSFORM
@@ -1024,11 +1201,22 @@ export function EditorProvider({
 
   const beginTransform =
     useCallback(
-      (id: string) => {
-
+      (
+        id: string
+      ) => {
         if (
           transformTransaction.current
         ) {
+          return;
+        }
+
+        const exists =
+          scene.objects.some(
+            (object) =>
+              object.id === id
+          );
+
+        if (!exists) {
           return;
         }
 
@@ -1040,11 +1228,9 @@ export function EditorProvider({
               scene
             ),
         };
-
       },
       [scene]
     );
-
 
   /* =======================================
      END TRANSFORM
@@ -1053,7 +1239,6 @@ export function EditorProvider({
   const endTransform =
     useCallback(
       () => {
-
         const transaction =
           transformTransaction.current;
 
@@ -1064,13 +1249,15 @@ export function EditorProvider({
         transformTransaction.current =
           null;
 
-
         setScene(
           (current) => {
-
             if (
-              current ===
-              transaction.scene
+              JSON.stringify(
+                current
+              ) ===
+              JSON.stringify(
+                transaction.scene
+              )
             ) {
               return current;
             }
@@ -1082,11 +1269,9 @@ export function EditorProvider({
             return current;
           }
         );
-
       },
       [pushHistory]
     );
-
 
   /* =======================================
      UNDO
@@ -1095,7 +1280,6 @@ export function EditorProvider({
   const undo =
     useCallback(
       () => {
-
         if (
           transformTransaction.current
         ) {
@@ -1104,55 +1288,49 @@ export function EditorProvider({
 
         setHistory(
           (previous) => {
-
             if (
-              previous.length === 0
+              previous.length ===
+              0
             ) {
               return previous;
             }
-
 
             const previousScene =
               previous[
                 previous.length - 1
               ];
 
-
             setScene(
               (current) => {
-
                 setFuture(
                   (currentFuture) => {
-
-                    const nextFuture = [
-                      ...currentFuture,
-                      cloneScene(
-                        current
-                      ),
-                    ];
-
+                    const nextFuture =
+                      [
+                        ...currentFuture,
+                        cloneScene(
+                          current
+                        ),
+                      ];
 
                     if (
                       nextFuture.length >
                       MAX_HISTORY_SIZE
                     ) {
-
                       return nextFuture.slice(
                         nextFuture.length -
                           MAX_HISTORY_SIZE
                       );
                     }
 
-
                     return nextFuture;
                   }
                 );
 
-
-                return previousScene;
+                return cloneScene(
+                  previousScene
+                );
               }
             );
-
 
             return previous.slice(
               0,
@@ -1160,11 +1338,9 @@ export function EditorProvider({
             );
           }
         );
-
       },
       []
     );
-
 
   /* =======================================
      REDO
@@ -1173,7 +1349,6 @@ export function EditorProvider({
   const redo =
     useCallback(
       () => {
-
         if (
           transformTransaction.current
         ) {
@@ -1182,55 +1357,49 @@ export function EditorProvider({
 
         setFuture(
           (previous) => {
-
             if (
-              previous.length === 0
+              previous.length ===
+              0
             ) {
               return previous;
             }
-
 
             const nextScene =
               previous[
                 previous.length - 1
               ];
 
-
             setScene(
               (current) => {
-
                 setHistory(
                   (currentHistory) => {
-
-                    const nextHistory = [
-                      ...currentHistory,
-                      cloneScene(
-                        current
-                      ),
-                    ];
-
+                    const nextHistory =
+                      [
+                        ...currentHistory,
+                        cloneScene(
+                          current
+                        ),
+                      ];
 
                     if (
                       nextHistory.length >
                       MAX_HISTORY_SIZE
                     ) {
-
                       return nextHistory.slice(
                         nextHistory.length -
                           MAX_HISTORY_SIZE
                       );
                     }
 
-
                     return nextHistory;
                   }
                 );
 
-
-                return nextScene;
+                return cloneScene(
+                  nextScene
+                );
               }
             );
-
 
             return previous.slice(
               0,
@@ -1238,11 +1407,9 @@ export function EditorProvider({
             );
           }
         );
-
       },
       []
     );
-
 
   /* =======================================
      EDITOR
@@ -1253,7 +1420,6 @@ export function EditorProvider({
       (
         active: boolean
       ) => {
-
         setEditorActiveState(
           active
         );
@@ -1261,23 +1427,19 @@ export function EditorProvider({
       []
     );
 
-
   const toggleEditor =
     useCallback(
       () => {
-
         setEditorActiveState(
           (current) =>
             !current
         );
-
       },
       []
     );
 
-
   /* =======================================
-     SELECT
+     SELECTION
   ======================================= */
 
   const select =
@@ -1285,15 +1447,12 @@ export function EditorProvider({
       (
         id?: string
       ) => {
-
         setSelectedId(
           id
         );
-
       },
       []
     );
-
 
   /* =======================================
      ADD OBJECT
@@ -1304,24 +1463,34 @@ export function EditorProvider({
       (
         object: SceneObject
       ) => {
-
         commitScene(
-          (current) => ({
+          (current) => {
+            if (
+              current.objects.some(
+                (item) =>
+                  item.id ===
+                  object.id
+              )
+            ) {
+              return current;
+            }
 
-            ...current,
+            return {
+              ...current,
 
-            objects: [
-              ...current.objects,
-              object,
-            ],
+              objects: [
+                ...current.objects,
 
-          })
+                structuredClone(
+                  object
+                ),
+              ],
+            };
+          }
         );
-
       },
       [commitScene]
     );
-
 
   /* =======================================
      REMOVE OBJECT
@@ -1332,25 +1501,21 @@ export function EditorProvider({
       (
         id: string
       ) => {
-
         let removedIds:
-          string[] = [];
-
+          | string[]
+          | undefined;
 
         commitScene(
           (current) => {
-
             const exists =
               current.objects.some(
                 (object) =>
                   object.id === id
               );
 
-
             if (!exists) {
               return current;
             }
-
 
             removedIds = [
               id,
@@ -1361,48 +1526,44 @@ export function EditorProvider({
               ),
             ];
 
-
             return {
-
               ...current,
 
               objects:
                 current.objects.filter(
                   (object) =>
-                    !removedIds.includes(
+                    !removedIds!.includes(
                       object.id
                     )
                 ),
-
             };
           }
         );
 
+        if (!removedIds) {
+          return;
+        }
 
         setSelectedId(
           (current) => {
-
             if (
               current &&
-              removedIds.includes(
+              removedIds!.includes(
                 current
               )
             ) {
-
               return undefined;
             }
 
             return current;
           }
         );
-
       },
       [commitScene]
     );
 
-
   /* =======================================
-     DUPLICATE
+     DUPLICATE OBJECT
   ======================================= */
 
   const duplicateObject =
@@ -1410,52 +1571,86 @@ export function EditorProvider({
       (
         id: string
       ) => {
-
         let duplicatedId:
           | string
           | undefined;
 
-
         commitScene(
           (current) => {
-
             const original =
               current.objects.find(
                 (object) =>
                   object.id === id
               );
 
-
             if (!original) {
               return current;
             }
 
-
-            let newId = "";
-
+            let newId: string;
 
             do {
-
               newId =
-                `${original.type}-${Math.random()
-                  .toString(36)
-                  .slice(2, 10)}`;
-
+                `${original.type}-${crypto.randomUUID()}`;
             } while (
               current.objects.some(
                 (object) =>
-                  object.id === newId
+                  object.id ===
+                  newId
               )
             );
-
 
             duplicatedId =
               newId;
 
+            /*
+             * IMPORTANT:
+             *
+             * Explicitly construct the
+             * transform so TypeScript
+             * retains Vector3Tuple.
+             */
+            const duplicateTransform:
+              Transform = {
+              position: [
+                original.transform
+                  .position[0] +
+                  0.75,
+
+                original.transform
+                  .position[1],
+
+                original.transform
+                  .position[2],
+              ],
+
+              rotation:
+                [
+                  original.transform
+                    .rotation[0],
+
+                  original.transform
+                    .rotation[1],
+
+                  original.transform
+                    .rotation[2],
+                ],
+
+              scale:
+                [
+                  original.transform
+                    .scale[0],
+
+                  original.transform
+                    .scale[1],
+
+                  original.transform
+                    .scale[2],
+                ],
+            };
 
             const duplicate:
               SceneObject = {
-
               ...structuredClone(
                 original
               ),
@@ -1466,55 +1661,31 @@ export function EditorProvider({
               parentId:
                 original.parentId,
 
-              transform: {
-
-                ...original.transform,
-
-                position: [
-
-                  original.transform
-                    .position[0] + 0.75,
-
-                  original.transform
-                    .position[1],
-
-                  original.transform
-                    .position[2],
-
-                ],
-              },
-
+              transform:
+                duplicateTransform,
             };
 
-
             return {
-
               ...current,
 
               objects: [
                 ...current.objects,
                 duplicate,
               ],
-
             };
-
           }
         );
-
 
         if (
           duplicatedId
         ) {
-
           setSelectedId(
             duplicatedId
           );
         }
-
       },
       [commitScene]
     );
-
 
   /* =======================================
      UPDATE OBJECT
@@ -1526,89 +1697,144 @@ export function EditorProvider({
         id: string,
         changes: SceneObjectUpdate
       ) => {
-
         commitScene(
           (current) => {
-
             const object =
               current.objects.find(
                 (item) =>
                   item.id === id
               );
 
-
             if (!object) {
               return current;
             }
 
-
-            const objects:
-              SceneObject[] =
-              current.objects.map(
-                (item) => {
-
-                  if (
-                    item.id !== id
-                  ) {
-                    return item;
-                  }
-
-
-                  return {
-                    ...item,
-
-                    transform:
-                      changes.transform
-                        ? {
-                            ...item.transform,
-                            ...changes.transform,
-                          }
-                        : item.transform,
-
-                    props:
-                      changes.props
-                        ? {
-                            ...item.props,
-                            ...changes.props,
-                          }
-                        : item.props,
-
-                    parentId:
-                      changes.parentId ??
-                      item.parentId,
-
-                    name:
-                      changes.name ??
-                      item.name,
-
-                    visible:
-                      changes.visible ??
-                      item.visible,
-
-                    locked:
-                      changes.locked ??
-                      item.locked,
-
-                  } as SceneObject;
-                }
-              );
-
-
             return {
-
               ...current,
 
-              objects,
+              objects:
+                current.objects.map(
+                  (item) => {
+                    if (
+                      item.id !== id
+                    ) {
+                      return item;
+                    }
 
+                    /*
+                     * Preserve the exact
+                     * discriminated union
+                     * member by spreading
+                     * the original object.
+                     */
+                    const nextObject =
+                      structuredClone(
+                        item
+                      ) as SceneObject;
+
+                    /* -------------------
+                       TRANSFORM
+                    ------------------- */
+
+                    if (
+                      changes.transform
+                    ) {
+                      nextObject.transform =
+                        {
+                          ...cloneTransform(
+                            item.transform
+                          ),
+
+                          ...changes.transform,
+                        };
+                    }
+
+                    /* -------------------
+                       PROPS
+                    ------------------- */
+
+                    if (
+                      changes.props
+                    ) {
+                      /*
+                       * SceneObject is a
+                       * discriminated union.
+                       *
+                       * Its props type depends
+                       * on `type`, so we cannot
+                       * safely assign an arbitrary
+                       * Record<string, unknown>
+                       * directly to it.
+                       *
+                       * The runtime operation is
+                       * intentionally generic,
+                       * so cast only this merged
+                       * value.
+                       */
+                      nextObject.props =
+                        {
+                          ...item.props,
+                          ...changes.props,
+                        } as typeof nextObject.props;
+                    }
+
+                    /* -------------------
+                       METADATA
+                    ------------------- */
+
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        changes,
+                        "name"
+                      )
+                    ) {
+                      nextObject.name =
+                        changes.name;
+                    }
+
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        changes,
+                        "visible"
+                      )
+                    ) {
+                      nextObject.visible =
+                        changes.visible;
+                    }
+
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        changes,
+                        "locked"
+                      )
+                    ) {
+                      nextObject.locked =
+                        changes.locked;
+                    }
+
+                    /* -------------------
+                       PARENT
+                    ------------------- */
+
+                    if (
+                      Object.prototype.hasOwnProperty.call(
+                        changes,
+                        "parentId"
+                      )
+                    ) {
+                      nextObject.parentId =
+                        changes.parentId;
+                    }
+
+                    return nextObject;
+                  }
+                ),
             };
-
           }
         );
-
       },
       [commitScene]
     );
-
 
   /* =======================================
      UPDATE TRANSFORM
@@ -1620,59 +1846,117 @@ export function EditorProvider({
         id: string,
         changes: Partial<Transform>
       ) => {
-
         commitScene(
           (current) => {
-
             const exists =
               current.objects.some(
                 (item) =>
                   item.id === id
               );
 
-
             if (!exists) {
               return current;
             }
 
-
             return {
-
               ...current,
 
               objects:
                 current.objects.map(
                   (item) => {
-
                     if (
                       item.id !== id
                     ) {
                       return item;
                     }
 
+                    /*
+                     * Explicit tuple construction
+                     * prevents number[] widening.
+                     */
+                    const nextTransform:
+                      Transform = {
+                      position:
+                        changes.position
+                          ? [
+                              changes
+                                .position[0],
+                              changes
+                                .position[1],
+                              changes
+                                .position[2],
+                            ]
+                          : [
+                              item
+                                .transform
+                                .position[0],
+                              item
+                                .transform
+                                .position[1],
+                              item
+                                .transform
+                                .position[2],
+                            ],
+
+                      rotation:
+                        changes.rotation
+                          ? [
+                              changes
+                                .rotation[0],
+                              changes
+                                .rotation[1],
+                              changes
+                                .rotation[2],
+                            ]
+                          : [
+                              item
+                                .transform
+                                .rotation[0],
+                              item
+                                .transform
+                                .rotation[1],
+                              item
+                                .transform
+                                .rotation[2],
+                            ],
+
+                      scale:
+                        changes.scale
+                          ? [
+                              changes
+                                .scale[0],
+                              changes
+                                .scale[1],
+                              changes
+                                .scale[2],
+                            ]
+                          : [
+                              item
+                                .transform
+                                .scale[0],
+                              item
+                                .transform
+                                .scale[1],
+                              item
+                                .transform
+                                .scale[2],
+                            ],
+                    };
 
                     return {
-
                       ...item,
 
-                      transform: {
-                        ...item.transform,
-                        ...changes,
-                      },
-
+                      transform:
+                        nextTransform,
                     } as SceneObject;
                   }
                 ),
-
             };
-
           }
         );
-
       },
       [commitScene]
     );
-
 
   /* =======================================
      SET PARENT
@@ -1684,26 +1968,26 @@ export function EditorProvider({
         id: string,
         parentId?: string
       ) => {
-
         commitScene(
           (current) => {
-
             const object =
               current.objects.find(
                 (item) =>
                   item.id === id
               );
 
-
             if (!object) {
               return current;
             }
 
+            /* --------------------------------
+               REMOVE PARENT
+            -------------------------------- */
 
             if (
-              parentId === undefined
+              parentId ===
+              undefined
             ) {
-
               if (
                 object.parentId ===
                 undefined
@@ -1711,9 +1995,7 @@ export function EditorProvider({
                 return current;
               }
 
-
               return {
-
                 ...current,
 
                 objects:
@@ -1722,15 +2004,18 @@ export function EditorProvider({
                       item.id === id
                         ? ({
                             ...item,
+
                             parentId:
                               undefined,
                           } as SceneObject)
                         : item
                   ),
-
               };
             }
 
+            /* --------------------------------
+               SELF PARENT
+            -------------------------------- */
 
             if (
               parentId === id
@@ -1738,25 +2023,30 @@ export function EditorProvider({
               return current;
             }
 
+            /* --------------------------------
+               PARENT MUST EXIST
+            -------------------------------- */
 
             const parent =
               current.objects.find(
                 (item) =>
-                  item.id === parentId
+                  item.id ===
+                  parentId
               );
-
 
             if (!parent) {
               return current;
             }
 
+            /* --------------------------------
+               CIRCULAR HIERARCHY
+            -------------------------------- */
 
             const descendants =
               getDescendantIds(
                 current.objects,
                 id
               );
-
 
             if (
               descendants.includes(
@@ -1766,6 +2056,9 @@ export function EditorProvider({
               return current;
             }
 
+            /* --------------------------------
+               ALREADY PARENTED
+            -------------------------------- */
 
             if (
               object.parentId ===
@@ -1774,9 +2067,11 @@ export function EditorProvider({
               return current;
             }
 
+            /* --------------------------------
+               APPLY
+            -------------------------------- */
 
             return {
-
               ...current,
 
               objects:
@@ -1785,29 +2080,26 @@ export function EditorProvider({
                     item.id === id
                       ? ({
                           ...item,
-                          parentId,
+
+                          parentId:
+                            parentId,
                         } as SceneObject)
                       : item
                 ),
-
             };
-
           }
         );
-
       },
       [commitScene]
     );
 
-
-  /* =======================================
+    /* =======================================
      CONTEXT VALUE
   ======================================= */
 
   const value =
     useMemo<EditorContextValue>(
       () => ({
-
         scene,
 
         selectedId,
@@ -1815,7 +2107,6 @@ export function EditorProvider({
         transformMode,
 
         editorActive,
-
 
         /* ASSETS */
 
@@ -1825,24 +2116,23 @@ export function EditorProvider({
 
         removeAsset,
 
-
         /* HISTORY */
 
         canUndo:
-          history.length > 0,
+          history.length >
+          0,
 
         canRedo:
-          future.length > 0,
+          future.length >
+          0,
 
         undo,
 
         redo,
 
-
         /* SELECTION */
 
         select,
-
 
         /* TRANSFORM */
 
@@ -1852,13 +2142,11 @@ export function EditorProvider({
 
         endTransform,
 
-
         /* EDITOR */
 
         setEditorActive,
 
         toggleEditor,
-
 
         /* SCENE */
 
@@ -1872,11 +2160,9 @@ export function EditorProvider({
 
         updateTransform,
 
-
         /* HIERARCHY */
 
         setParent,
-
 
         /* SAVE / LOAD */
 
@@ -1884,9 +2170,13 @@ export function EditorProvider({
 
         loadScene,
 
+        /* SERVER PROJECTS */
+
+        loadProject,
+
+        saveProject,
       }),
       [
-
         scene,
 
         selectedId,
@@ -1937,9 +2227,15 @@ export function EditorProvider({
 
         loadScene,
 
+        loadProject,
+
+        saveProject,
       ]
     );
 
+  /* =======================================
+     PROVIDER
+  ======================================= */
 
   return (
     <EditorContext.Provider
@@ -1950,26 +2246,21 @@ export function EditorProvider({
   );
 }
 
-
 /* =========================================
    USE EDITOR
 ========================================= */
 
 export function useEditor() {
-
   const context =
     useContext(
       EditorContext
     );
 
-
   if (!context) {
-
     throw new Error(
       "useEditor must be used inside an EditorProvider"
     );
   }
-
 
   return context;
 }

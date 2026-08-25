@@ -11,9 +11,8 @@ import {
 
 import Analytics from "ideas/Analytics";
 import Title from "ideas/Title";
-
+import { createOrientationDialogue } from "ideas/Dialogues/useOrientationDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";
-import { introDialogue } from "ideas/Dialogues/useOrientationDialogue";
 
 type ProjectTemplate = "editor" | "found";
 
@@ -69,10 +68,9 @@ export default function Orientation() {
     "cypherverse-world-name"
   );
 
-  const creationSession =
-    sessionStorage.getItem(
-      "cypherverse-creation-session"
-    );
+  const creationSession = sessionStorage.getItem(
+    "cypherverse-creation-session"
+  );
 
   /*
    * =========================================================
@@ -181,6 +179,21 @@ export default function Orientation() {
 
     window.location.href = "/editor";
   };
+
+  /*
+   * =========================================================
+   * ORIENTATION DIALOGUE
+   * =========================================================
+   *
+   * The dialogue receives finishOrientation so the final
+   * "Enter Builder" button can directly enter the selected
+   * project template.
+   */
+
+  const orientationDialogue =
+    createOrientationDialogue(
+      finishOrientation
+    );
 
   /*
    * =========================================================
@@ -326,7 +339,7 @@ export default function Orientation() {
           1.3,
           0.3,
         ]}
-        dialogue={introDialogue}
+        dialogue={orientationDialogue}
         side="right"
         face
         enabled
@@ -344,43 +357,9 @@ export default function Orientation() {
         </Button>
       </Dialogue>
 
-      {/* =====================================================
-          CONTINUE TO WORLD
-          ===================================================== */}
-
-      {hasCreationSession &&
-        template &&
-        projectId && (
-          <group
-            position={[
-              0,
-              0.3,
-              -2.0,
-            ]}
-          >
-            <Title
-            position-y={-0.6}
-            position-z={-0.75}
-            >
-            {worldName ?? ""}
-            </Title>
-
-            <Button
-              position={[
-                0,
-                -1.1,
-                -0.75,
-              ]}
-              onClick={
-                finishOrientation
-              }
-              fontSize={0.1}
-              maxWidth={1.5}
-            >
-              Enter Your Website
-            </Button>
-          </group>
-        )}
+      
+        
+      
     </StandardReality>
   );
 }

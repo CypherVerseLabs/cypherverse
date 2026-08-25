@@ -9,18 +9,35 @@ import {
 } from "cyengine";
 
 import CloudySky from "ideas/CloudySky";
-import Link from "../ideas/Link";
-import PreloadImage from "ideas/PreloadImage";
 import { Rain } from "ideas/Rain";
 import Speaker from "ideas/players/Speaker";
 import Analytics from "ideas/Analytics";
 import Title from "ideas/Title";
 
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
+import { introDialogue } from "ideas/Dialogues/intro";
 import { useAuthContext } from "ideas/context/AuthContext";
+
 import TemplateSelector from "ideas/TemplateSelector";
+import Test from "ideas/PreviewBox";
+import Words from "ideas/Text";
+
+import WorldCard from "ideas/WorldCard";
+import {
+  useProjects,
+  type Project,
+} from "ideas/projects/useProjects";
+
+import type { Scene } from "../editor/scene/objectTypes";
+import Cyrus from "ideas/characters/Cyrus";
+import Ground from "ideas/Ground";
+import ManageSite from "ideas/ManageSite";
 
 export default function Starter() {
+  /* =========================================================
+     AUTHENTICATION
+  ========================================================= */
+
   const {
     walletAddress,
     loginWithWallet,
@@ -28,35 +45,28 @@ export default function Starter() {
     loading,
   } = useAuthContext();
 
-  /*
-   * =========================================================
-   * API DIALOGUE
-   * =========================================================
-   *
-   * This is the main authentication / account dialogue.
-   *
-   * It handles:
-   *
-   * - Login with email
-   * - Signup
-   * - Login with wallet
-   * - Logout
-   * - Create a website
-   * - Manage websites
-   */
+  /* =========================================================
+     API DIALOGUE
+  ========================================================= */
+
   const dialogue = useApiDialogue();
 
-  /*
-   * =========================================================
-   * WALLET BUTTON
-   * =========================================================
-   *
-   * This button is the small authentication button attached
-   * to the dialogue.
-   *
-   * The actual email/password authentication is handled by
-   * useApiDialogue().
-   */
+  /* =========================================================
+     PROJECTS
+  ========================================================= */
+
+  const {
+    projects,
+    loading: projectsLoading,
+    error: projectsError,
+  } = useProjects();
+
+  console.log("STARTER PROJECTS:", projects);
+
+  /* =========================================================
+     WALLET AUTH
+  ========================================================= */
+
   const handleAuth = async () => {
     try {
       if (walletAddress) {
@@ -65,19 +75,24 @@ export default function Starter() {
         await loginWithWallet();
       }
     } catch (error) {
-      console.error(
-        "Authentication failed:",
-        error
-      );
+      console.error("Authentication failed:", error);
     }
   };
+
+  /* =========================================================
+     PROJECTS WITH SCENES
+  ========================================================= */
+
+  const projectsWithScenes = projects.filter(
+    (project: Project) =>
+      project.scene !== undefined &&
+      project.scene !== null
+  );
 
   return (
     <StandardReality
       environmentProps={{
-        dev:
-          process.env.NODE_ENV ===
-          "development",
+        dev: process.env.NODE_ENV === "development",
 
         canvasProps: {
           frameloop: "demand",
@@ -87,9 +102,21 @@ export default function Starter() {
         flying: false,
       }}
     >
+      {/* =====================================================
+          ANALYTICS
+      ===================================================== */}
+
       <Analytics />
 
+      {/* =====================================================
+          BASE WORLD
+      ===================================================== */}
+
       <LostWorld />
+
+      {/* =====================================================
+          SKY
+      ===================================================== */}
 
       <CloudySky
         position={[0, 0, 0]}
@@ -97,17 +124,24 @@ export default function Starter() {
           0.7,
           0.85,
           1,
+
           0.4,
           0.65,
           0.9,
+
           0.2,
           0.45,
           0.7,
+
           0.1,
           0.2,
           0.5,
         ]}
       />
+
+      {/* =====================================================
+          FOG
+      ===================================================== */}
 
       <Fog
         color="#00ff00"
@@ -119,7 +153,7 @@ export default function Starter() {
 
       {/* =====================================================
           MAIN STARTER WORLD
-          ===================================================== */}
+      ===================================================== */}
 
       <group position-z={-2.25}>
         <Title
@@ -135,37 +169,9 @@ export default function Starter() {
         />
 
         <group position-y={0.8}>
-          {/* =================================================
-              NAVIGATION
-              ================================================= */}
-
-          <Link
-            href="/multiplayer"
-            position-x={-1.5}
-            position-z={0.75}
-          >
-            visit multiplayer page
-          </Link>
-
-          <Link
-            href="/decentral_station"
-            position-x={-1}
-          >
-            Decentral Station
-          </Link>
-
-          <Link
-            href="/workshop"
-            position-x={1}
-          >
-            visit workshop page
-          </Link>
-
           <Button
             onClick={() =>
-              console.log(
-                "GitHub button clicked"
-              )
+              console.log("GitHub button clicked")
             }
             fontSize={0.1}
             maxWidth={1}
@@ -179,10 +185,6 @@ export default function Starter() {
             Visit GitHub
           </Button>
 
-          {/* =================================================
-              LOGO
-              ================================================= */}
-
           <Spinning
             xSpeed={0}
             ySpeed={1}
@@ -194,58 +196,55 @@ export default function Starter() {
             />
           </Spinning>
 
-          {/* =================================================
-              ENVIRONMENT
-              ================================================= */}
-
           <Rain color="blueviolet" />
 
-          <PreloadImage />
+          <Speaker position={[1, 0, -4]} />
 
-          <Speaker
-            position={[1, 0.0, -4.0]}
+          <Cyrus
+            position={[0, 0.0, 0]}
+            dialogue="i'm daydreaming ... and i want to build what i see!"
           />
-
-          <Button
-            onClick={() =>
-              console.log(
-                "Starter button clicked"
-              )
-            }
-            fontSize={0.1}
-            maxWidth={1}
-            textColor="#120606ff"
-            color="#b9c1f3ff"
-            outline={false}
-            outlineColor="#9f9f9f"
-          >
-            Click me!
-          </Button>
         </group>
       </group>
 
       {/* =====================================================
-          AUTHENTICATION / ACCOUNT DIALOGUE
-          =====================================================
+          INTRO DIALOGUE
+      ===================================================== */}
 
-          THIS is the login/create-account dialogue.
+      <group>
+        <Dialogue
+          position={[1, 1.3, 0.3]}
+          dialogue={introDialogue}
+          side="right"
+          face
+          enabled
+        />
 
-          useApiDialogue() controls the state.
+        <Words color="#00FF88">
+          Hello
+        </Words>
+      </group>
 
-          When logged out:
-            - Login with Wallet
-            - Login with Email
-            - Signup
-            - What is Cypherverse?
+      {/* =====================================================
+          TEST OBJECT
+      ===================================================== */}
 
-          When logged in:
-            - Create a Website
-            - Manage My Websites
-            - Logout
+      <Test
+        name="normalize and center model"
+        position-x={1.2 * 4}
+        children={undefined}
+      />
 
-          "Create a Website" eventually leads to the
-          TemplateSelector below.
-          ===================================================== */}
+      {/* =====================================================
+          ACCOUNT DIALOGUE
+
+          useApiDialogue() controls:
+          - Login
+          - Signup
+          - Create a Website
+          - Manage My Websites
+          - Logout
+      ===================================================== */}
 
       <Dialogue
         position={[9, 1.3, 4.3]}
@@ -268,26 +267,129 @@ export default function Starter() {
       </Dialogue>
 
       {/* =====================================================
-          WEBSITE / PROJECT CREATION
-          =====================================================
+          CREATE PROJECT
 
-          TemplateSelector handles:
+          TemplateSelector already exists here.
+          Do NOT duplicate it inside the dialogue.
+      ===================================================== */}
 
-          1. Choosing Editor or Found
-          2. Entering website name
-          3. Creating the project in Neon
-          4. Showing ownership confirmation
-          5. Moving to Orientation
-
-          The component itself verifies authentication before
-          calling POST /api/projects.
-          ===================================================== */}
-
-      <group
-        position={[3, -0.5, 7]}
-      >
+      <group position={[3, -0.5, 7]}>
         <TemplateSelector />
       </group>
+
+      {/* =====================================================
+          USER WORLDS
+      ===================================================== */}
+
+      <group position={[0, 0, 5]}>
+        <Title position={[0, 2.8, 0]}>
+          Your Worlds
+        </Title>
+
+        {/* ===================================================
+            LOADING
+        =================================================== */}
+
+        {projectsLoading && (
+          <Words
+            color="#00FF88"
+            position={[0, 2.2, 0]}
+          >
+            Loading your worlds...
+          </Words>
+        )}
+
+        {/* ===================================================
+            ERROR
+        =================================================== */}
+
+        {projectsError && (
+          <Words
+            color="#ff4444"
+            position={[0, 2.2, 0]}
+          >
+            Unable to load your worlds.
+          </Words>
+        )}
+
+        {/* ===================================================
+            NO PROJECTS
+        =================================================== */}
+
+        {!projectsLoading &&
+          !projectsError &&
+          projects.length === 0 && (
+            <Words
+              color="#cccccc"
+              position={[0, 2.2, 0]}
+            >
+              You have not created a world yet.
+            </Words>
+          )}
+
+        {/* ===================================================
+            WORLD CARDS
+        =================================================== */}
+
+        {projectsWithScenes.map(
+          (project, index) => {
+            const column = index % 3;
+            const row = Math.floor(index / 3);
+
+            return (
+              <WorldCard
+                key={project.id}
+                name={project.name}
+                scene={project.scene as Scene}
+                position={[
+                  (column - 1) * 3.5,
+                  -row * 4,
+                  0,
+                ]}
+                projectId={""}
+              />
+            );
+          }
+        )}
+
+        {/* ===================================================
+            PROJECT EXISTS BUT HAS NO SCENE
+        =================================================== */}
+
+        {!projectsLoading &&
+          !projectsError &&
+          projects.length > 0 &&
+          projectsWithScenes.length === 0 && (
+            <Words
+              color="#aaaaaa"
+              position={[0, 1.7, 0]}
+            >
+              Your worlds are being prepared...
+            </Words>
+          )}
+      </group>
+
+        
+      <group
+  position={[10 , 0, 5,]}
+>
+  <ManageSite
+    projects={projects}
+    loading={projectsLoading}
+    error={projectsError}
+  />
+</group>
+
+      {/* =====================================================
+          GROUND
+      ===================================================== */}
+
+      <group position-y={0.1}>
+        <Ground />
+      </group>
+
+
     </StandardReality>
   );
 }
+

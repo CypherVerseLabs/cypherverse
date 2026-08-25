@@ -1,4 +1,44 @@
 /* =========================================
+   AI SCENE CONTEXT
+========================================= */
+
+export type AIGenerateContext = {
+  objects: {
+    id: string;
+
+    type: string;
+
+    name?: string;
+
+    props?: Record<
+      string,
+      unknown
+    >;
+
+    transform?: {
+      position: [
+        number,
+        number,
+        number
+      ];
+
+      rotation: [
+        number,
+        number,
+        number
+      ];
+
+      scale: [
+        number,
+        number,
+        number
+      ];
+    };
+  }[];
+};
+
+
+/* =========================================
    AI SCENE ACTIONS
 ========================================= */
 

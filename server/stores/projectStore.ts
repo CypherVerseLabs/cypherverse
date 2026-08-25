@@ -11,6 +11,11 @@ export interface Project {
   description?: string;
   template: ProjectTemplate;
   scene?: unknown;
+
+  // Publishing
+  slug?: string;
+  publishedAt?: string;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -22,6 +27,10 @@ function toProject(project: {
   description: string | null;
   template: ProjectTemplate;
   scene: unknown;
+
+  slug: string | null;
+  publishedAt: Date | null;
+
   createdAt: Date;
   updatedAt: Date;
 }): Project {
@@ -45,6 +54,19 @@ function toProject(project: {
         }
       : {}),
 
+    ...(project.slug
+      ? {
+          slug: project.slug,
+        }
+      : {}),
+
+    ...(project.publishedAt
+      ? {
+          publishedAt:
+            project.publishedAt.toISOString(),
+        }
+      : {}),
+
     createdAt:
       project.createdAt.toISOString(),
 
@@ -56,10 +78,6 @@ function toProject(project: {
 /**
  * Convert arbitrary JSON data into the
  * Prisma JSON input type.
- *
- * Prisma requires Prisma.JsonNull
- * instead of plain JavaScript null
- * for a nullable JSON field.
  */
 function toPrismaJson(
   value: unknown
@@ -145,11 +163,6 @@ export async function getProjectById(
  * =========================================================
  * UPDATE PROJECT
  * =========================================================
- *
- * Template is intentionally NOT updateable.
- *
- * scene contains the editor/world state
- * and is updateable.
  */
 export async function updateProject(
   projectId: string,
@@ -203,6 +216,150 @@ export async function updateProject(
     });
 
   return toProject(project);
+}
+
+/**
+ * =========================================================
+ * PUBLISH PROJECT
+ * =========================================================
+ */
+export async function publishProject(
+  projectId: string,
+  ownerId: string
+): Promise<Project | undefined> {
+  const existing =
+    await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        ownerId,
+      },
+    });
+
+  if (!existing) {
+    return undefined;
+  }
+
+  /*
+   * If the project already has a slug,
+   * keep it when republishing.
+   */
+  const slug =
+    existing.slug ??
+    createProjectSlug(
+      existing.name,
+      existing.id
+    );
+
+  const project =
+    await prisma.project.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        slug,
+        publishedAt: new Date(),
+      },
+    });
+
+  return toProject(project);
+}
+
+/**
+ * =========================================================
+ * UNPUBLISH PROJECT
+ * =========================================================
+ */
+export async function unpublishProject(
+  projectId: string,
+  ownerId: string
+): Promise<Project | undefined> {
+  const existing =
+    await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        ownerId,
+      },
+    });
+
+  if (!existing) {
+    return undefined;
+  }
+
+  const project =
+    await prisma.project.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        publishedAt: null,
+      },
+    });
+
+  return toProject(project);
+}
+
+/**
+ * =========================================================
+ * GET PUBLIC PROJECT
+ * =========================================================
+ *
+ * IMPORTANT:
+ *
+ * This does NOT require authentication.
+ *
+ * A project is public only when
+ * publishedAt is not null.
+ */
+export async function getPublicProject(
+  slug: string
+): Promise<Project | undefined> {
+  const project =
+    await prisma.project.findFirst({
+      where: {
+        slug,
+        publishedAt: {
+          not: null,
+        },
+      },
+    });
+
+  if (!project) {
+    return undefined;
+  }
+
+  return toProject(project);
+}
+
+/**
+ * =========================================================
+ * SLUG GENERATOR
+ * =========================================================
+ */
+function createProjectSlug(
+  name: string,
+  id: string
+): string {
+  const base =
+    name
+      .toLowerCase()
+      .trim()
+      .replace(
+        /[^a-z0-9]+/g,
+        "-"
+      )
+      .replace(
+        /^-+|-+$/g,
+        ""
+      )
+      .slice(0, 60) ||
+    "project";
+
+  /*
+   * Add part of the project ID so
+   * two projects with the same name
+   * cannot collide.
+   */
+  return `${base}-${id.slice(0, 8)}`;
 }
 
 /**

@@ -1,124 +1,164 @@
-import { useState, useEffect } from "react";
-import type { DialogueFSM } from "cyengine";
-import { useAuthContext } from "ideas/context/AuthContext";
+// src/ideas/Dialogues/useApiDialogue.ts
 
-function validateEmail(email: string) {
-  return /\S+@\S+\.\S+/.test(email);
+import { useState } from "react";
+import type { DialogueFSM } from "cyengine";
+import { useAuthContext } from "../context/AuthContext";
+
+/* =========================================
+   VALIDATION
+========================================= */
+
+function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function validatePassword(password: string) {
+function validatePassword(password: string): boolean {
   const complexityRegex =
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
   return complexityRegex.test(password);
 }
 
-function isTokenExpired(token: string) {
-  try {
-    const payload = token.split('.')?.[1];
-    if (!payload) return true;
-    const decoded = JSON.parse(atob(payload));
-    return Date.now() >= (decoded.exp ?? 0) * 1000;
-  } catch (e) {
-    console.warn("Failed to decode token", e);
-    return true;
-  }
-}
+/* =========================================
+   DIALOGUE
+========================================= */
 
-function getEmailFromToken(token: string): string | null {
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload?.email || null;
-  } catch {
-    return null;
-  }
-}
+export function useApiDialogue(): DialogueFSM {
+  /* =======================================
+     AUTH
+  ======================================= */
 
+  const {
+    user,
+    walletAddress,
+    loading,
+    isAuthenticated,
+    loginWithWallet,
+    loginWithEmail,
+    signup,
+    logout,
+  } = useAuthContext();
 
-export function useApiDialogue(): DialogueFSM
-{
+  /* =======================================
+     LOCAL DIALOGUE STATE
+  ======================================= */
+
   const [name, setName] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
-  const { walletAddress, loginWithWallet, logout } = useAuthContext();
-
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-  const token = localStorage.getItem("jwt");
-  if (token && !isTokenExpired(token)) {
-    setIsLoggedIn(true);
-    const email = getEmailFromToken(token);
-    if (email) {
-      
-      setName(email.split("@")[0]); // optionally extract display name
-    }
-  } else {
-    localStorage.removeItem("jwt");
-    setIsLoggedIn(false);
-  }
-}, []);
+  /* =======================================
+     DISPLAY NAME
+  ======================================= */
 
+  const displayName =
+    name ||
+    user?.username ||
+    (user?.email
+      ? user.email.split("@")[0]
+      : walletAddress
+        ? `Wallet ${walletAddress.slice(0, 6)}...`
+        : "friend");
+
+  /* =======================================
+     DIALOGUE
+  ======================================= */
 
   const dialogue: DialogueFSM = [
+    /* =====================================
+       INIT
+    ===================================== */
+
     {
       key: "init",
-      text: "Welcome to Cypherverse. What's your name?",
-      input: {
-        value: name,
-        setValue: (val) => {
-          setName(val);
-          return val;
-        },
-        persist: true,
-      },
-      decisions: [{ name: "Continue", nextKey: "menu" }],
-    },
-    {
-  key: "menu",
-  text: isLoggedIn
-    ? `Welcome back, ${name || "friend"}! What would you like to do next?`
-    : `Hi ${name || "there"}! What would you like to do?`,
-
-  decisions: isLoggedIn
-    ? [
+      text: isAuthenticated
+        ? `Welcome back, ${displayName}!`
+        : "Welcome to Cypherverse. What's your name?",
+      input: isAuthenticated
+        ? undefined
+        : {
+            value: name,
+            setValue: (value) => {
+              setName(value);
+              setError(null);
+              return value;
+            },
+            persist: true,
+          },
+      decisions: [
         {
-          name: "Create a Website",
-          nextKey: "template_selector",
-        },
-        {
-          name: "Manage My Websites",
-          nextKey: "manage_websites",
-        },
-        {
-          name: "Logout",
-          nextKey: "logout",
-        },
-      ]
-    : [
-        {
-          name: "Login with Wallet",
-          nextKey: "login_wallet",
-        },
-        {
-          name: "Login with Email",
-          nextKey: "login_email",
-        },
-        {
-          name: "Signup",
-          nextKey: "signup_email",
-        },
-        {
-          name: "What is Cypherverse?",
-          nextKey: "about",
+          name: "Continue",
+          nextKey: "menu",
         },
       ],
-},
-    
+    },
 
-    // ==== LOGIN FLOW ====
+    /* =====================================
+       MENU
+    ===================================== */
+
+    {
+      key: "menu",
+      text: isAuthenticated
+        ? `Welcome back, ${displayName}! What would you like to do next?`
+        : `Hi ${displayName}! What would you like to do?`,
+      decisions: isAuthenticated
+        ? [
+            {
+              name: "Create a Website",
+              nextKey: "template_selector",
+            },
+            {
+              name: "Manage My Websites",
+              nextKey: "manage_websites",
+            },
+            {
+              name: "Logout",
+              nextKey: "logout",
+            },
+          ]
+        : [
+            {
+              name: "Login with Wallet",
+              nextKey: "login_wallet",
+            },
+            {
+              name: "Login with Email",
+              nextKey: "login_email",
+            },
+            {
+              name: "Signup",
+              nextKey: "signup_email",
+            },
+            {
+              name: "What is Cypherverse?",
+              nextKey: "about",
+            },
+          ],
+    },
+
+    /* =====================================
+       MANAGE WEBSITES
+    ===================================== */
+
+    {
+      key: "manage_websites",
+      text: "Your websites will appear here.",
+      decisions: [
+        {
+          name: "Back to Menu",
+          nextKey: "menu",
+        },
+      ],
+    },
+
+    /* =====================================
+       EMAIL LOGIN
+    ===================================== */
+
     {
       key: "login_email",
       text: !validateEmail(loginEmail)
@@ -126,107 +166,151 @@ export function useApiDialogue(): DialogueFSM
         : "Enter your email to login.",
       input: {
         value: loginEmail,
-        setValue: (val) => {
-  const normalized = val.trim().toLowerCase();
-  setLoginEmail(normalized);
-  if (!name && validateEmail(normalized)) {
-    setName(normalized.split("@")[0]);
-  }
-  setError(null);
-  return normalized;
-},
+        setValue: (value) => {
+          const normalized = value.trim().toLowerCase();
+
+          setLoginEmail(normalized);
+
+          if (!name && validateEmail(normalized)) {
+            setName(normalized.split("@")[0]);
+          }
+
+          setError(null);
+          return normalized;
+        },
         persist: true,
       },
       decisions: validateEmail(loginEmail)
-  ? [
-      { name: "Next", nextKey: "login_password" },
-      { name: "Cancel", nextKey: "menu" },
-    ]
-  : [{ name: "Cancel", nextKey: "menu" }],
+        ? [
+            {
+              name: "Next",
+              nextKey: "login_password",
+            },
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ]
+        : [
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ],
     },
+
+    /* =====================================
+       EMAIL PASSWORD
+    ===================================== */
 
     {
       key: "login_password",
       text: `Enter your password.${error ? `\nError: ${error}` : ""}`,
       input: {
         value: loginPassword,
-        setValue: (val) => {
-  const trimmed = val.trim();
-  setLoginPassword(trimmed);
-  setError(null);
-  return trimmed;
-},
+        setValue: (value) => {
+          setLoginPassword(value);
+          setError(null);
+          return value;
+        },
         persist: true,
         type: "password",
       },
       decisions: validatePassword(loginPassword)
-        ? [{ name: "Login", nextKey: "login_submit" },
-           { name: "Cancel", nextKey: "menu" },
-        ]
-        : [{ name: "Cancel", nextKey: "menu" }],
+        ? [
+            {
+              name: "Login",
+              nextKey: "login_submit",
+            },
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ]
+        : [
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ],
     },
 
+    /* =====================================
+       EMAIL LOGIN SUBMIT
+    ===================================== */
+
     {
-  key: "login_submit",
-  text: `Login successful! Welcome, ${name || loginEmail.split("@")[0]}.`,
+      key: "login_submit",
+      text: error
+        ? `Login failed.\nError: ${error}`
+        : "Logging you in...",
+      effect: async () => {
+        setError(null);
 
-  effect: async () => {
-    setError(null);
-    try {
-      const email = loginEmail.trim().toLowerCase();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: loginPassword }),
-      });
+        try {
+          await loginWithEmail(loginEmail, loginPassword);
 
-      const data = await res.json().catch(() => null);
-      const { token } = data || {};
+          setName(loginEmail.split("@")[0]);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Login failed.";
 
-      if (!res.ok) {
-        if (res.status === 401) throw new Error("Invalid email or password.");
-        throw new Error(data?.message || "Login failed.");
-      }
+          setError(message);
+        }
+      },
+      decisions: [
+        {
+          name: "Continue",
+          nextKey: error ? "login_password" : "menu",
+        },
+      ],
+    },
 
-      if (!token) throw new Error("Invalid server response.");
+    /* =====================================
+       SIGNUP EMAIL
+    ===================================== */
 
-      localStorage.setItem("jwt", token);
-      setIsLoggedIn(true);
-      
-    } catch (e: any) {
-      setError(e.message || "Login failed");
-      setIsLoggedIn(false);
-    }
-  },
-  decisions: [
-  { name: "Continue", nextKey: error ? "login_password" : "menu" },
-],
-
-}
-
-,
-
-    // ==== SIGNUP FLOW ====
     {
-  key: "signup_email",
-  text: `Enter your email to sign up.${error ? `\nError: ${error}` : ""}`,
-  input: {
-    value: signupEmail,
-    setValue: (val) => {
-  const normalized = val.trim().toLowerCase();
-  setSignupEmail(normalized);
-  if (!name && validateEmail(normalized)) {
-    setName(normalized.split("@")[0]);
-  }
-  setError(null);
-  return normalized;
-},
-    persist: true,
-  },
-  decisions: validateEmail(signupEmail)
-    ? [{ name: "Next", nextKey: "signup_password" }]
-    : [],
-},
+      key: "signup_email",
+      text: `Enter your email to sign up.${error ? `\nError: ${error}` : ""}`,
+      input: {
+        value: signupEmail,
+        setValue: (value) => {
+          const normalized = value.trim().toLowerCase();
+
+          setSignupEmail(normalized);
+
+          if (!name && validateEmail(normalized)) {
+            setName(normalized.split("@")[0]);
+          }
+
+          setError(null);
+          return normalized;
+        },
+        persist: true,
+      },
+      decisions: validateEmail(signupEmail)
+        ? [
+            {
+              name: "Next",
+              nextKey: "signup_password",
+            },
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ]
+        : [
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ],
+    },
+
+    /* =====================================
+       SIGNUP PASSWORD
+    ===================================== */
 
     {
       key: "signup_password",
@@ -235,114 +319,195 @@ export function useApiDialogue(): DialogueFSM
         : `Choose a password.${error ? `\nServer error: ${error}` : ""}`,
       input: {
         value: signupPassword,
-        setValue: (val) => {
-          setSignupPassword(val);
+        setValue: (value) => {
+          setSignupPassword(value);
           setError(null);
-          return val;
+          return value;
         },
         persist: true,
         type: "password",
       },
       decisions: validatePassword(signupPassword)
-        ? [{ name: "Create Account", nextKey: "signup_submit" }]
-        : [],
+        ? [
+            {
+              name: "Create Account",
+              nextKey: "signup_submit",
+            },
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ]
+        : [
+            {
+              name: "Cancel",
+              nextKey: "menu",
+            },
+          ],
     },
+
+    /* =====================================
+       SIGNUP SUBMIT
+    ===================================== */
+
     {
-  key: "signup_submit",
-  text: `Creating your account...${error ? `\nError: ${error}` : ""}`,
-  effect: async () => {
-    setError(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: signupEmail, password: signupPassword }),
-      });
+      key: "signup_submit",
+      text: error
+        ? `Account creation failed.\nError: ${error}`
+        : "Creating your account...",
+      effect: async () => {
+        setError(null);
 
-      const data = await res.json().catch(() => null);
+        try {
+          const newUser = await signup(
+            signupEmail,
+            signupPassword
+          );
 
-      if (!res.ok) {
-        throw new Error(data?.message || "Signup failed");
-      }
+          /*
+           * A null user means the server
+           * accepted the signup but requires
+           * email verification before login.
+           */
+          if (!newUser) {
+            setError(
+              "Please verify your email address before logging in."
+            );
+            return;
+          }
 
-      if (!data?.token) {
-        setError("Please verify your email address before logging in.");
-        return;
-      }
+          setName(signupEmail.split("@")[0]);
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : "Signup failed.";
 
-      localStorage.setItem("jwt", data.token);
-      setIsLoggedIn(true);
-      
-    } catch (e: any) {
-      setError(e.message || "Signup failed");
-      setIsLoggedIn(false);
-    }
-  },
-  decisions: [{ name: "Continue", nextKey: error ? "signup_password" : "menu" }],
-},
+          setError(message);
+        }
+      },
+      decisions: [
+        {
+          name: "Continue",
+          nextKey: error ? "signup_password" : "menu",
+        },
+      ],
+    },
 
+    /* =====================================
+       WALLET LOGIN
+    ===================================== */
 
-{
-  key: "login_wallet",
-  text: isLoggedIn
-    ? "You're all good to go!"
-    : `Connecting your wallet...${error ? `\nError: ${error}` : ""}`,
- effect: async () => {
-  setError(null);
-  try {
-    await loginWithWallet();
-
-    if (!walletAddress) {
-      throw new Error("Wallet address not found after login.");
-    }
-
-    setName(`Wallet ${walletAddress.slice(0, 6)}...`);
-    setIsLoggedIn(true);
-  } catch (e: any) {
-    setError(e.message || "Wallet login failed.");
-    setIsLoggedIn(false);
-  }
-}
-,
-  decisions: [{ name: "Continue", nextKey: "menu" }],
-},
-
-
-    // ==== LOGOUT ====
     {
-  key: "logout",
-  text: "You have been logged out.",
-  effect: async () => {
-    logout(); // Add this line to use the function
-    localStorage.removeItem("jwt");
-    setIsLoggedIn(false);
-    setLoginEmail("");
-    setLoginPassword("");
-    setSignupEmail("");
-    setSignupPassword("");
-    setError(null);
-  },
-  decisions: [{ name: "Back to Start", nextKey: "init" }],
-}
-,
+      key: "login_wallet",
+      text: loading
+        ? "Connecting your wallet..."
+        : error
+          ? `Wallet login failed.\nError: ${error}`
+          : "Connecting your wallet...",
+      effect: async () => {
+        setError(null);
 
-    // ==== ABOUT FLOW ====
+        try {
+          const loggedInUser = await loginWithWallet();
+
+          /*
+           * Use the user returned by AuthContext rather
+           * than relying on walletAddress state updating
+           * immediately.
+           */
+          if (loggedInUser.address) {
+            setName(
+              `Wallet ${loggedInUser.address.slice(0, 6)}...`
+            );
+          } else if (walletAddress) {
+            setName(`Wallet ${walletAddress.slice(0, 6)}...`);
+          } else {
+            setName("Wallet user");
+          }
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Wallet login failed.";
+
+          setError(message);
+        }
+      },
+      decisions: [
+        {
+          name: "Continue",
+          nextKey: "menu",
+        },
+      ],
+    },
+
+    /* =====================================
+       LOGOUT
+    ===================================== */
+
+    {
+      key: "logout",
+      text: "You have been logged out.",
+      effect: async () => {
+        try {
+          await logout();
+        } finally {
+          setName("");
+          setLoginEmail("");
+          setLoginPassword("");
+          setSignupEmail("");
+          setSignupPassword("");
+          setError(null);
+        }
+      },
+      decisions: [
+        {
+          name: "Back to Start",
+          nextKey: "init",
+        },
+      ],
+    },
+
+    /* =====================================
+       ABOUT
+    ===================================== */
+
     {
       key: "about",
-      text: "Cypherverse is a decentralized 3D world where creativity, collaboration, and digital identity intersect.",
-      decisions: [{ name: "How so?", nextKey: "about_how" }],
+      text:
+        "Cypherverse is a decentralized 3D world where creativity, collaboration, and digital identity intersect.",
+      decisions: [
+        {
+          name: "How so?",
+          nextKey: "about_how",
+        },
+      ],
     },
+
     {
       key: "about_how",
-      text: "Cypherverse provides a natural place to display all types of content, including 3D models, video, sound, images, and more.",
-      decisions: [{ name: "Next", nextKey: "about_future" }],
+      text:
+        "Cypherverse provides a natural place to display all types of content, including 3D models, video, sound, images, and more.",
+      decisions: [
+        {
+          name: "Next",
+          nextKey: "about_future",
+        },
+      ],
     },
+
     {
       key: "about_future",
-      text: "The possibilities are endless. Grow with us and combine your digital and physical self.",
-      decisions: [{ name: "Back to Menu", nextKey: "menu" }],
+      text:
+        "The possibilities are endless. Grow with us and combine your digital and physical self.",
+      decisions: [
+        {
+          name: "Back to Menu",
+          nextKey: "menu",
+        },
+      ],
     },
   ];
 
   return dialogue;
 }
+

@@ -2,11 +2,14 @@
 
 import dotenv from "dotenv";
 
-dotenv.config({ path: ".env" });
+dotenv.config({
+  path: ".env",
+});
 
 import express, {
   Request,
   Response,
+  NextFunction,
 } from "express";
 
 import cors from "cors";
@@ -43,18 +46,12 @@ import {
   updateUserByEmail,
 } from "./stores/userStore.js";
 
-/*
- * =========================================================
- * ENVIRONMENT
- * =========================================================
- */
+// =========================================================
+// ENVIRONMENT
+// =========================================================
 
-console.log(
-  "JWT_SECRET loaded:",
-  Boolean(process.env.JWT_SECRET)
-);
-
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET =
+  process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
   throw new Error(
@@ -62,16 +59,21 @@ if (!JWT_SECRET) {
   );
 }
 
+const PORT =
+  Number(process.env.PORT) || 5000;
+
+const NODE_ENV =
+  process.env.NODE_ENV || "development";
+
+// =========================================================
+// APP
+// =========================================================
+
 const app = express();
 
-const PORT =
-  process.env.PORT || 5000;
-
-/*
- * =========================================================
- * CORS
- * =========================================================
- */
+// =========================================================
+// CORS
+// =========================================================
 
 const allowedOrigins =
   (process.env.CORS_ORIGIN || "")
@@ -85,15 +87,13 @@ app.use(
       origin,
       callback
     ) => {
-      /*
-       * Allow:
-       *
-       * - configured frontend origins
-       * - requests without an Origin header
-       */
+      // Allow non-browser requests.
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
 
       if (
-        !origin ||
         allowedOrigins.includes(origin)
       ) {
         callback(null, true);
@@ -111,21 +111,32 @@ app.use(
   })
 );
 
-/*
- * =========================================================
- * BODY / COOKIE MIDDLEWARE
- * =========================================================
- */
+// =========================================================
+// BODY PARSING
+// =========================================================
 
-app.use(express.json());
+/*
+ * 12 MB request limit.
+ *
+ * This is intentionally larger than the
+ * 10 MB scene limit so the application can
+ * still return a controlled 413 response.
+ */
+app.use(
+  express.json({
+    limit: "12mb",
+  })
+);
+
+// =========================================================
+// COOKIES
+// =========================================================
 
 app.use(cookieParser());
 
-/*
- * =========================================================
- * BASIC HEALTH CHECK
- * =========================================================
- */
+// =========================================================
+// HEALTH CHECK
+// =========================================================
 
 app.get(
   "/",
@@ -133,35 +144,29 @@ app.get(
     _req: Request,
     res: Response
   ) => {
-    return res.json({
+    return res.status(200).json({
       ok: true,
-      service:
-        "CyBuilder Auth Server",
+      service: "CyBuilder Auth Server",
+      environment: NODE_ENV,
     });
   }
 );
 
-/*
- * =========================================================
- * AUTH ROUTES
- * =========================================================
- *
- * Wallet nonce:
- *
- * POST /auth/nonce
- *
- * Wallet verification:
- *
- * POST /auth/verify
- *
- * Refresh:
- *
- * POST /auth/refresh
- *
- * Email authentication:
- *
- * /api/*
- */
+app.get(
+  "/health",
+  (
+    _req: Request,
+    res: Response
+  ) => {
+    return res.status(200).json({
+      ok: true,
+    });
+  }
+);
+
+// =========================================================
+// AUTH ROUTES
+// =========================================================
 
 app.use(
   "/auth",
@@ -183,57 +188,27 @@ app.use(
   emailAuthRouter
 );
 
-
-
-/*
- * =========================================================
- * PROJECT ROUTES
- * =========================================================
- *
- * Project ownership is determined by the authenticated
- * JWT inside projects.ts.
- *
- * Available routes:
- *
- * POST   /api/projects
- * GET    /api/projects
- * GET    /api/projects/:id
- * PATCH  /api/projects/:id
- * DELETE /api/projects/:id
- *
- * IMPORTANT:
- *
- * This must be registered BEFORE the 404 handler below.
- */
+// =========================================================
+// PROJECT ROUTES
+// =========================================================
 
 app.use(
   "/api/projects",
   projectRouter
 );
 
-/*
- * =========================================================
- * AI SCENE BUILDER
- * =========================================================
- *
- * POST /api/ai
- *
- * Converts a natural-language scene request into
- * an array of validated AI scene actions.
- */
+// =========================================================
+// AI ROUTES
+// =========================================================
 
 app.use(
   "/api/ai",
   aiRouter
 );
 
-/*
- * =========================================================
- * GET CURRENT USER
- * =========================================================
- *
- * GET /auth/me
- */
+// =========================================================
+// CURRENT USER
+// =========================================================
 
 app.get(
   "/auth/me",
@@ -251,14 +226,13 @@ app.get(
     try {
       let user;
 
-      /*
-       * Wallet authentication
-       */
+      // -----------------------------------------------
+      // WALLET USER
+      // -----------------------------------------------
 
       if (
-        req.user.address &&
         typeof req.user.address ===
-          "string"
+        "string"
       ) {
         user =
           await getUserByAddress(
@@ -266,13 +240,12 @@ app.get(
           );
       }
 
-      /*
-       * Email authentication
-       */
+      // -----------------------------------------------
+      // EMAIL USER
+      // -----------------------------------------------
 
       if (
         !user &&
-        req.user.email &&
         typeof req.user.email ===
           "string"
       ) {
@@ -284,12 +257,11 @@ app.get(
 
       if (!user) {
         return res.status(404).json({
-          error:
-            "User not found",
+          error: "User not found",
         });
       }
 
-      return res.json({
+      return res.status(200).json({
         user: {
           id: user.id,
           address: user.address,
@@ -315,13 +287,9 @@ app.get(
   }
 );
 
-/*
- * =========================================================
- * UPDATE USER PROFILE
- * =========================================================
- *
- * POST /auth/profile
- */
+// =========================================================
+// UPDATE PROFILE
+// =========================================================
 
 app.post(
   "/auth/profile",
@@ -339,11 +307,11 @@ app.post(
     const {
       email,
       username,
-    } = req.body;
+    } = req.body ?? {};
 
-    /*
-     * Validate email.
-     */
+    // -----------------------------------------------
+    // VALIDATE EMAIL
+    // -----------------------------------------------
 
     if (
       email !== undefined &&
@@ -355,9 +323,9 @@ app.post(
       });
     }
 
-    /*
-     * Validate username.
-     */
+    // -----------------------------------------------
+    // VALIDATE USERNAME
+    // -----------------------------------------------
 
     if (
       username !== undefined &&
@@ -369,102 +337,100 @@ app.post(
       });
     }
 
-    /*
-     * =====================================================
-     * WALLET USER
-     * =====================================================
-     */
+    const normalizedEmail =
+      typeof email === "string"
+        ? email.trim().toLowerCase()
+        : undefined;
 
-    if (
-      req.user.address &&
-      typeof req.user.address ===
+    const normalizedUsername =
+      typeof username === "string"
+        ? username.trim()
+        : undefined;
+
+    try {
+      // ---------------------------------------------
+      // WALLET USER
+      // ---------------------------------------------
+
+      if (
+        typeof req.user.address ===
         "string"
-    ) {
-      const updatedUser =
-        await updateUserByAddress(
-          req.user.address,
-          {
-            email:
-              email !== undefined
-                ? email
-                    .trim()
-                    .toLowerCase()
-                : undefined,
+      ) {
+        const updatedUser =
+          await updateUserByAddress(
+            req.user.address,
+            {
+              email:
+                normalizedEmail,
+              username:
+                normalizedUsername,
+            }
+          );
 
-            username:
-              username !== undefined
-                ? username.trim()
-                : undefined,
-          }
-        );
+        if (!updatedUser) {
+          return res.status(404).json({
+            error:
+              "User not found",
+          });
+        }
 
-      if (!updatedUser) {
-        return res.status(404).json({
-          error:
-            "User not found",
+        return res.status(200).json({
+          user: updatedUser,
         });
       }
 
-      return res.json({
-        user: updatedUser,
-      });
-    }
+      // ---------------------------------------------
+      // EMAIL USER
+      // ---------------------------------------------
 
-    /*
-     * =====================================================
-     * EMAIL USER
-     * =====================================================
-     */
-
-    if (
-      req.user.email &&
-      typeof req.user.email ===
+      if (
+        typeof req.user.email ===
         "string"
-    ) {
-      const updatedUser =
-        await updateUserByEmail(
-          req.user.email,
-          {
-            email:
-              email !== undefined
-                ? email
-                    .trim()
-                    .toLowerCase()
-                : undefined,
+      ) {
+        const updatedUser =
+          await updateUserByEmail(
+            req.user.email,
+            {
+              email:
+                normalizedEmail,
+              username:
+                normalizedUsername,
+            }
+          );
 
-            username:
-              username !== undefined
-                ? username.trim()
-                : undefined,
-          }
-        );
+        if (!updatedUser) {
+          return res.status(404).json({
+            error:
+              "User not found",
+          });
+        }
 
-      if (!updatedUser) {
-        return res.status(404).json({
-          error:
-            "User not found",
+        return res.status(200).json({
+          user: updatedUser,
         });
       }
 
-      return res.json({
-        user: updatedUser,
+      return res.status(400).json({
+        error:
+          "Invalid authenticated user",
+      });
+    } catch (error) {
+      console.error(
+        "Update profile error:",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to update profile",
       });
     }
-
-    return res.status(400).json({
-      error:
-        "Invalid authenticated user",
-    });
   }
 );
 
-/*
- * =========================================================
- * LOGOUT
- * =========================================================
- *
- * POST /auth/logout
- */
+// =========================================================
+// LOGOUT
+// =========================================================
 
 app.post(
   "/auth/logout",
@@ -478,10 +444,13 @@ app.post(
         httpOnly: true,
 
         secure:
-          process.env.NODE_ENV ===
+          NODE_ENV ===
           "production",
 
-        sameSite: "strict",
+        sameSite:
+          "strict",
+
+        path: "/",
       }
     );
 
@@ -491,13 +460,9 @@ app.post(
   }
 );
 
-/*
- * =========================================================
- * 404 HANDLER
- * =========================================================
- *
- * This MUST remain after every real route.
- */
+// =========================================================
+// 404
+// =========================================================
 
 app.use(
   (
@@ -509,29 +474,45 @@ app.use(
     );
 
     return res.status(404).json({
-      error:
-        "Route not found",
+      error: "Route not found",
     });
   }
 );
 
-/*
- * =========================================================
- * ERROR HANDLER
- * =========================================================
- */
+// =========================================================
+// GLOBAL ERROR HANDLER
+// =========================================================
 
 app.use(
   (
     error: unknown,
     _req: Request,
     res: Response,
-    _next: express.NextFunction
+    _next: NextFunction
   ) => {
     console.error(
       "Server error:",
       error
     );
+
+    if (
+      error instanceof Error &&
+      error.message ===
+        "Not allowed by CORS"
+    ) {
+      return res.status(403).json({
+        error: "CORS origin not allowed",
+      });
+    }
+
+    if (
+      error instanceof SyntaxError
+    ) {
+      return res.status(400).json({
+        error:
+          "Invalid JSON request",
+      });
+    }
 
     return res.status(500).json({
       error:
@@ -540,18 +521,20 @@ app.use(
   }
 );
 
-/*
- * =========================================================
- * SERVER START
- * =========================================================
- */
+// =========================================================
+// SERVER
+// =========================================================
 
 const server =
   app.listen(
     PORT,
     () => {
       console.log(
-        `✅ Auth server running at http://localhost:${PORT}`
+        `✅ CyBuilder server running on port ${PORT}`
+      );
+
+      console.log(
+        `Environment: ${NODE_ENV}`
       );
 
       console.log(
@@ -559,83 +542,99 @@ const server =
       );
 
       console.log(
-        "  POST /auth/nonce"
+        "  GET    /"
       );
 
       console.log(
-        "  POST /auth/verify"
+        "  GET    /health"
       );
 
       console.log(
-        "  POST /auth/refresh"
+        "  POST   /auth/nonce"
       );
 
       console.log(
-        "  GET  /auth/me"
+        "  POST   /auth/verify"
       );
 
       console.log(
-        "  POST /auth/profile"
+        "  POST   /auth/refresh"
       );
 
       console.log(
-        "  POST /auth/logout"
+        "  GET    /auth/me"
       );
 
       console.log(
-        "  GET  /api/projects"
+        "  POST   /auth/profile"
       );
 
       console.log(
-        "  POST /api/projects"
+        "  POST   /auth/logout"
       );
 
       console.log(
-        "  GET  /api/projects/:id"
+        "  GET    /api/projects"
       );
 
       console.log(
-        "  PATCH /api/projects/:id"
+        "  POST   /api/projects"
+      );
+
+      console.log(
+        "  GET    /api/projects/:id"
+      );
+
+      console.log(
+        "  PATCH  /api/projects/:id"
       );
 
       console.log(
         "  DELETE /api/projects/:id"
       );
+
+      console.log(
+        "  POST   /api/ai"
+      );
     }
   );
 
-/*
- * =========================================================
- * GRACEFUL SHUTDOWN
- * =========================================================
- */
+// =========================================================
+// GRACEFUL SHUTDOWN
+// =========================================================
+
+function shutdown(
+  signal: string
+) {
+  console.log(
+    `🛑 ${signal} received. Shutting down...`
+  );
+
+  server.close(
+    () => {
+      console.log(
+        "✅ Server closed."
+      );
+
+      process.exit(0);
+    }
+  );
+
+  setTimeout(() => {
+    console.error(
+      "⚠️ Forced shutdown."
+    );
+
+    process.exit(1);
+  }, 10_000).unref();
+}
 
 process.on(
   "SIGINT",
-  () => {
-    console.log(
-      "🛑 Server shutting down..."
-    );
-
-    server.close(
-      () => {
-        process.exit(0);
-      }
-    );
-  }
+  () => shutdown("SIGINT")
 );
 
 process.on(
   "SIGTERM",
-  () => {
-    console.log(
-      "🛑 Caught SIGTERM, shutting down..."
-    );
-
-    server.close(
-      () => {
-        process.exit(0);
-      }
-    );
-  }
+  () => shutdown("SIGTERM")
 );

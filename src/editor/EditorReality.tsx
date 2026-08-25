@@ -25,16 +25,8 @@ import {
 type EditorRealityProps = {
   children?: ReactNode | ReactNode[];
 
-  /**
-   * Explicit starting scene.
-   *
-   * If omitted, the template scene is used.
-   */
   initialScene?: SceneData;
 
-  /**
-   * World/template used by the editor.
-   */
   template?: EditorTemplate;
 };
 
@@ -57,30 +49,22 @@ export default function EditorReality({
         initialScene={startingScene}
       >
 
-        {/* =====================================
-            TEMPLATE ENVIRONMENT
-        ====================================== */}
+        {/* TEMPLATE ENVIRONMENT */}
 
         {template.environment}
 
 
-        {/* =====================================
-            EDITABLE SCENE
-        ====================================== */}
+        {/* EDITABLE SCENE */}
 
         <Scene />
 
 
-        {/* =====================================
-            EDITOR UI
-        ====================================== */}
+        {/* EDITOR UI */}
 
         <EditorUI />
 
 
-        {/* =====================================
-            EXTRA CHILDREN
-        ====================================== */}
+        {/* EXTRA CHILDREN */}
 
         {children}
 
