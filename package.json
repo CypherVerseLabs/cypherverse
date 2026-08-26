@@ -17,6 +17,13 @@
     "type": "git",
     "url": "git+https://github.com/CypherVerseLabs/cypherverse.git"
   },
+
+  "author": {
+    "name": "Mac Tohbala",
+    "email": "mactohbala@gmail.com",
+    "url": "https://github.com/CypherVerseLabs/cypherverse.git"
+  },
+
   "scripts": {
     "dev": "next dev",
     "build": "next build && next export",

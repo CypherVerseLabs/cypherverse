@@ -6,15 +6,15 @@ import type {
 import type {
   AIActionResponse,
   AIGenerateContext,
-} from "../../../../server/ai/aiTypes.js";
+} from "../../../../server/ai/aiTypes";
 
 import type {
   AIIdeaContext,
-} from "../../../../server/ai/aiService.js";
+} from "../../../../server/ai/aiService";
 
 import {
   generateSceneActions,
-} from "../../../../server/ai/aiService.js";
+} from "../../../../server/ai/aiService";
 
 
 /* =========================================

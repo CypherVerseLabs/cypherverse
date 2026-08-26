@@ -1,25 +1,18 @@
 
 
 import {
-  Spinning,
+
   StandardReality,
-  Button,
-  Model,
+
   LostWorld,
   Fog,
-  Dialogue,
+
 } from "cyengine";
 
-import CloudySky from "ideas/CloudySky";
-import Link from "../ideas/Link";
-import PreloadImage from "ideas/PreloadImage";
-import { Rain } from "ideas/Rain";
-import Speaker from "ideas/players/Speaker";
+
 import Analytics from "ideas/Analytics";
 import Title from "ideas/Title";
 
-import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
-import { useAuthContext } from "ideas/context/AuthContext";
 
 export default function Teaser() {
  

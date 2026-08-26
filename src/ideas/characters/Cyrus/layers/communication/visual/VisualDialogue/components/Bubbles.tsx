@@ -1,9 +1,9 @@
 import { useMemo, useRef } from "react";
 import { Floating, Spinning, useLimiter } from "cyengine";
 import { Idea, VisualIdea } from "../../../../basis";
-import { animated, useSpring } from "@react-spring/three";
+
 import { GroupProps, useFrame } from "@react-three/fiber";
-import { Group, Vector3 } from "three";
+import { Group, Vector3,  } from "three";
 
 type Bubble = {
   idea: Idea;
@@ -18,23 +18,35 @@ type BubbleProps = {
 } & Bubble;
 
 function Bubble(props: BubbleProps) {
-  const { i, num, enabled, pos, size, idea } = props;
+  const { i, enabled, pos, size, idea } = props;
 
-  const { scale } = useSpring({ scale: enabled ? 1 : 0 });
+  const groupRef = useRef<Group>(null);
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+
+    const target = enabled ? 1 : 0;
+    const speed = 8;
+
+    groupRef.current.scale.setScalar(
+      groupRef.current.scale.x +
+        (target - groupRef.current.scale.x) *
+          Math.min(1, delta * speed)
+    );
+  });
 
   return (
     <group name={`bubble-${i}`} position={pos}>
       <Floating height={size * 0.25}>
         <Spinning xSpeed={0.1} ySpeed={0.1} zSpeed={0.1}>
-          <animated.group scale={scale}>
+          <group ref={groupRef}>
             <VisualIdea idea={idea} size={size} />
-          </animated.group>
+          </group>
         </Spinning>
       </Floating>
     </group>
   );
 }
-
 type BubblesProps = {
   numStops: number;
   idea: Idea;

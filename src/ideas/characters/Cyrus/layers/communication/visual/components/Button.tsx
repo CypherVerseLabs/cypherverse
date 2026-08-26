@@ -47,6 +47,7 @@ export default function Button(props: ButtonProps) {
   const [clicked, setClicked] = useState(false);
 
   const restColor = idea ? idea.getHex() : "#aaa";
+
   const hoverColor = idea
     ? new Idea()
         .setFromCreation(
@@ -60,35 +61,38 @@ export default function Button(props: ButtonProps) {
   const { color, scale } = useSpring({
     color: hovered ? restColor : hoverColor,
     scale: clicked ? 0.75 : 1,
-    ...config.stiff,
+    config: config.stiff,
   });
 
-  // spring animation on click
   useEffect(() => {
-    if (clicked) {
-      setTimeout(() => setClicked(false), 150);
-    }
+    if (!clicked) return;
+
+    const timeout = setTimeout(() => {
+      setClicked(false);
+    }, 150);
+
+    return () => clearTimeout(timeout);
   }, [clicked]);
 
   const onButtonClick = () => {
-    if (onClick) {
-      onClick();
-    }
+    onClick?.();
     setClicked(true);
   };
 
   return (
     <group name={`button-${children}`} {...rest}>
       <group name="button-wrapper" scale={size}>
+        {/* @ts-ignore */}
         <animated.group scale={scale}>
           {children && (
-            <>
-              {/* @ts-ignore */}
-              <Text {...TEXT_STYLES} position-z={DEPTH / 2 + 0.001}>
-                {children}
-              </Text>
-            </>
+            <Text
+              {...TEXT_STYLES}
+              position-z={DEPTH / 2 + 0.001}
+            >
+              {children}
+            </Text>
           )}
+
           <Interactable
             onClick={onButtonClick}
             onHover={() => setHovered(true)}

@@ -86,6 +86,3 @@ const hashStringToRange = (str: string, loop = 20): number => {
   return (count % scaledLoop) / scaledLoop;
 };
 
-const wrapNumber = (num: number, range = 10) => {
-  return (num % range) / range;
-};

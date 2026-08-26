@@ -26,7 +26,7 @@ export default function BuildMe() {
   loginWithWallet,
   logout,
   loading,
-  isAuthenticated,
+  
 } = useAuthContext();
 
   const dialogue = useApiDialogue();

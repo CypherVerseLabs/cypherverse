@@ -25,6 +25,7 @@ import refreshRouter from "./routes/auth/refresh.js";
 import emailAuthRouter from "./routes/auth/emailAuth.js";
 import projectRouter from "./routes/auth/projects.js";
 import aiRouter from "./routes/auth/ai.js";
+import publicProjectRouter from "./routes/public/projects.js";
 
 // =========================================================
 // AUTH MIDDLEWARE
@@ -189,12 +190,44 @@ app.use(
 );
 
 // =========================================================
-// PROJECT ROUTES
+// PUBLIC PROJECT ROUTES
 // =========================================================
+
+app.use(
+  "/api/public/projects",
+  publicProjectRouter
+);
+
+// =========================================================
+// AUTHENTICATED PROJECT ROUTES
+// =========================================================
+
+console.log(
+  "MOUNTING PROJECT ROUTER"
+);
+
+app.use(
+  "/api/projects",
+  (req, _res, next) => {
+    console.log(
+      "🔥 API PROJECTS REQUEST:",
+      req.method,
+      req.originalUrl
+    );
+
+    next();
+  }
+);
 
 app.use(
   "/api/projects",
   projectRouter
+);
+
+
+
+console.log(
+  "PROJECT ROUTER MOUNTED"
 );
 
 // =========================================================
@@ -591,6 +624,10 @@ const server =
 
       console.log(
         "  DELETE /api/projects/:id"
+      );
+
+      console.log(
+        "  POST   /api/projects/:id/publish"
       );
 
       console.log(

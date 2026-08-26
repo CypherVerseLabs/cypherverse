@@ -4,33 +4,16 @@ import {
   VisualWorld,
 } from "cyengine";
 
-import { Text } from "@react-three/drei";
 
 import Analytics from "ideas/Analytics";
 
-import { scene } from "../templates/found";
 import { sceneToWorld } from "../editor/scene/sceneToWorld";
 import Cyrus from "ideas/characters/Cyrus";
+import { scene } from "pages/found";
 
 const previewWorld = sceneToWorld(scene);
 
-const objectCount = scene.objects.length;
 
-const modelCount = scene.objects.filter(
-  (object) => object.type === "model"
-).length;
-
-const linkCount = scene.objects.filter(
-  (object) => object.type === "link"
-).length;
-
-const hasRain = scene.objects.some(
-  (object) => object.type === "rain"
-);
-
-const hasGround = scene.objects.some(
-  (object) => object.type === "ground"
-);
 
 export default function Playground() {
   return (

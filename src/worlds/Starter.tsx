@@ -19,7 +19,6 @@ import { introDialogue } from "ideas/Dialogues/intro";
 import { useAuthContext } from "ideas/context/AuthContext";
 
 import TemplateSelector from "ideas/TemplateSelector";
-import Test from "ideas/PreviewBox";
 import Words from "ideas/Text";
 
 import WorldCard from "ideas/WorldCard";
@@ -229,11 +228,7 @@ export default function Starter() {
           TEST OBJECT
       ===================================================== */}
 
-      <Test
-        name="normalize and center model"
-        position-x={1.2 * 4}
-        children={undefined}
-      />
+      
 
       {/* =====================================================
           ACCOUNT DIALOGUE

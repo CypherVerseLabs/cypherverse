@@ -73,10 +73,17 @@ export const SCENE_FILE_VERSION =
    CONSTANTS
 ========================================= */
 
+const API_URL =
+  (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+
+
 const MAX_HISTORY_SIZE = 100;
 
 const MAX_SCENE_FILE_SIZE =
   50 * 1024 * 1024;
+
+const MAX_PUBLISH_SCENE_SIZE =
+  10 * 1024 * 1024;
 
 /* =========================================
    CONTEXT VALUE
@@ -185,23 +192,26 @@ type EditorContextValue = {
   ) => void;
 
   /* =======================================
-   SAVE / LOAD
-======================================= */
+     SAVE / LOAD
+  ======================================= */
 
-saveScene: () => Promise<void>;
+  saveScene: () => Promise<void>;
 
-loadScene: (
-  file: File
-) => Promise<void>;
+  loadScene: (
+    file: File
+  ) => Promise<void>;
 
-loadProject: (
-  projectId: string
-) => Promise<void>;
+  loadProject: (
+    projectId: string
+  ) => Promise<void>;
 
-saveProject: (
-  projectId: string
-) => Promise<void>;
+  saveProject: (
+    projectId: string
+  ) => Promise<void>;
 
+  publishProject: (
+    projectId: string
+  ) => Promise<void>;
 };
 
 /* =========================================
@@ -1031,7 +1041,7 @@ export function EditorProvider({
       []
     );
 
-      /* =======================================
+  /* =======================================
      LOAD PROJECT
   ======================================= */
 
@@ -1154,6 +1164,23 @@ export function EditorProvider({
         const sceneToSave =
           cloneScene(scene);
 
+        const sceneJson =
+          JSON.stringify(sceneToSave);
+
+        const sceneSize =
+          new TextEncoder()
+            .encode(sceneJson)
+            .byteLength;
+
+        if (
+          sceneSize >
+          MAX_PUBLISH_SCENE_SIZE
+        ) {
+          throw new Error(
+            "Project scene must be 10 MB or smaller."
+          );
+        }
+
         const response =
           await authFetch(
             `/api/projects/${encodeURIComponent(
@@ -1194,6 +1221,183 @@ export function EditorProvider({
       },
       [authFetch, scene]
     );
+
+  /* =======================================
+     PUBLISH PROJECT
+  ======================================= */
+
+  /* =======================================
+   PUBLISH PROJECT
+======================================= */
+
+const publishProject =
+  useCallback(
+    async (
+      projectId: string
+    ) => {
+      if (!projectId) {
+        throw new Error(
+          "Project ID is required."
+        );
+      }
+
+      /*
+       * The project was already created by
+       * TemplateSelector.
+       *
+       * Publishing updates that existing
+       * project. It does NOT create a project.
+       */
+
+      const sceneToPublish =
+        cloneScene(scene);
+
+      /* ---------------------------------
+         SCENE JSON
+      --------------------------------- */
+
+      let sceneJson: string;
+
+      try {
+        sceneJson =
+          JSON.stringify(
+            sceneToPublish
+          );
+      } catch {
+        throw new Error(
+          "Project scene could not be serialized."
+        );
+      }
+
+      const sceneSize =
+        new TextEncoder()
+          .encode(sceneJson)
+          .byteLength;
+
+      if (
+        sceneSize >
+        MAX_PUBLISH_SCENE_SIZE
+      ) {
+        throw new Error(
+          "Project scene must be 10 MB or smaller."
+        );
+      }
+
+      /* ---------------------------------
+         ASSET MANIFEST
+      --------------------------------- */
+
+      const currentAssets =
+        assetsRef.current;
+
+      const assetManifest =
+        currentAssets.map(
+          (asset) => ({
+            assetId:
+              asset.id,
+
+            objectUrl:
+              asset.objectUrl,
+          })
+        );
+
+      /* ---------------------------------
+         FORM DATA
+      --------------------------------- */
+
+      const formData =
+        new FormData();
+
+      /*
+       * These names MUST match the server:
+       *
+       * scene
+       * assetManifest
+       * asset-<assetId>
+       */
+
+      formData.append(
+        "scene",
+        sceneJson
+      );
+
+      formData.append(
+        "assetManifest",
+        JSON.stringify(
+          assetManifest
+        )
+      );
+
+      /* ---------------------------------
+         ASSET FILES
+      --------------------------------- */
+
+      for (
+        const asset of currentAssets
+      ) {
+        if (!asset.file) {
+          throw new Error(
+            `Asset "${asset.name}" is missing its file.`
+          );
+        }
+
+        formData.append(
+          `asset-${asset.id}`,
+          asset.file,
+          asset.name
+        );
+      }
+
+      /* ---------------------------------
+         SEND TO EXISTING PROJECT
+      --------------------------------- */
+
+      const response =
+  await authFetch(
+    `/api/projects/${encodeURIComponent(
+      projectId
+    )}/publish`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+      /* ---------------------------------
+         RESPONSE
+      --------------------------------- */
+
+      const data =
+        await response
+          .json()
+          .catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            data?.message ||
+            "Failed to publish project."
+        );
+      }
+
+      if (!data?.project) {
+        throw new Error(
+          "Server did not return the published project."
+        );
+      }
+
+      console.log(
+        "✅ Project published:",
+        projectId
+      );
+
+      return data.project;
+    },
+    [
+      scene,
+      authFetch,
+    ]
+  );
 
   /* =======================================
      BEGIN TRANSFORM
@@ -1603,13 +1807,6 @@ export function EditorProvider({
             duplicatedId =
               newId;
 
-            /*
-             * IMPORTANT:
-             *
-             * Explicitly construct the
-             * transform so TypeScript
-             * retains Vector3Tuple.
-             */
             const duplicateTransform:
               Transform = {
               position: [
@@ -1721,20 +1918,10 @@ export function EditorProvider({
                       return item;
                     }
 
-                    /*
-                     * Preserve the exact
-                     * discriminated union
-                     * member by spreading
-                     * the original object.
-                     */
                     const nextObject =
                       structuredClone(
                         item
                       ) as SceneObject;
-
-                    /* -------------------
-                       TRANSFORM
-                    ------------------- */
 
                     if (
                       changes.transform
@@ -1749,38 +1936,15 @@ export function EditorProvider({
                         };
                     }
 
-                    /* -------------------
-                       PROPS
-                    ------------------- */
-
                     if (
                       changes.props
                     ) {
-                      /*
-                       * SceneObject is a
-                       * discriminated union.
-                       *
-                       * Its props type depends
-                       * on `type`, so we cannot
-                       * safely assign an arbitrary
-                       * Record<string, unknown>
-                       * directly to it.
-                       *
-                       * The runtime operation is
-                       * intentionally generic,
-                       * so cast only this merged
-                       * value.
-                       */
                       nextObject.props =
                         {
                           ...item.props,
                           ...changes.props,
                         } as typeof nextObject.props;
                     }
-
-                    /* -------------------
-                       METADATA
-                    ------------------- */
 
                     if (
                       Object.prototype.hasOwnProperty.call(
@@ -1811,10 +1975,6 @@ export function EditorProvider({
                       nextObject.locked =
                         changes.locked;
                     }
-
-                    /* -------------------
-                       PARENT
-                    ------------------- */
 
                     if (
                       Object.prototype.hasOwnProperty.call(
@@ -1870,10 +2030,6 @@ export function EditorProvider({
                       return item;
                     }
 
-                    /*
-                     * Explicit tuple construction
-                     * prevents number[] widening.
-                     */
                     const nextTransform:
                       Transform = {
                       position:
@@ -2093,7 +2249,7 @@ export function EditorProvider({
       [commitScene]
     );
 
-    /* =======================================
+  /* =======================================
      CONTEXT VALUE
   ======================================= */
 
@@ -2175,6 +2331,8 @@ export function EditorProvider({
         loadProject,
 
         saveProject,
+
+        publishProject,
       }),
       [
         scene,
@@ -2230,6 +2388,8 @@ export function EditorProvider({
         loadProject,
 
         saveProject,
+
+        publishProject,
       ]
     );
 

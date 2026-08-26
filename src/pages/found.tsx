@@ -1,8 +1,5 @@
 import dynamic from "next/dynamic";
-
-import {
-  Scene,
-} from "../editor/scene/objectTypes";
+import { Scene } from "../editor/scene/objectTypes";
 
 const EditorReality = dynamic(
   () => import("../editor/EditorReality"),
@@ -138,7 +135,7 @@ export const scene: Scene = {
       type: "link",
 
       transform: {
-        position: [1, 0.8, 0],
+        position: [1, 0.8, 0.75],
         rotation: [0, 0, 0],
         scale: [1, 1, 1],
       },
@@ -171,10 +168,40 @@ export const scene: Scene = {
   ],
 };
 
-export default function EditorPage() {
+export default function FoundPage() {
+  /*
+   * The project was already created by TemplateSelector.
+   *
+   * Orientation preserved the project ID in sessionStorage.
+   *
+   * Found is therefore NOT creating a project.
+   * It is opening the existing project using the starter scene.
+   */
+
+  const projectId =
+    typeof window !== "undefined"
+      ? sessionStorage.getItem(
+          "cypherverse-project-id"
+        )
+      : null;
+
+  /*
+   * Development logging.
+   */
+
+  if (
+    process.env.NODE_ENV === "development"
+  ) {
+    console.log(
+      "FOUND PROJECT ID:",
+      projectId
+    );
+  }
+
   return (
     <EditorReality
       initialScene={scene}
+      projectId={projectId ?? undefined}
     />
   );
 }

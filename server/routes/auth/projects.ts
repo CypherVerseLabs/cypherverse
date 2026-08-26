@@ -14,7 +14,16 @@ import {
   getProjectById,
   updateProject,
   deleteProject,
+  publishProjectWithAssets,
 } from "../../stores/projectStore.js";
+
+import multer from "multer";
+
+import {
+  uploadToR2,
+} from "../../lib/r2.js";
+
+import crypto from "crypto";
 
 const router = Router();
 
@@ -200,6 +209,403 @@ router.post(
     }
   }
 );
+
+
+
+const publishUpload =
+  multer({
+    storage:
+      multer.memoryStorage(),
+
+    limits: {
+      files: 100,
+
+      fileSize:
+        20 * 1024 * 1024,
+
+      fieldSize:
+        12 * 1024 * 1024,
+    },
+  });
+
+
+// =========================================================
+// POST /api/projects/:id/publish
+// =========================================================
+//
+// Publish the current project scene and assets.
+//
+// Multipart fields:
+//
+//   scene
+//   assetManifest
+//   asset-<assetId>
+// =========================================================
+
+router.post(
+  "/:id/publish",
+  authenticateToken,
+  publishUpload.any(),
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+
+    console.log(
+      "🔥 PUBLISH ROUTE HIT:",
+      req.method,
+      req.originalUrl,
+      req.params.id
+    ); 
+    
+    try {
+      /* -----------------------------------------------
+         AUTH
+      ----------------------------------------------- */
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          error: "Unauthorized",
+        });
+      }
+
+      /* -----------------------------------------------
+         PROJECT ID
+      ----------------------------------------------- */
+
+      const projectId =
+        req.params.id;
+
+        console.log(
+        "🔥 PUBLISH PROJECT ID:",
+        projectId
+      );
+
+      if (!projectId) {
+        return res.status(400).json({
+          error:
+            "Project ID is required",
+        });
+      }
+
+      /* -----------------------------------------------
+         PROJECT OWNERSHIP
+      ----------------------------------------------- */
+
+      const project =
+        await getProjectById(
+          projectId,
+          req.user.id
+        );
+
+      if (!project) {
+        return res.status(404).json({
+          error:
+            "Project not found",
+        });
+      }
+
+      /* -----------------------------------------------
+         MULTIPART FIELDS
+      ----------------------------------------------- */
+
+      const sceneField =
+        req.body?.scene;
+
+      const manifestField =
+        req.body?.assetManifest;
+
+      if (
+        typeof sceneField !==
+        "string"
+      ) {
+        return res.status(400).json({
+          error:
+            "Publish request is missing scene",
+        });
+      }
+
+      if (
+        typeof manifestField !==
+        "string"
+      ) {
+        return res.status(400).json({
+          error:
+            "Publish request is missing assetManifest",
+        });
+      }
+
+      /* -----------------------------------------------
+         PARSE SCENE
+      ----------------------------------------------- */
+
+      let scene: unknown;
+
+      try {
+        scene =
+          JSON.parse(
+            sceneField
+          );
+      } catch {
+        return res.status(400).json({
+          error:
+            "Project scene must be valid JSON",
+        });
+      }
+
+      if (
+        !scene ||
+        typeof scene !==
+          "object" ||
+        !Array.isArray(
+          (scene as {
+            objects?: unknown;
+          }).objects
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Project scene is invalid",
+        });
+      }
+
+      /* -----------------------------------------------
+         SCENE SIZE
+      ----------------------------------------------- */
+
+      const sceneSize =
+        Buffer.byteLength(
+          sceneField,
+          "utf8"
+        );
+
+      if (
+        sceneSize >
+        10 * 1024 * 1024
+      ) {
+        return res.status(413).json({
+          error:
+            "Project scene must be 10 MB or smaller",
+        });
+      }
+
+      /* -----------------------------------------------
+         PARSE MANIFEST
+      ----------------------------------------------- */
+
+      let assetManifest: {
+        assetId: string;
+        objectUrl: string;
+      }[];
+
+      try {
+        assetManifest =
+          JSON.parse(
+            manifestField
+          );
+      } catch {
+        return res.status(400).json({
+          error:
+            "Invalid asset manifest",
+        });
+      }
+
+      if (
+        !Array.isArray(
+          assetManifest
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Asset manifest must be an array",
+        });
+      }
+
+      /* -----------------------------------------------
+         FILES
+      ----------------------------------------------- */
+
+      const uploadedFiles =
+        (req.files ?? []) as Express.Multer.File[];
+
+      const filesByField =
+        new Map<
+          string,
+          Express.Multer.File
+        >();
+
+      for (
+        const file of
+          uploadedFiles
+      ) {
+        filesByField.set(
+          file.fieldname,
+          file
+        );
+      }
+
+      /* -----------------------------------------------
+         PREPARE SCENE
+      ----------------------------------------------- */
+
+      const sceneToPublish =
+        structuredClone(
+          scene
+        ) as {
+          objects: {
+            props?: Record<
+              string,
+              unknown
+            >;
+          }[];
+        };
+
+      /* -----------------------------------------------
+         ASSET RECORDS
+      ----------------------------------------------- */
+
+      const projectAssets: {
+        originalName: string;
+        storageKey: string;
+        mimeType: string;
+        sizeBytes: number;
+      }[] = [];
+
+      /* -----------------------------------------------
+         PROCESS ASSETS
+      ----------------------------------------------- */
+
+      for (
+        const manifestAsset of
+          assetManifest
+      ) {
+        if (
+          !manifestAsset ||
+          typeof manifestAsset.assetId !==
+            "string" ||
+          typeof manifestAsset.objectUrl !==
+            "string"
+        ) {
+          return res.status(400).json({
+            error:
+              "Invalid asset manifest entry",
+          });
+        }
+
+        const fieldName =
+          `asset-${manifestAsset.assetId}`;
+
+        const file =
+          filesByField.get(
+            fieldName
+          );
+
+        if (!file) {
+          return res.status(400).json({
+            error:
+              `Missing asset file: ${fieldName}`,
+          });
+        }
+
+        const storageKey =
+          `projects/${projectId}/assets/${crypto.randomUUID()}-${sanitizeStorageName(
+            file.originalname
+          )}`;
+
+        const publicUrl =
+          await uploadToR2(
+            storageKey,
+            file.buffer,
+            file.mimetype
+          );
+
+        projectAssets.push({
+          originalName:
+            file.originalname,
+
+          storageKey,
+
+          mimeType:
+            file.mimetype ||
+            "application/octet-stream",
+
+          sizeBytes:
+            file.size,
+        });
+
+        /* -------------------------------------------
+           REWRITE SCENE REFERENCES
+        ------------------------------------------- */
+
+        for (
+          const object of
+            sceneToPublish.objects
+        ) {
+          if (
+            !object.props
+          ) {
+            continue;
+          }
+
+          for (
+            const key of
+              Object.keys(
+                object.props
+              )
+          ) {
+            if (
+              object.props[key] ===
+              manifestAsset.objectUrl
+            ) {
+              object.props[key] =
+                publicUrl;
+            }
+          }
+        }
+      }
+
+      /* -----------------------------------------------
+         PUBLISH DATABASE STATE
+      ----------------------------------------------- */
+
+      const publishedProject =
+        await publishProjectWithAssets(
+          projectId,
+          req.user.id,
+          sceneToPublish,
+          projectAssets
+        );
+
+      if (!publishedProject) {
+        return res.status(404).json({
+          error:
+            "Project not found",
+        });
+      }
+
+      /* -----------------------------------------------
+         RESPONSE
+      ----------------------------------------------- */
+
+      return res.status(200).json({
+        project:
+          publishedProject,
+      });
+    } catch (error) {
+      console.error(
+        "Publish project error:",
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          "Failed to publish project",
+      });
+    }
+  }
+);
+
+  
 
 /**
  * =========================================================
@@ -496,3 +902,11 @@ router.delete(
 );
 
 export default router;
+
+function sanitizeStorageName(
+  originalname: string
+): string {
+  return originalname
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 200);
+}

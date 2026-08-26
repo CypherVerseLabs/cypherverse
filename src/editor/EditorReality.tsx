@@ -28,6 +28,16 @@ type EditorRealityProps = {
   initialScene?: SceneData;
 
   template?: EditorTemplate;
+
+  /**
+   * ID of the server project being edited.
+   *
+   * Required for:
+   * - Save Project
+   * - Load Project
+   * - Publish Project
+   */
+  projectId?: string;
 };
 
 
@@ -35,6 +45,7 @@ export default function EditorReality({
   children,
   initialScene,
   template = defaultEditorTemplate,
+  projectId,
 }: EditorRealityProps) {
 
   const startingScene =
@@ -61,7 +72,9 @@ export default function EditorReality({
 
         {/* EDITOR UI */}
 
-        <EditorUI />
+        <EditorUI
+          projectId={projectId}
+        />
 
 
         {/* EXTRA CHILDREN */}

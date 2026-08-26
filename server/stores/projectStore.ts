@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+
 import {
   Prisma,
   ProjectTemplate,
@@ -12,10 +13,20 @@ export interface Project {
   template: ProjectTemplate;
   scene?: unknown;
 
-  // Publishing
   slug?: string;
   publishedAt?: string;
 
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectAsset {
+  id: string;
+  projectId: string;
+  originalName: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,10 +38,8 @@ function toProject(project: {
   description: string | null;
   template: ProjectTemplate;
   scene: unknown;
-
   slug: string | null;
   publishedAt: Date | null;
-
   createdAt: Date;
   updatedAt: Date;
 }): Project {
@@ -75,13 +84,35 @@ function toProject(project: {
   };
 }
 
-/**
- * Convert arbitrary JSON data into the
- * Prisma JSON input type.
- */
+function toProjectAsset(asset: {
+  id: string;
+  projectId: string;
+  originalName: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: Date;
+  updatedAt: Date;
+}): ProjectAsset {
+  return {
+    id: asset.id,
+    projectId: asset.projectId,
+    originalName: asset.originalName,
+    storageKey: asset.storageKey,
+    mimeType: asset.mimeType,
+    sizeBytes: asset.sizeBytes,
+    createdAt:
+      asset.createdAt.toISOString(),
+    updatedAt:
+      asset.updatedAt.toISOString(),
+  };
+}
+
 function toPrismaJson(
   value: unknown
-): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+):
+  | Prisma.InputJsonValue
+  | typeof Prisma.JsonNull {
   if (value === null) {
     return Prisma.JsonNull;
   }
@@ -89,16 +120,16 @@ function toPrismaJson(
   return value as Prisma.InputJsonValue;
 }
 
-/**
- * =========================================================
- * CREATE PROJECT
- * =========================================================
- */
+/* =========================================================
+   CREATE
+========================================================= */
+
 export async function createProject(
   ownerId: string,
   name: string,
   description?: string,
-  template: ProjectTemplate = ProjectTemplate.editor
+  template: ProjectTemplate =
+    ProjectTemplate.editor
 ): Promise<Project> {
   const project =
     await prisma.project.create({
@@ -114,11 +145,10 @@ export async function createProject(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * GET PROJECTS BY OWNER
- * =========================================================
- */
+/* =========================================================
+   GET PROJECTS
+========================================================= */
+
 export async function getProjectsByOwnerId(
   ownerId: string
 ): Promise<Project[]> {
@@ -135,11 +165,10 @@ export async function getProjectsByOwnerId(
   return projects.map(toProject);
 }
 
-/**
- * =========================================================
- * GET PROJECT BY ID
- * =========================================================
- */
+/* =========================================================
+   GET PROJECT
+========================================================= */
+
 export async function getProjectById(
   projectId: string,
   ownerId: string
@@ -159,11 +188,10 @@ export async function getProjectById(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * UPDATE PROJECT
- * =========================================================
- */
+/* =========================================================
+   UPDATE PROJECT
+========================================================= */
+
 export async function updateProject(
   projectId: string,
   ownerId: string,
@@ -197,7 +225,8 @@ export async function updateProject(
             }
           : {}),
 
-        ...(updates.description !== undefined
+        ...(updates.description !==
+        undefined
           ? {
               description:
                 updates.description.trim() ||
@@ -218,11 +247,55 @@ export async function updateProject(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * PUBLISH PROJECT
- * =========================================================
- */
+/* =========================================================
+   CREATE ASSET
+========================================================= */
+
+export async function createProjectAsset(
+  projectId: string,
+  originalName: string,
+  storageKey: string,
+  mimeType: string,
+  sizeBytes: number
+): Promise<ProjectAsset> {
+  const asset =
+    await prisma.projectAsset.create({
+      data: {
+        projectId,
+        originalName,
+        storageKey,
+        mimeType,
+        sizeBytes,
+      },
+    });
+
+  return toProjectAsset(asset);
+}
+
+/* =========================================================
+   GET ASSETS
+========================================================= */
+
+export async function getProjectAssets(
+  projectId: string
+): Promise<ProjectAsset[]> {
+  const assets =
+    await prisma.projectAsset.findMany({
+      where: {
+        projectId,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+  return assets.map(toProjectAsset);
+}
+
+/* =========================================================
+   PUBLISH
+========================================================= */
+
 export async function publishProject(
   projectId: string,
   ownerId: string
@@ -239,10 +312,6 @@ export async function publishProject(
     return undefined;
   }
 
-  /*
-   * If the project already has a slug,
-   * keep it when republishing.
-   */
   const slug =
     existing.slug ??
     createProjectSlug(
@@ -264,11 +333,101 @@ export async function publishProject(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * UNPUBLISH PROJECT
- * =========================================================
- */
+/* =========================================================
+   publishProjectWithAssets
+========================================================= */
+
+export async function publishProjectWithAssets(
+  projectId: string,
+  ownerId: string,
+  scene: unknown,
+  assets: {
+    originalName: string;
+    storageKey: string;
+    mimeType: string;
+    sizeBytes: number;
+  }[]
+): Promise<Project | undefined> {
+  const existing =
+    await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        ownerId,
+      },
+    });
+
+  if (!existing) {
+    return undefined;
+  }
+
+  const slug =
+    existing.slug ??
+    createProjectSlug(
+      existing.name,
+      existing.id
+    );
+
+  const project =
+    await prisma.$transaction(
+      async (tx) => {
+        /*
+         * Replace the project's asset records
+         * with the assets from this publication.
+         */
+        await tx.projectAsset.deleteMany({
+          where: {
+            projectId: existing.id,
+          },
+        });
+
+        if (assets.length > 0) {
+          await tx.projectAsset.createMany({
+            data: assets.map(
+              (asset) => ({
+                projectId:
+                  existing.id,
+
+                originalName:
+                  asset.originalName,
+
+                storageKey:
+                  asset.storageKey,
+
+                mimeType:
+                  asset.mimeType,
+
+                sizeBytes:
+                  asset.sizeBytes,
+              })
+            ),
+          });
+        }
+
+        return tx.project.update({
+          where: {
+            id: existing.id,
+          },
+
+          data: {
+            scene:
+              toPrismaJson(scene),
+
+            slug,
+
+            publishedAt:
+              new Date(),
+          },
+        });
+      }
+    );
+
+  return toProject(project);
+}
+
+/* =========================================================
+   UNPUBLISH
+========================================================= */
+
 export async function unpublishProject(
   projectId: string,
   ownerId: string
@@ -298,18 +457,10 @@ export async function unpublishProject(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * GET PUBLIC PROJECT
- * =========================================================
- *
- * IMPORTANT:
- *
- * This does NOT require authentication.
- *
- * A project is public only when
- * publishedAt is not null.
- */
+/* =========================================================
+   PUBLIC PROJECT
+========================================================= */
+
 export async function getPublicProject(
   slug: string
 ): Promise<Project | undefined> {
@@ -330,11 +481,10 @@ export async function getPublicProject(
   return toProject(project);
 }
 
-/**
- * =========================================================
- * SLUG GENERATOR
- * =========================================================
- */
+/* =========================================================
+   SLUG
+========================================================= */
+
 function createProjectSlug(
   name: string,
   id: string
@@ -343,30 +493,18 @@ function createProjectSlug(
     name
       .toLowerCase()
       .trim()
-      .replace(
-        /[^a-z0-9]+/g,
-        "-"
-      )
-      .replace(
-        /^-+|-+$/g,
-        ""
-      )
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
       .slice(0, 60) ||
     "project";
 
-  /*
-   * Add part of the project ID so
-   * two projects with the same name
-   * cannot collide.
-   */
   return `${base}-${id.slice(0, 8)}`;
 }
 
-/**
- * =========================================================
- * DELETE PROJECT
- * =========================================================
- */
+/* =========================================================
+   DELETE
+========================================================= */
+
 export async function deleteProject(
   projectId: string,
   ownerId: string

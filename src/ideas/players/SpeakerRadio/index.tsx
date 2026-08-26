@@ -3,7 +3,7 @@ import { Suspense, useState } from "react";
 import { GroupProps } from "@react-three/fiber";
 import { AudioAnalyser } from "three";
 import SpeakerModel from "../Speaker/models/Speaker";
-import Audio from "../Speaker/components/Audio";
+import Audio from "./components/Audio";
 
 type SpeakerRadioProps = {
   distance?: number;

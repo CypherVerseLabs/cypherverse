@@ -1,8 +1,6 @@
 import { Html } from "@react-three/drei";
 
 import {
-  CSSProperties,
-  ReactNode,
   ChangeEvent,
   useEffect,
   useRef,
@@ -13,20 +11,15 @@ import { useEditor } from "../context/EditorContext";
 
 import {
   createSceneObject,
-  getIdeaCategories,
-  getIdeasByCategory,
   getIdeaDefinition,
 } from "../ideas";
 
 import {
-  Scene,
   SceneObject,
 } from "../scene/objectTypes";
 
-import PropertyEditor from "./PropertyEditor";
-
-import SceneHierarchy from "../scene/SceneHierarchy";
-
+import EditorLeftPanel from "./EditorLeftPanel";
+import EditorRightPanel from "./EditorRightPanel";
 
 
 /* =========================================
@@ -55,16 +48,18 @@ function cloneSceneObject(
 }
 
 
-
-
-
-
-
 /* =========================================
    EDITOR UI
 ========================================= */
 
-export default function EditorUI() {
+type EditorUIProps = {
+  projectId?: string;
+};
+
+
+export default function EditorUI({
+  projectId,
+}: EditorUIProps) {
 
   /* =========================================
      PANEL STATE
@@ -108,16 +103,29 @@ export default function EditorUI() {
 
 
   /* =========================================
+     SERVER PROJECT STATE
+  ========================================= */
+
+  const [
+    projectSaving,
+    setProjectSaving,
+  ] = useState(false);
+
+  const [
+    projectLoading,
+    setProjectLoading,
+  ] = useState(false);
+
+
+  /* =========================================
      EDITOR
   ========================================= */
 
   const {
     scene,
-
     selectedId,
 
     select,
-
 
     /* HISTORY */
 
@@ -126,7 +134,6 @@ export default function EditorUI() {
 
     undo,
     redo,
-
 
     /* SCENE */
 
@@ -137,23 +144,25 @@ export default function EditorUI() {
     updateObject,
     updateTransform,
 
-
     /* TRANSFORM */
 
     transformMode,
     setTransformMode,
-
 
     /* EDITOR */
 
     editorActive,
     toggleEditor,
 
-
     /* SAVE / LOAD */
 
     saveScene,
     loadScene,
+
+    /* SERVER PROJECTS */
+
+    publishProject,
+    loadProject,
 
   } = useEditor();
 
@@ -171,10 +180,8 @@ export default function EditorUI() {
       const target =
         event.target as HTMLElement | null;
 
-
       const tagName =
         target?.tagName?.toLowerCase();
-
 
       /*
        * Never run editor shortcuts while
@@ -186,7 +193,6 @@ export default function EditorUI() {
         tagName === "textarea" ||
         tagName === "select" ||
         target?.isContentEditable;
-
 
       if (isTyping) {
         return;
@@ -431,44 +437,152 @@ export default function EditorUI() {
 
 
   /* =========================================
-     LOAD FILE
+     LOAD LOCAL FILE
   ========================================= */
 
   const handleLoadFile = async (
-  event: ChangeEvent<HTMLInputElement>
-) => {
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
 
-  const file =
-    event.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
-  if (!file) {
-    return;
-  }
+    if (!file) {
+      return;
+    }
 
-  try {
+    try {
 
-    await loadScene(
-      file
-    );
+      await loadScene(
+        file
+      );
 
-  } catch (error) {
+    } catch (error) {
 
-    console.error(
-      "Failed to load CyBuilder project:",
-      error
-    );
+      console.error(
+        "Failed to load CyBuilder project:",
+        error
+      );
 
-    window.alert(
-      error instanceof Error
-        ? error.message
-        : "Failed to load CyBuilder project."
-    );
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to load CyBuilder project."
+      );
 
-  } finally {
+    } finally {
 
-    event.target.value = "";
-  }
-};
+      event.target.value = "";
+
+    }
+  };
+
+
+  /* =========================================
+     PUBLISH PROJECT
+========================================= */
+
+  const handlePublishProject =
+    async () => {
+
+      if (!projectId) {
+
+        window.alert(
+          "No project is selected."
+        );
+
+        return;
+      }
+
+      if (projectSaving) {
+        return;
+      }
+
+      try {
+
+        setProjectSaving(
+          true
+        );
+
+        await publishProject(
+          projectId
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Failed to publish CyBuilder project:",
+          error
+        );
+
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : "Failed to publish project."
+        );
+
+      } finally {
+
+        setProjectSaving(
+          false
+        );
+
+      }
+    };
+
+
+  /* =========================================
+     LOAD SERVER PROJECT
+  ========================================= */
+
+  const handleLoadProject =
+    async () => {
+
+      if (!projectId) {
+
+        window.alert(
+          "No project is selected."
+        );
+
+        return;
+      }
+
+      if (projectLoading) {
+        return;
+      }
+
+      try {
+
+        setProjectLoading(
+          true
+        );
+
+        await loadProject(
+          projectId
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Failed to load CyBuilder project:",
+          error
+        );
+
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : "Failed to load project."
+        );
+
+      } finally {
+
+        setProjectLoading(
+          false
+        );
+
+      }
+    };
+
 
   /* =========================================
      SELECTED OBJECT
@@ -506,11 +620,9 @@ export default function EditorUI() {
         type
       );
 
-
     addObject(
       object
     );
-
 
     select(
       object.id
@@ -544,7 +656,7 @@ export default function EditorUI() {
   if (!editorActive) {
     return null;
   }
-
+console.log("EDITOR PROJECT ID:", projectId);
 
   /* =========================================
      RENDER
@@ -578,1170 +690,117 @@ export default function EditorUI() {
         }}
       >
 
-        {/* =====================================
-            LEFT PANEL
-        ====================================== */}
+        <EditorLeftPanel
+          leftPanelCollapsed={
+            leftPanelCollapsed
+          }
+          setLeftPanelCollapsed={
+            setLeftPanelCollapsed
+          }
 
-        <div
-          style={{
-            width:
-              leftPanelCollapsed
-                ? 42
-                : 240,
+          scene={scene}
+          selectedId={selectedId}
 
-            height:
-              "calc(100vh - 32px)",
+          select={select}
 
-            margin: 16,
+          canUndo={canUndo}
+          canRedo={canRedo}
 
-            padding:
-              leftPanelCollapsed
-                ? 6
-                : 12,
+          undo={undo}
+          redo={redo}
 
-            boxSizing:
-              "border-box",
+          saveScene={saveScene}
 
-            borderRadius: 12,
+          fileInputRef={
+            fileInputRef
+          }
 
-            background:
-              "rgba(18, 18, 22, 0.94)",
+          handleLoadFile={
+            handleLoadFile
+          }
 
-            border:
-              "1px solid rgba(255,255,255,0.1)",
+          projectId={projectId}
 
-            boxShadow:
-              "0 10px 30px rgba(0,0,0,0.3)",
+          projectSaving={
+            projectSaving
+          }
 
-            pointerEvents:
-              "auto",
+          projectLoading={
+            projectLoading
+          }
 
-            display: "flex",
+          handlePublishProject={
+            handlePublishProject
+          }
 
-            flexDirection:
-              "column",
+          handleLoadProject={
+            handleLoadProject
+          }
 
-            transition:
-              "width 160ms ease, padding 160ms ease",
+          transformMode={
+            transformMode
+          }
 
-            overflow: "hidden",
-          }}
-        >
+          setTransformMode={
+            setTransformMode
+          }
 
-          {/* =====================================
-              HEADER
-          ====================================== */}
+          openIdeaFolders={
+            openIdeaFolders
+          }
 
-          <div
-            style={{
-              display: "flex",
+          toggleIdeaFolder={
+            toggleIdeaFolder
+          }
 
-              alignItems:
-                "center",
+          addIdea={addIdea}
+        />
 
-              justifyContent:
-                leftPanelCollapsed
-                  ? "center"
-                  : "space-between",
 
-              flexShrink: 0,
+        <EditorRightPanel
+          selectedObject={
+            selectedObject
+          }
 
-              marginBottom:
-                leftPanelCollapsed
-                  ? 0
-                  : 12,
-            }}
-          >
+          selectedDefinition={
+            selectedDefinition
+          }
 
-            {!leftPanelCollapsed && (
-              <div
-                style={{
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: 0.3,
-                }}
-              >
-                CyBuilder
-              </div>
-            )}
+          select={select}
 
+          updateObject={
+            updateObject
+          }
 
-            <button
-              onClick={() =>
-                setLeftPanelCollapsed(
-                  !leftPanelCollapsed
-                )
-              }
-              title={
-                leftPanelCollapsed
-                  ? "Expand panel"
-                  : "Collapse panel"
-              }
-              style={{
-                width: 30,
-                height: 30,
-                padding: 0,
-                border: 0,
-                borderRadius: 7,
-                background: "#292930",
-                color: "#ffffff",
-                cursor: "pointer",
-                fontSize: 16,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {leftPanelCollapsed
-                ? "›"
-                : "‹"}
-            </button>
+          updateTransform={
+            updateTransform
+          }
 
-          </div>
+          clipboardObject={
+            clipboardObject
+          }
 
+          setClipboardObject={
+            setClipboardObject
+          }
 
-          {/* =====================================
-              HISTORY + SAVE / LOAD
-          ====================================== */}
+          scene={scene}
 
-          {!leftPanelCollapsed && (
-            <>
+          addObject={
+            addObject
+          }
 
-              {/* HISTORY */}
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "1fr 1fr",
-                  gap: 5,
-                  marginBottom: 5,
-                  flexShrink: 0,
-                }}
-              >
-
-                <button
-                  onClick={undo}
-                  disabled={!canUndo}
-                  title="Undo (Ctrl/Cmd+Z)"
-                  style={{
-                    padding: "8px 6px",
-                    border: 0,
-                    borderRadius: 6,
-
-                    background:
-                      canUndo
-                        ? "#292930"
-                        : "#202027",
-
-                    color:
-                      canUndo
-                        ? "#ffffff"
-                        : "#55555f",
-
-                    cursor:
-                      canUndo
-                        ? "pointer"
-                        : "default",
-
-                    fontSize: 11,
-
-                    opacity:
-                      canUndo
-                        ? 1
-                        : 0.7,
-                  }}
-                >
-                  ↶ Undo
-                </button>
-
-
-                <button
-                  onClick={redo}
-                  disabled={!canRedo}
-                  title="Redo (Ctrl/Cmd+Shift+Z)"
-                  style={{
-                    padding: "8px 6px",
-                    border: 0,
-                    borderRadius: 6,
-
-                    background:
-                      canRedo
-                        ? "#292930"
-                        : "#202027",
-
-                    color:
-                      canRedo
-                        ? "#ffffff"
-                        : "#55555f",
-
-                    cursor:
-                      canRedo
-                        ? "pointer"
-                        : "default",
-
-                    fontSize: 11,
-
-                    opacity:
-                      canRedo
-                        ? 1
-                        : 0.7,
-                  }}
-                >
-                  ↷ Redo
-                </button>
-
-              </div>
-
-
-              {/* SAVE / LOAD */}
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "1fr 1fr",
-                  gap: 5,
-                  marginBottom: 12,
-                  flexShrink: 0,
-                }}
-              >
-
-                <button
-                  onClick={saveScene}
-                  title="Save scene"
-                  style={{
-                    padding: "8px 6px",
-                    border: 0,
-                    borderRadius: 6,
-                    background: "#343a52",
-                    color: "#ffffff",
-                    cursor: "pointer",
-                    fontSize: 11,
-                  }}
-                >
-                  ↓ Save
-                </button>
-
-
-                <button
-                  onClick={() =>
-                    fileInputRef.current?.click()
-                  }
-                  title="Load scene"
-                  style={{
-                    padding: "8px 6px",
-                    border: 0,
-                    borderRadius: 6,
-                    background: "#292930",
-                    color: "#ffffff",
-                    cursor: "pointer",
-                    fontSize: 11,
-                  }}
-                >
-                  ↑ Load
-                </button>
-
-              </div>
-
-
-              {/* HIDDEN FILE INPUT */}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".cybuilder"
-                onChange={handleLoadFile}
-                style={{
-                  display: "none",
-                }}
-              />
-
-            </>
-          )}
-
-
-          {/* =====================================
-              LEFT PANEL CONTENT
-          ====================================== */}
-
-          {!leftPanelCollapsed && (
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-                overflowX: "hidden",
-                paddingRight: 3,
-              }}
-            >
-
-              {/* SCENE */}
-
-              <SceneHierarchy
-                scene={scene}
-                selectedId={selectedId}
-                onSelect={select}
-              />
-
-
-              {/* TRANSFORM */}
-
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  marginBottom: 9,
-                  opacity: 0.55,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                }}
-              >
-                Transform
-              </div>
-
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns:
-                    "repeat(3, 1fr)",
-                  gap: 5,
-                  marginBottom: 18,
-                }}
-              >
-
-                {(
-                  [
-                    ["translate", "Move"],
-                    ["rotate", "Rotate"],
-                    ["scale", "Scale"],
-                  ] as const
-                ).map(
-                  ([mode, label]) => (
-                    <button
-                      key={mode}
-                      onClick={() =>
-                        setTransformMode(
-                          mode
-                        )
-                      }
-                      style={{
-                        padding:
-                          "8px 4px",
-
-                        border: 0,
-
-                        borderRadius: 6,
-
-                        background:
-                          transformMode ===
-                          mode
-                            ? "#4c7dff"
-                            : "#292930",
-
-                        color:
-                          "#ffffff",
-
-                        cursor:
-                          "pointer",
-
-                        fontSize: 10,
-                      }}
-                    >
-                      {label}
-                    </button>
-                  )
-                )}
-
-              </div>
-
-
-              {/* DIVIDER */}
-
-              <div
-                style={{
-                  height: 1,
-                  background:
-                    "rgba(255,255,255,0.08)",
-                  margin:
-                    "4px 0 16px",
-                }}
-              />
-
-
-              {/* IDEAS */}
-
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  marginBottom: 9,
-                  opacity: 0.55,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                }}
-              >
-                Ideas
-              </div>
-
-
-              {getIdeaCategories().map(
-                (category) => {
-
-                  const isOpen =
-                    openIdeaFolders[
-                      category
-                    ] ?? true;
-
-
-                  const ideas =
-                    getIdeasByCategory(
-                      category
-                    );
-
-
-                  return (
-                    <div
-                      key={category}
-                      style={{
-                        marginBottom: 10,
-                      }}
-                    >
-
-                      <button
-                        onClick={() =>
-                          toggleIdeaFolder(
-                            category
-                          )
-                        }
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent:
-                            "space-between",
-                          width: "100%",
-                          padding:
-                            "8px 9px",
-                          border: 0,
-                          borderRadius: 6,
-                          background:
-                            "#202027",
-                          color:
-                            "#ffffff",
-                          cursor:
-                            "pointer",
-                          textAlign:
-                            "left",
-                          fontSize: 11,
-                          fontWeight: 700,
-                        }}
-                      >
-
-                        <span
-                          style={{
-                            display: "flex",
-                            alignItems:
-                              "center",
-                            gap: 7,
-                          }}
-                        >
-
-                          <span
-                            style={{
-                              fontSize: 10,
-                              opacity: 0.6,
-                            }}
-                          >
-                            {isOpen
-                              ? "▼"
-                              : "▶"}
-                          </span>
-
-
-                          <span>
-                            {category}
-                          </span>
-
-                        </span>
-
-
-                        <span
-                          style={{
-                            fontSize: 9,
-                            opacity: 0.4,
-                          }}
-                        >
-                          {ideas.length}
-                        </span>
-
-                      </button>
-
-
-                      {isOpen && (
-                        <div
-                          style={{
-                            marginTop: 5,
-                            paddingLeft: 8,
-                          }}
-                        >
-
-                          {ideas.map(
-                            (definition) => (
-                              <button
-                                key={definition.id}
-                                onClick={() =>
-                                  addIdea(
-                                    definition.id as SceneObject["type"]
-                                  )
-                                }
-                                style={{
-                                  display: "block",
-                                  width: "100%",
-                                  padding: "8px 9px",
-                                  marginBottom: 4,
-                                  border: 0,
-                                  borderRadius: 6,
-                                  background: "#292930",
-                                  color: "#ffffff",
-                                  textAlign: "left",
-                                  cursor: "pointer",
-                                  fontSize: 11,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    opacity: 0.5,
-                                    marginRight: 6,
-                                  }}
-                                >
-                                  +
-                                </span>
-
-                                {definition.name}
-                              </button>
-                            )
-                          )}
-
-                        </div>
-                      )}
-
-                    </div>
-                  );
-                }
-              )}
-
-            </div>
-          )}
-
-        </div>
-
-
-        {/* =====================================
-            RIGHT INSPECTOR
-        ====================================== */}
-
-        {selectedObject && (
-          <div
-            style={{
-              width: 280,
-
-              maxHeight:
-                "calc(100vh - 32px)",
-
-              overflowY: "auto",
-
-              margin: 16,
-
-              padding: 14,
-
-              boxSizing:
-                "border-box",
-
-              borderRadius: 12,
-
-              background:
-                "rgba(18, 18, 22, 0.94)",
-
-              border:
-                "1px solid rgba(255,255,255,0.1)",
-
-              boxShadow:
-                "0 10px 30px rgba(0,0,0,0.3)",
-
-              pointerEvents:
-                "auto",
-
-              alignSelf:
-                "flex-start",
-            }}
-          >
-
-            {/* HEADER */}
-
-            <div
-              style={{
-                display: "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "space-between",
-                marginBottom: 14,
-              }}
-            >
-
-              <div>
-
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                  }}
-                >
-                  {selectedObject.type}
-                </div>
-
-
-                <div
-                  style={{
-                    fontSize: 10,
-                    opacity: 0.45,
-                    marginTop: 3,
-                  }}
-                >
-                  {selectedObject.id}
-                </div>
-
-              </div>
-
-
-              <button
-                onClick={() =>
-                  select(undefined)
-                }
-                title="Deselect"
-                style={{
-                  border: 0,
-                  background:
-                    "transparent",
-                  color: "#aaa",
-                  cursor:
-                    "pointer",
-                  fontSize: 18,
-                }}
-              >
-                ×
-              </button>
-
-            </div>
-
-
-            {/* TRANSFORM */}
-
-            <Section title="Transform">
-
-              <VectorInput
-                label="Position"
-                value={
-                  selectedObject
-                    .transform
-                    .position
-                }
-                onChange={(
-                  axis,
-                  value
-                ) => {
-
-                  const next = [
-                    ...selectedObject
-                      .transform
-                      .position,
-                  ] as [
-                    number,
-                    number,
-                    number
-                  ];
-
-                  next[axis] =
-                    value;
-
-
-                  updateTransform(
-                    selectedObject.id,
-                    {
-                      position:
-                        next,
-                    }
-                  );
-                }}
-              />
-
-
-              <VectorInput
-                label="Rotation"
-                value={
-                  selectedObject
-                    .transform
-                    .rotation
-                }
-                onChange={(
-                  axis,
-                  value
-                ) => {
-
-                  const next = [
-                    ...selectedObject
-                      .transform
-                      .rotation,
-                  ] as [
-                    number,
-                    number,
-                    number
-                  ];
-
-                  next[axis] =
-                    value;
-
-
-                  updateTransform(
-                    selectedObject.id,
-                    {
-                      rotation:
-                        next,
-                    }
-                  );
-                }}
-              />
-
-
-              <VectorInput
-                label="Scale"
-                value={
-                  selectedObject
-                    .transform
-                    .scale
-                }
-                onChange={(
-                  axis,
-                  value
-                ) => {
-
-                  const next = [
-                    ...selectedObject
-                      .transform
-                      .scale,
-                  ] as [
-                    number,
-                    number,
-                    number
-                  ];
-
-                  next[axis] =
-                    value;
-
-
-                  updateTransform(
-                    selectedObject.id,
-                    {
-                      scale:
-                        next,
-                    }
-                  );
-                }}
-              />
-
-            </Section>
-
-
-            {/* IDEA PROPERTIES */}
-
-            {selectedDefinition && (
-              <PropertyEditor
-                object={
-                  selectedObject
-                }
-                definition={
-                  selectedDefinition
-                }
-                onChange={(
-                  object
-                ) => {
-
-                  updateObject(
-                    selectedObject.id,
-                    object
-                  );
-
-                }}
-              />
-            )}
-
-
-            {/* ACTIONS */}
-
-            <button
-              onClick={() => {
-
-                setClipboardObject(
-                  structuredClone(
-                    selectedObject
-                  )
-                );
-
-              }}
-              title="Copy (Ctrl/Cmd+C)"
-              style={{
-                width: "100%",
-                padding:
-                  "9px 10px",
-                border: 0,
-                borderRadius: 7,
-                background:
-                  "#292930",
-                color:
-                  "#ffffff",
-                cursor:
-                  "pointer",
-              }}
-            >
-              Copy
-            </button>
-
-
-            <button
-              disabled={
-                !clipboardObject
-              }
-              onClick={() => {
-
-                if (
-                  !clipboardObject
-                ) {
-                  return;
-                }
-
-
-                let pastedObject =
-                  cloneSceneObject(
-                    clipboardObject
-                  );
-
-
-                while (
-                  scene.objects.some(
-                    (object) =>
-                      object.id ===
-                      pastedObject.id
-                  )
-                ) {
-
-                  pastedObject =
-                    cloneSceneObject(
-                      clipboardObject
-                    );
-
-                }
-
-
-                addObject(
-                  pastedObject
-                );
-
-
-                select(
-                  pastedObject.id
-                );
-
-              }}
-              title="Paste (Ctrl/Cmd+V)"
-              style={{
-                width: "100%",
-                marginTop: 6,
-                padding:
-                  "9px 10px",
-                border: 0,
-                borderRadius: 7,
-
-                background:
-                  clipboardObject
-                    ? "#343a52"
-                    : "#202027",
-
-                color:
-                  clipboardObject
-                    ? "#ffffff"
-                    : "#55555f",
-
-                cursor:
-                  clipboardObject
-                    ? "pointer"
-                    : "default",
-              }}
-            >
-              Paste
-            </button>
-
-
-            <button
-              onClick={() =>
-                duplicateObject(
-                  selectedObject.id
-                )
-              }
-              title="Duplicate (Ctrl/Cmd+D)"
-              style={{
-                width: "100%",
-                marginTop: 16,
-                padding:
-                  "9px 10px",
-                border: 0,
-                borderRadius: 7,
-                background:
-                  "#343a52",
-                color:
-                  "#ffffff",
-                cursor:
-                  "pointer",
-              }}
-            >
-              Duplicate
-            </button>
-
-
-            <button
-              onClick={() =>
-                removeObject(
-                  selectedObject.id
-                )
-              }
-              title="Delete (Delete)"
-              style={{
-                width: "100%",
-                marginTop: 6,
-                padding:
-                  "9px 10px",
-                border: 0,
-                borderRadius: 7,
-                background:
-                  "#6f2525",
-                color:
-                  "#ffffff",
-                cursor:
-                  "pointer",
-              }}
-            >
-              Delete
-            </button>
-
-          </div>
-        )}
+          duplicateObject={
+            duplicateObject
+          }
+
+          removeObject={
+            removeObject
+          }
+        />
 
       </div>
 
     </Html>
   );
 }
-
-
-/* =========================================
-   SECTION
-========================================= */
-
-function Section(props: {
-  title: string;
-  children: ReactNode;
-}) {
-
-  return (
-    <div
-      style={{
-        marginTop: 16,
-      }}
-    >
-
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          opacity: 0.55,
-          textTransform:
-            "uppercase",
-          letterSpacing: 0.8,
-          marginBottom: 9,
-        }}
-      >
-        {props.title}
-      </div>
-
-
-      {props.children}
-
-    </div>
-  );
-}
-
-
-/* =========================================
-   FIELD LABEL
-========================================= */
-
-function FieldLabel(props: {
-  children: ReactNode;
-}) {
-
-  return (
-    <label
-      style={{
-        display: "block",
-        fontSize: 11,
-        opacity: 0.65,
-        marginBottom: 5,
-      }}
-    >
-      {props.children}
-    </label>
-  );
-}
-
-
-/* =========================================
-   VECTOR INPUT
-========================================= */
-
-function VectorInput(props: {
-  label: string;
-
-  value: [
-    number,
-    number,
-    number
-  ];
-
-  onChange: (
-    axis: 0 | 1 | 2,
-    value: number
-  ) => void;
-}) {
-
-  const {
-    label,
-    value,
-    onChange,
-  } = props;
-
-
-  return (
-    <div
-      style={{
-        marginBottom: 12,
-      }}
-    >
-
-      <FieldLabel>
-        {label}
-      </FieldLabel>
-
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(3, 1fr)",
-          gap: 5,
-        }}
-      >
-
-        {(
-          [
-            "X",
-            "Y",
-            "Z",
-          ] as const
-        ).map(
-          (
-            axisName,
-            index
-          ) => (
-
-            <input
-              key={
-                axisName
-              }
-              type="number"
-              step="0.01"
-              value={
-                value[index]
-              }
-              onChange={(
-                event
-              ) => {
-
-                const next =
-                  Number(
-                    event.target.value
-                  );
-
-
-                if (
-                  Number.isFinite(
-                    next
-                  )
-                ) {
-
-                  onChange(
-                    index as
-                      | 0
-                      | 1
-                      | 2,
-                    next
-                  );
-
-                }
-              }}
-              aria-label={`${label} ${axisName}`}
-              style={
-                inputStyle
-              }
-            />
-
-          )
-        )}
-
-      </div>
-
-    </div>
-  );
-}
-
-
-/* =========================================
-   INPUT STYLE
-========================================= */
-
-const inputStyle:
-  CSSProperties = {
-
-  boxSizing:
-    "border-box",
-
-  width:
-    "100%",
-
-  padding:
-    "7px 8px",
-
-  borderRadius:
-    6,
-
-  border:
-    "1px solid rgba(255,255,255,0.12)",
-
-  background:
-    "rgba(255,255,255,0.06)",
-
-  color:
-    "#ffffff",
-
-  outline:
-    "none",
-};

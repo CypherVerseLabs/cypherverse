@@ -791,7 +791,7 @@ export default function TemplateSelector() {
               anchorX="center"
               anchorY="middle"
             >
-              You're the proud new owner of
+              You&apos;re the proud new owner of
             </Text>
 
             <Text
