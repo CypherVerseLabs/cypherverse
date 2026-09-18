@@ -1,0 +1,339 @@
+Cypherverse — Future Real Payment Integration
+Purpose
+
+This document describes how to replace the current TEST payment system with a real payment provider later.
+
+The marketplace order architecture should remain in place.
+
+The goal is to replace the test payment processing layer without rebuilding the marketplace.
+
+Current System
+
+The current marketplace uses:
+
+Frontend
+   ↓
+POST /api/marketplace/orders
+   ↓
+Marketplace Order
+   ↓
+POST /api/marketplace/orders/:orderId/payment
+   ↓
+Test Payment
+   ↓
+Test Confirm / Fail / Cancel
+
+
+The current system is intentionally designed so that payment processing is separated from order creation.
+
+Future Real Payment System
+
+When real payments are introduced, the intended flow becomes:
+
+User
+ ↓
+Frontend
+ ↓
+Create Marketplace Order
+ ↓
+Server determines authoritative price
+ ↓
+Create Payment
+ ↓
+Real Payment Provider
+ ↓
+Customer completes checkout
+ ↓
+Payment Provider processes payment
+ ↓
+Provider Webhook
+ ↓
+Cypherverse Server
+ ↓
+Verify Payment
+ ↓
+Mark Order Paid
+ ↓
+Complete Parcel Purchase
+ ↓
+Grant Ownership / Entitlement
+
+Important Principle
+
+The browser must never be the final authority for payment success.
+
+Do not rely on:
+
+Frontend says payment succeeded
+
+
+Instead:
+
+Payment Provider
+        ↓
+Verified server-side notification
+        ↓
+Cypherverse backend
+        ↓
+Order marked paid
+
+
+The payment provider webhook should be treated as the authoritative payment confirmation.
+
+Step 1 — Choose Payment Provider
+
+Select the real provider.
+
+Examples could include:
+
+Stripe
+PayPal
+Another provider appropriate for the business
+
+The provider should support server-side payment confirmation/webhooks.
+
+Do not modify the marketplace order architecture just because the provider changes.
+
+Step 2 — Add Provider Configuration
+
+Add server-side environment variables.
+
+Example:
+
+PAYMENTS_MODE=production
+
+PAYMENT_PROVIDER=stripe
+
+PAYMENT_PROVIDER_SECRET_KEY=...
+
+PAYMENT_WEBHOOK_SECRET=...
+
+
+Never expose secret payment credentials to the frontend.
+
+Do not put secret keys in:
+
+React code
+browser localStorage
+public environment variables
+Git
+client-side configuration
+
+Step 3 — Keep Marketplace Orders
+
+Continue using:
+
+POST /api/marketplace/orders
+
+
+The frontend still sends:
+
+{
+  "parcelId": "..."
+}
+
+
+The backend continues determining:
+
+User
+Parcel
+Listing
+Seller
+Price
+Currency
+Quantity
+
+The client should still never determine the authoritative purchase price.
+
+Step 4 — Create the Payment
+
+Continue using:
+
+POST /api/marketplace/orders/:orderId/payment
+
+
+The backend should:
+
+Load the authenticated user's order.
+Verify the order belongs to the user.
+Verify the order can still be paid.
+Read the authoritative order amount.
+Create a payment-provider checkout/payment object.
+Store the provider payment/checkout ID.
+Return only the information the frontend needs to continue checkout.
+
+Conceptually:
+
+MarketplaceOrder
+      ↓
+authoritative amount
+      ↓
+Real Payment Provider
+      ↓
+Provider Payment ID
+      ↓
+MarketplacePayment
+
+Step 5 — Store Provider IDs
+
+The payment database record should associate the Cypherverse payment with the provider payment.
+
+Conceptually:
+
+MarketplacePayment
+------------------
+id
+orderId
+provider
+providerPaymentId
+amount
+currency
+status
+createdAt
+updatedAt
+
+
+The exact schema depends on the existing Prisma models.
+
+The important relationship is:
+
+Cypherverse Order
+        ↓
+Cypherverse Payment
+        ↓
+Provider Payment
+
+Step 6 — Frontend Checkout
+
+The frontend should:
+
+Create Order
+     ↓
+Create Payment
+     ↓
+Receive checkout information
+     ↓
+Open provider checkout
+     ↓
+User completes payment
+
+
+The frontend can display:
+
+Payment screen
+Processing state
+Success state
+Failure state
+Cancellation state
+
+But the frontend should not directly grant ownership.
+
+Step 7 — Provider Webhook
+
+Add a server endpoint specifically for the payment provider.
+
+Example:
+
+POST /api/payments/webhook
+
+
+The webhook must:
+
+Receive the provider event.
+Verify the provider signature.
+Reject invalid signatures.
+Identify the provider payment.
+Find the corresponding Cypherverse payment.
+Find the corresponding marketplace order.
+Verify the amount and currency.
+Determine the payment status.
+Update the payment/order.
+Complete the purchase when appropriate.
+Step 8 — Verify the Payment
+
+Never trust fields supplied directly by the browser.
+
+The server should verify:
+
+Provider payment ID
+Provider status
+Amount
+Currency
+Order association
+Payment environment
+
+
+For example:
+
+Expected order amount:
+$19.99
+
+Provider-confirmed amount:
+$19.99
+
+Result:
+VALID
+
+
+If the provider reports:
+
+$1.99
+
+
+while the Cypherverse order is:
+
+$19.99
+
+
+the purchase must not be completed.
+
+Step 9 — Make Webhooks Idempotent
+
+Payment providers may send the same webhook more than once.
+
+Therefore:
+
+Webhook #1
+   ↓
+Process payment
+   ↓
+Order becomes PAID
+
+Webhook #2
+   ↓
+Same event
+   ↓
+Already processed
+   ↓
+Do nothing
+
+
+The purchase must never:
+
+Transfer ownership twice
+Grant an entitlement twice
+Create duplicate purchases
+Create duplicate fulfillment records
+
+The server must make payment completion idempotent.
+
+Step 10 — Complete the Marketplace Purchase
+
+Only after verified successful payment:
+
+Payment verified
+      ↓
+Order marked PAID
+      ↓
+Parcel ownership transferred
+      ↓
+Entitlement granted
+      ↓
+Listing closed/deactivated
+
+
+These operations should occur in a safe server-side transaction where possible.
+
+Step 11 — Handle Failed Payments
+
+If the

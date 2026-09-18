@@ -23,9 +23,15 @@ import nonceRouter from "./routes/auth/nonce.js";
 import verifyRouter from "./routes/auth/verify.js";
 import refreshRouter from "./routes/auth/refresh.js";
 import emailAuthRouter from "./routes/auth/emailAuth.js";
+import meRouter from "./routes/auth/me.js";
 import projectRouter from "./routes/auth/projects.js";
 import aiRouter from "./routes/auth/ai.js";
 import publicProjectRouter from "./routes/public/projects.js";
+import parcelRouter from "./routes/parcels.js";
+import marketplaceRouter from "./routes/marketplace.js";
+import marketplaceRoutes from "./routes/marketplaceRoutes.js";
+
+import ideasRouter from "./routes/ideas.js";
 
 // =========================================================
 // AUTH MIDDLEWARE
@@ -41,10 +47,8 @@ import {
 // =========================================================
 
 import {
-  getUserByAddress,
-  getUserByEmail,
-  updateUserByAddress,
-  updateUserByEmail,
+  getUserById,
+  updateUserById,
 } from "./stores/userStore.js";
 
 // =========================================================
@@ -123,6 +127,7 @@ app.use(
  * 10 MB scene limit so the application can
  * still return a controlled 413 response.
  */
+
 app.use(
   express.json({
     limit: "12mb",
@@ -185,6 +190,11 @@ app.use(
 );
 
 app.use(
+  "/auth/me",
+  meRouter
+);
+
+app.use(
   "/api",
   emailAuthRouter
 );
@@ -224,10 +234,99 @@ app.use(
   projectRouter
 );
 
-
+// =========================================================
+// IDEAS ROUTES
+// =========================================================
 
 console.log(
-  "PROJECT ROUTER MOUNTED"
+  "MOUNTING IDEAS ROUTER"
+);
+
+app.use(
+  "/api/ideas",
+  (req, _res, next) => {
+    console.log(
+      "🔥 API IDEAS REQUEST:",
+      req.method,
+      req.originalUrl
+    );
+
+    next();
+  }
+);
+
+app.use(
+  "/api/ideas",
+  ideasRouter
+);
+
+console.log(
+  "IDEAS ROUTER MOUNTED"
+);
+
+// =========================================================
+// PARCEL ROUTES
+// =========================================================
+
+console.log(
+  "MOUNTING PARCEL ROUTER"
+);
+
+app.use(
+  "/api/parcels",
+  (req, _res, next) => {
+    console.log(
+      "🔥 API PARCELS REQUEST:",
+      req.method,
+      req.originalUrl
+    );
+
+    next();
+  }
+);
+
+app.use(
+  "/api/parcels",
+  parcelRouter
+);
+
+console.log(
+  "PARCEL ROUTER MOUNTED"
+);
+
+// =========================================================
+// MARKETPLACE ROUTES
+// =========================================================
+
+console.log(
+  "MOUNTING MARKETPLACE ROUTER"
+);
+
+app.use(
+  "/api/marketplace",
+  (req, _res, next) => {
+    console.log(
+      "🔥 API MARKETPLACE REQUEST:",
+      req.method,
+      req.originalUrl
+    );
+
+    next();
+  }
+);
+
+app.use(
+  "/api/marketplace",
+  marketplaceRouter
+);
+
+console.log(
+  "MARKETPLACE ROUTER MOUNTED"
+);
+
+app.use(
+  "/api/marketplace",
+  marketplaceRoutes
 );
 
 // =========================================================
@@ -250,43 +349,17 @@ app.get(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-    if (!req.user) {
+    if (!req.user?.id) {
       return res.status(401).json({
         error: "Unauthorized",
       });
     }
 
     try {
-      let user;
-
-      // -----------------------------------------------
-      // WALLET USER
-      // -----------------------------------------------
-
-      if (
-        typeof req.user.address ===
-        "string"
-      ) {
-        user =
-          await getUserByAddress(
-            req.user.address
-          );
-      }
-
-      // -----------------------------------------------
-      // EMAIL USER
-      // -----------------------------------------------
-
-      if (
-        !user &&
-        typeof req.user.email ===
-          "string"
-      ) {
-        user =
-          await getUserByEmail(
-            req.user.email
-          );
-      }
+      const user =
+        await getUserById(
+          req.user.id
+        );
 
       if (!user) {
         return res.status(404).json({
@@ -306,6 +379,7 @@ app.get(
             user.updatedAt,
         },
       });
+
     } catch (error) {
       console.error(
         "Get current user error:",
@@ -331,7 +405,7 @@ app.post(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-    if (!req.user) {
+    if (!req.user?.id) {
       return res.status(401).json({
         error: "Unauthorized",
       });
@@ -342,9 +416,9 @@ app.post(
       username,
     } = req.body ?? {};
 
-    // -----------------------------------------------
+    // -------------------------------------------------------
     // VALIDATE EMAIL
-    // -----------------------------------------------
+    // -------------------------------------------------------
 
     if (
       email !== undefined &&
@@ -356,9 +430,9 @@ app.post(
       });
     }
 
-    // -----------------------------------------------
+    // -------------------------------------------------------
     // VALIDATE USERNAME
-    // -----------------------------------------------
+    // -------------------------------------------------------
 
     if (
       username !== undefined &&
@@ -370,6 +444,10 @@ app.post(
       });
     }
 
+    // -------------------------------------------------------
+    // NORMALIZE VALUES
+    // -------------------------------------------------------
+
     const normalizedEmail =
       typeof email === "string"
         ? email.trim().toLowerCase()
@@ -380,78 +458,121 @@ app.post(
         ? username.trim()
         : undefined;
 
-    try {
-      // ---------------------------------------------
-      // WALLET USER
-      // ---------------------------------------------
+    // -------------------------------------------------------
+    // VALIDATE EMAIL LENGTH
+    // -------------------------------------------------------
 
-      if (
-        typeof req.user.address ===
-        "string"
-      ) {
-        const updatedUser =
-          await updateUserByAddress(
-            req.user.address,
-            {
-              email:
-                normalizedEmail,
-              username:
-                normalizedUsername,
-            }
-          );
-
-        if (!updatedUser) {
-          return res.status(404).json({
-            error:
-              "User not found",
-          });
-        }
-
-        return res.status(200).json({
-          user: updatedUser,
-        });
-      }
-
-      // ---------------------------------------------
-      // EMAIL USER
-      // ---------------------------------------------
-
-      if (
-        typeof req.user.email ===
-        "string"
-      ) {
-        const updatedUser =
-          await updateUserByEmail(
-            req.user.email,
-            {
-              email:
-                normalizedEmail,
-              username:
-                normalizedUsername,
-            }
-          );
-
-        if (!updatedUser) {
-          return res.status(404).json({
-            error:
-              "User not found",
-          });
-        }
-
-        return res.status(200).json({
-          user: updatedUser,
-        });
-      }
-
+    if (
+      normalizedEmail !== undefined &&
+      normalizedEmail.length > 320
+    ) {
       return res.status(400).json({
         error:
-          "Invalid authenticated user",
+          "Email must be 320 characters or less",
       });
-    } catch (error) {
+    }
+
+    // -------------------------------------------------------
+    // VALIDATE USERNAME LENGTH
+    // -------------------------------------------------------
+
+    if (
+      normalizedUsername !== undefined &&
+      normalizedUsername.length > 50
+    ) {
+      return res.status(400).json({
+        error:
+          "Username must be 50 characters or less",
+      });
+    }
+
+    // -------------------------------------------------------
+    // UPDATE USER
+    // -------------------------------------------------------
+
+    try {
+      const updatedUser =
+        await updateUserById(
+          req.user.id,
+          {
+            ...(normalizedEmail !== undefined
+              ? {
+                  email:
+                    normalizedEmail,
+                }
+              : {}),
+
+            ...(normalizedUsername !== undefined
+              ? {
+                  username:
+                    normalizedUsername,
+                }
+              : {}),
+          }
+        );
+
+      // -----------------------------------------------------
+      // USER NOT FOUND
+      // -----------------------------------------------------
+
+      if (!updatedUser) {
+        return res.status(404).json({
+          error:
+            "User not found",
+        });
+      }
+
+      // -----------------------------------------------------
+      // SUCCESS
+      // -----------------------------------------------------
+
+      return res.status(200).json({
+        user: {
+          id: updatedUser.id,
+          address:
+            updatedUser.address,
+          email:
+            updatedUser.email,
+          username:
+            updatedUser.username,
+          createdAt:
+            updatedUser.createdAt,
+          updatedAt:
+            updatedUser.updatedAt,
+        },
+      });
+
+    } catch (error: unknown) {
       console.error(
         "Update profile error:",
         error
       );
+
+      // -----------------------------------------------------
+      // PRISMA UNIQUE CONSTRAINT
+      // -----------------------------------------------------
+      //
+      // P2002 means a unique field already exists.
+      // For example, another account may already
+      // own the requested email address.
+      //
+
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: unknown }).code ===
+          "P2002"
+      ) {
+        return res.status(409).json({
+          error:
+            "That email is already in use",
+        });
+      }
+
+      // -----------------------------------------------------
+      // GENERAL ERROR
+      // -----------------------------------------------------
 
       return res.status(500).json({
         error:
@@ -528,15 +649,24 @@ app.use(
       error
     );
 
+    // -------------------------------------------------------
+    // CORS ERROR
+    // -------------------------------------------------------
+
     if (
       error instanceof Error &&
       error.message ===
         "Not allowed by CORS"
     ) {
       return res.status(403).json({
-        error: "CORS origin not allowed",
+        error:
+          "CORS origin not allowed",
       });
     }
+
+    // -------------------------------------------------------
+    // INVALID JSON
+    // -------------------------------------------------------
 
     if (
       error instanceof SyntaxError
@@ -546,6 +676,10 @@ app.use(
           "Invalid JSON request",
       });
     }
+
+    // -------------------------------------------------------
+    // GENERAL SERVER ERROR
+    // -------------------------------------------------------
 
     return res.status(500).json({
       error:
@@ -629,6 +763,34 @@ const server =
       console.log(
         "  POST   /api/projects/:id/publish"
       );
+
+      // =====================================================
+      // MARKETPLACE
+      // =====================================================
+
+      console.log(
+        "  GET    /api/marketplace/listings"
+      );
+
+      console.log(
+        "  POST   /api/marketplace/parcels/:id/buy"
+      );
+
+      console.log(
+        "  POST   /api/marketplace/parcels/:id/reserve"
+      );
+
+      console.log(
+        "  POST   /api/marketplace/parcels/:id/list"
+      );
+
+      console.log(
+        "  POST   /api/marketplace/parcels/:id/release"
+      );
+
+      // =====================================================
+      // AI
+      // =====================================================
 
       console.log(
         "  POST   /api/ai"

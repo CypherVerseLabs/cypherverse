@@ -1,0 +1,33 @@
+{
+  "id": "link",
+  "type": "link",
+  "name": "Link",
+  "description": "Create an interactive link that navigates to another URL.",
+  "category": "Interaction",
+  "kind": "scene-object",
+  "tags": [
+    "link",
+    "navigation",
+    "button",
+    "url",
+    "interaction"
+  ],
+  "skills": [
+    "interaction.link",
+    "navigation.url"
+  ],
+  "schema": [
+    {
+      "name": "href",
+      "type": "string",
+      "required": true,
+      "description": "The destination URL."
+    },
+    {
+      "name": "text",
+      "type": "string",
+      "required": true,
+      "description": "The visible text displayed on the link."
+    }
+  ]
+}

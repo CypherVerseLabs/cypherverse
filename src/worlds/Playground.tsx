@@ -9,7 +9,7 @@ import Analytics from "ideas/Analytics";
 
 import { sceneToWorld } from "../editor/scene/sceneToWorld";
 import Cyrus from "ideas/characters/Cyrus";
-import { scene } from "pages/found";
+import { scene } from "ideas/found";
 
 const previewWorld = sceneToWorld(scene);
 

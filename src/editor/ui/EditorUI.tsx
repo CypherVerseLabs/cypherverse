@@ -19,409 +19,164 @@ import {
 } from "../scene/objectTypes";
 
 import EditorLeftPanel from "./EditorLeftPanel";
-import EditorRightPanel from "./EditorRightPanel";
-
-
-/* =========================================
-   CLONE SCENE OBJECT
-========================================= */
-
-function cloneSceneObject(
-  object: SceneObject
-): SceneObject {
-
-  const cloned =
-    structuredClone(object);
-
-  cloned.id =
-    `${cloned.type}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
-
-  cloned.transform.position = [
-    cloned.transform.position[0] + 0.75,
-    cloned.transform.position[1],
-    cloned.transform.position[2],
-  ];
-
-  return cloned;
-}
-
-
-/* =========================================
-   EDITOR UI
-========================================= */
+import EditorContextualPanel from "./EditorContextualPanel";
 
 type EditorUIProps = {
   projectId?: string;
 };
 
+type ActivePanel = "add" | "move" | "rotate" | "scale" | "help" | null;
 
-export default function EditorUI({
-  projectId,
-}: EditorUIProps) {
+function cloneSceneObject(object: SceneObject): SceneObject {
+  const cloned = structuredClone(object);
+  cloned.id = `${cloned.type}-${Math.random().toString(36).slice(2, 10)}`;
+  cloned.transform.position = [
+    cloned.transform.position[0] + 0.75,
+    cloned.transform.position[1],
+    cloned.transform.position[2],
+  ];
+  return cloned;
+}
 
-  /* =========================================
-     PANEL STATE
-  ========================================= */
-
-  const [
-    leftPanelCollapsed,
-    setLeftPanelCollapsed,
-  ] = useState(false);
-
-
-  /* =========================================
-     CLIPBOARD
-  ========================================= */
-
-  const [
-    clipboardObject,
-    setClipboardObject,
-  ] = useState<SceneObject>();
-
-
-  /* =========================================
-     IDEA FOLDERS
-  ========================================= */
-
-  const [
-    openIdeaFolders,
-    setOpenIdeaFolders,
-  ] = useState<Record<string, boolean>>({
+export default function EditorUI({ projectId }: EditorUIProps) {
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [clipboardObject, setClipboardObject] = useState<SceneObject>();
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [openIdeaFolders, setOpenIdeaFolders] = useState<Record<string, boolean>>({
     Media: true,
     Environment: true,
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* =========================================
-     FILE INPUT
-  ========================================= */
-
-  const fileInputRef =
-    useRef<HTMLInputElement>(null);
-
-
-  /* =========================================
-     SERVER PROJECT STATE
-  ========================================= */
-
-  const [
-    projectSaving,
-    setProjectSaving,
-  ] = useState(false);
-
-  const [
-    projectLoading,
-    setProjectLoading,
-  ] = useState(false);
-
-
-  /* =========================================
-     EDITOR
-  ========================================= */
+  const [projectSaving, setProjectSaving] = useState(false);
+  const [projectLoading, setProjectLoading] = useState(false);
 
   const {
     scene,
     selectedId,
-
     select,
-
-    /* HISTORY */
-
     canUndo,
     canRedo,
-
     undo,
     redo,
-
-    /* SCENE */
-
     addObject,
     removeObject,
     duplicateObject,
-
     updateObject,
     updateTransform,
-
-    /* TRANSFORM */
-
     transformMode,
     setTransformMode,
-
-    /* EDITOR */
-
     editorActive,
     toggleEditor,
-
-    /* SAVE / LOAD */
-
     saveScene,
     loadScene,
-
-    /* SERVER PROJECTS */
-
     publishProject,
     loadProject,
-
   } = useEditor();
 
-
-  /* =========================================
-     KEYBOARD SHORTCUTS
-  ========================================= */
-
   useEffect(() => {
-
-    const handleKeyDown = (
-      event: KeyboardEvent
-    ) => {
-
-      const target =
-        event.target as HTMLElement | null;
-
-      const tagName =
-        target?.tagName?.toLowerCase();
-
-      /*
-       * Never run editor shortcuts while
-       * the user is typing into a control.
-       */
-
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
       const isTyping =
         tagName === "input" ||
         tagName === "textarea" ||
         tagName === "select" ||
         target?.isContentEditable;
 
-      if (isTyping) {
-        return;
-      }
-
-
-      /* -------------------------------------
-         UNDO
-      ------------------------------------- */
+      if (isTyping) return;
 
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "z" &&
         !event.shiftKey
       ) {
-
         event.preventDefault();
         event.stopPropagation();
-
         undo();
-
         return;
       }
-
-
-      /* -------------------------------------
-         REDO
-      ------------------------------------- */
 
       if (
         (event.ctrlKey || event.metaKey) &&
-        (
-          (
-            event.key.toLowerCase() === "z" &&
-            event.shiftKey
-          ) ||
-          event.key.toLowerCase() === "y"
-        )
+        ((event.key.toLowerCase() === "z" && event.shiftKey) ||
+          event.key.toLowerCase() === "y")
       ) {
-
         event.preventDefault();
         event.stopPropagation();
-
         redo();
-
         return;
       }
-
-
-      /* -------------------------------------
-         COPY
-      ------------------------------------- */
 
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "c"
       ) {
-
-        if (!selectedId) {
-          return;
-        }
-
-        const object =
-          scene.objects.find(
-            (item) =>
-              item.id === selectedId
-          );
-
-        if (!object) {
-          return;
-        }
-
+        if (!selectedId) return;
+        const object = scene.objects.find((item) => item.id === selectedId);
+        if (!object) return;
         event.preventDefault();
         event.stopPropagation();
-
-        setClipboardObject(
-          structuredClone(object)
-        );
-
+        setClipboardObject(structuredClone(object));
         return;
       }
-
-
-      /* -------------------------------------
-         PASTE
-      ------------------------------------- */
 
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "v"
       ) {
-
-        if (!clipboardObject) {
-          return;
-        }
-
+        if (!clipboardObject) return;
         event.preventDefault();
         event.stopPropagation();
 
-        let pastedObject =
-          cloneSceneObject(
-            clipboardObject
-          );
-
-        while (
-          scene.objects.some(
-            (object) =>
-              object.id ===
-              pastedObject.id
-          )
-        ) {
-
-          pastedObject =
-            cloneSceneObject(
-              clipboardObject
-            );
+        let pastedObject = cloneSceneObject(clipboardObject);
+        while (scene.objects.some((object) => object.id === pastedObject.id)) {
+          pastedObject = cloneSceneObject(clipboardObject);
         }
 
-        addObject(
-          pastedObject
-        );
-
-        select(
-          pastedObject.id
-        );
-
+        addObject(pastedObject);
+        select(pastedObject.id);
         return;
       }
-
-
-      /* -------------------------------------
-         DUPLICATE
-      ------------------------------------- */
 
       if (
         (event.ctrlKey || event.metaKey) &&
         event.key.toLowerCase() === "d"
       ) {
-
-        if (!selectedId) {
-          return;
-        }
-
+        if (!selectedId) return;
         event.preventDefault();
         event.stopPropagation();
-
-        duplicateObject(
-          selectedId
-        );
-
+        duplicateObject(selectedId);
         return;
       }
 
-
-      /* -------------------------------------
-         DELETE
-      ------------------------------------- */
-
-      if (
-        event.key === "Delete" ||
-        event.key === "Backspace"
-      ) {
-
-        if (!selectedId) {
-          return;
-        }
-
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (!selectedId) return;
         event.preventDefault();
         event.stopPropagation();
-
-        removeObject(
-          selectedId
-        );
-
+        removeObject(selectedId);
         return;
       }
 
-
-      /* -------------------------------------
-         DESELECT
-      ------------------------------------- */
-
-      if (
-        event.key === "Escape"
-      ) {
-
+      if (event.key === "Escape") {
         event.preventDefault();
-
-        select(
-          undefined
-        );
-
+        setActivePanel(null);
+        select(undefined);
         return;
       }
 
-
-      /* -------------------------------------
-         TOGGLE EDITOR
-      ------------------------------------- */
-
-      if (
-        event.key.toLowerCase() === "e"
-      ) {
-
+      if (event.key.toLowerCase() === "e") {
         event.preventDefault();
-
         toggleEditor();
-
-        return;
       }
-
     };
 
-
-    window.addEventListener(
-      "keydown",
-      handleKeyDown
-    );
-
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-
-      window.removeEventListener(
-        "keydown",
-        handleKeyDown
-      );
-
+      window.removeEventListener("keydown", handleKeyDown);
     };
-
   }, [
     scene,
     selectedId,
@@ -435,372 +190,284 @@ export default function EditorUI({
     redo,
   ]);
 
-
-  /* =========================================
-     LOAD LOCAL FILE
-  ========================================= */
-
-  const handleLoadFile = async (
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-
-    const file =
-      event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
+  const handleLoadFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
     try {
-
-      await loadScene(
-        file
-      );
-
+      await loadScene(file);
     } catch (error) {
-
-      console.error(
-        "Failed to load CyBuilder project:",
-        error
-      );
-
+      console.error("Failed to load CyBuilder project:", error);
       window.alert(
         error instanceof Error
           ? error.message
           : "Failed to load CyBuilder project."
       );
-
     } finally {
-
       event.target.value = "";
-
     }
   };
 
+  const handlePublishProject = async () => {
+    if (!projectId) {
+      window.alert("No project is selected.");
+      return;
+    }
+    if (projectSaving) return;
 
-  /* =========================================
-     PUBLISH PROJECT
-========================================= */
-
-  const handlePublishProject =
-    async () => {
-
-      if (!projectId) {
-
-        window.alert(
-          "No project is selected."
-        );
-
-        return;
-      }
-
-      if (projectSaving) {
-        return;
-      }
-
-      try {
-
-        setProjectSaving(
-          true
-        );
-
-        await publishProject(
-          projectId
-        );
-
-      } catch (error) {
-
-        console.error(
-          "Failed to publish CyBuilder project:",
-          error
-        );
-
-        window.alert(
-          error instanceof Error
-            ? error.message
-            : "Failed to publish project."
-        );
-
-      } finally {
-
-        setProjectSaving(
-          false
-        );
-
-      }
-    };
-
-
-  /* =========================================
-     LOAD SERVER PROJECT
-  ========================================= */
-
-  const handleLoadProject =
-    async () => {
-
-      if (!projectId) {
-
-        window.alert(
-          "No project is selected."
-        );
-
-        return;
-      }
-
-      if (projectLoading) {
-        return;
-      }
-
-      try {
-
-        setProjectLoading(
-          true
-        );
-
-        await loadProject(
-          projectId
-        );
-
-      } catch (error) {
-
-        console.error(
-          "Failed to load CyBuilder project:",
-          error
-        );
-
-        window.alert(
-          error instanceof Error
-            ? error.message
-            : "Failed to load project."
-        );
-
-      } finally {
-
-        setProjectLoading(
-          false
-        );
-
-      }
-    };
-
-
-  /* =========================================
-     SELECTED OBJECT
-  ========================================= */
-
-  const selectedObject =
-    scene.objects.find(
-      (object) =>
-        object.id === selectedId
-    );
-
-
-  /* =========================================
-     SELECTED IDEA DEFINITION
-  ========================================= */
-
-  const selectedDefinition =
-    selectedObject
-      ? getIdeaDefinition(
-          selectedObject.type
-        )
-      : undefined;
-
-
-  /* =========================================
-     ADD IDEA
-  ========================================= */
-
-  const addIdea = (
-    type: SceneObject["type"]
-  ) => {
-
-    const object =
-      createSceneObject(
-        type
+    try {
+      setProjectSaving(true);
+      await publishProject(projectId);
+    } catch (error) {
+      console.error("Failed to publish CyBuilder project:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to publish project."
       );
-
-    addObject(
-      object
-    );
-
-    select(
-      object.id
-    );
+    } finally {
+      setProjectSaving(false);
+    }
   };
 
+  const handleLoadProject = async () => {
+    if (!projectId) {
+      window.alert("No project is selected.");
+      return;
+    }
+    if (projectLoading) return;
 
-  /* =========================================
-     TOGGLE IDEA FOLDER
-  ========================================= */
+    try {
+      setProjectLoading(true);
+      await loadProject(projectId);
+    } catch (error) {
+      console.error("Failed to load CyBuilder project:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to load project."
+      );
+    } finally {
+      setProjectLoading(false);
+    }
+  };
 
-  const toggleIdeaFolder = (
-    category: string
+  const selectedObject = scene.objects.find(
+    (object) => object.id === selectedId
+  );
+
+  const selectedDefinition = selectedObject
+    ? getIdeaDefinition(selectedObject.type)
+    : undefined;
+
+  const addIdea = (type: string) => {
+    const object = createSceneObject(
+      type as Parameters<typeof createSceneObject>[0]
+    );
+    addObject(object);
+    select(object.id);
+  };
+
+  const toggleIdeaFolder = (category: string) => {
+    setOpenIdeaFolders((current) => ({
+      ...current,
+      [category]: !current[category],
+    }));
+  };
+
+  const togglePanel = (panel: ActivePanel) => {
+    setActivePanel((current) => (current === panel ? null : panel));
+  };
+
+  const activateTransform = (
+    mode: "translate" | "rotate" | "scale"
   ) => {
-
-    setOpenIdeaFolders(
-      (current) => ({
-        ...current,
-
-        [category]:
-          !current[category],
-      })
-    );
+    setTransformMode(mode);
+    setActivePanel((current) => {
+      const next = mode === "translate" ? "move" : mode;
+      return current === next ? null : next;
+    });
   };
-
-
-  /* =========================================
-     EDITOR OFF
-  ========================================= */
 
   if (!editorActive) {
     return null;
   }
-console.log("EDITOR PROJECT ID:", projectId);
-
-  /* =========================================
-     RENDER
-  ========================================= */
 
   return (
     <Html
       fullscreen
       zIndexRange={[100, 0]}
-      style={{
-        pointerEvents: "none",
-      }}
+      style={{ pointerEvents: "none" }}
     >
-
       <div
         style={{
           position: "absolute",
           inset: 0,
-
-          display: "flex",
-
-          justifyContent:
-            "space-between",
-
           pointerEvents: "none",
-
-          fontFamily:
-            "Inter, ui-sans-serif, system-ui, sans-serif",
-
-          color: "#ffffff",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          color: "#25282d",
         }}
       >
-
         <EditorLeftPanel
-          leftPanelCollapsed={
-            leftPanelCollapsed
-          }
-          setLeftPanelCollapsed={
-            setLeftPanelCollapsed
-          }
-
+          leftPanelCollapsed={leftPanelCollapsed}
+          setLeftPanelCollapsed={setLeftPanelCollapsed}
           scene={scene}
           selectedId={selectedId}
-
+          selectedObject={selectedObject}
+          selectedDefinition={selectedDefinition}
           select={select}
-
-          canUndo={canUndo}
-          canRedo={canRedo}
-
-          undo={undo}
-          redo={redo}
-
-          saveScene={saveScene}
-
-          fileInputRef={
-            fileInputRef
-          }
-
-          handleLoadFile={
-            handleLoadFile
-          }
-
-          projectId={projectId}
-
-          projectSaving={
-            projectSaving
-          }
-
-          projectLoading={
-            projectLoading
-          }
-
-          handlePublishProject={
-            handlePublishProject
-          }
-
-          handleLoadProject={
-            handleLoadProject
-          }
-
-          transformMode={
-            transformMode
-          }
-
-          setTransformMode={
-            setTransformMode
-          }
-
-          openIdeaFolders={
-            openIdeaFolders
-          }
-
-          toggleIdeaFolder={
-            toggleIdeaFolder
-          }
-
-          addIdea={addIdea}
+          updateObject={updateObject}
+          updateTransform={updateTransform}
+          clipboardObject={clipboardObject}
+          setClipboardObject={setClipboardObject}
+          addObject={addObject}
+          duplicateObject={duplicateObject}
+          removeObject={removeObject}
         />
 
+        <EditorContextualPanel
+  panel={activePanel}
+  scene={scene}
+  selectedId={selectedId}
+  leftPanelCollapsed={leftPanelCollapsed}
+  transformMode={transformMode}
+  setTransformMode={setTransformMode}
+  updateTransform={updateTransform}
+  openIdeaFolders={openIdeaFolders}
+  toggleIdeaFolder={toggleIdeaFolder}
+  addIdea={addIdea}
+  onClose={() => setActivePanel(null)}
+/>
 
-        <EditorRightPanel
-          selectedObject={
-            selectedObject
-          }
-
-          selectedDefinition={
-            selectedDefinition
-          }
-
-          select={select}
-
-          updateObject={
-            updateObject
-          }
-
-          updateTransform={
-            updateTransform
-          }
-
-          clipboardObject={
-            clipboardObject
-          }
-
-          setClipboardObject={
-            setClipboardObject
-          }
-
-          scene={scene}
-
-          addObject={
-            addObject
-          }
-
-          duplicateObject={
-            duplicateObject
-          }
-
-          removeObject={
-            removeObject
-          }
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".cybuilder,application/json,application/zip"
+          onChange={handleLoadFile}
+          style={{ display: "none" }}
         />
 
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            bottom: 18,
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            padding: 6,
+            borderRadius: 14,
+            background: "rgba(235, 236, 238, 0.98)",
+            border: "1px solid rgba(30, 32, 36, 0.12)",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.16)",
+            pointerEvents: "auto",
+            zIndex: 50,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <ToolbarButton
+            label="Add"
+            active={activePanel === "add"}
+            onClick={() => togglePanel("add")}
+          />
+          <ToolbarButton
+            label="Undo"
+            disabled={!canUndo}
+            onClick={undo}
+          />
+          <ToolbarButton
+            label="Redo"
+            disabled={!canRedo}
+            onClick={redo}
+          />
+          <ToolbarButton
+            label="Move"
+            active={activePanel === "move"}
+            onClick={() => activateTransform("translate")}
+          />
+          <ToolbarButton
+            label="Rotate"
+            active={activePanel === "rotate"}
+            onClick={() => activateTransform("rotate")}
+          />
+          <ToolbarButton
+            label="Scale"
+            active={activePanel === "scale"}
+            onClick={() => activateTransform("scale")}
+          />
+          <ToolbarButton
+            label="Help"
+            active={activePanel === "help"}
+            onClick={() => togglePanel("help")}
+          />
+          <ToolbarDivider />
+          <ToolbarButton label="Save" onClick={saveScene} />
+          <ToolbarButton
+            label="Load"
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <ToolbarButton
+            label={projectLoading ? "Loading…" : "Project"}
+            disabled={projectLoading}
+            onClick={handleLoadProject}
+          />
+          <ToolbarButton
+            label={projectSaving ? "Publishing…" : "Publish"}
+            disabled={projectSaving}
+            onClick={handlePublishProject}
+          />
+        </div>
       </div>
-
     </Html>
+  );
+}
+
+function ToolbarDivider() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 1,
+        height: 24,
+        margin: "0 3px",
+        background: "rgba(30, 32, 36, 0.12)",
+      }}
+    />
+  );
+}
+
+function ToolbarButton({
+  label,
+  onClick,
+  active = false,
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        height: 34,
+        padding: "0 11px",
+        border: 0,
+        borderRadius: 9,
+        background: active ? "#5d83ee" : "transparent",
+        color: active ? "#ffffff" : disabled ? "#a2a6ad" : "#3b3f46",
+        cursor: disabled ? "default" : "pointer",
+        fontSize: 11,
+        fontWeight: 700,
+        opacity: disabled ? 0.7 : 1,
+        transition: "background 120ms ease, color 120ms ease",
+      }}
+    >
+      {label}
+    </button>
   );
 }

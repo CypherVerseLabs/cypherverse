@@ -4,9 +4,9 @@ import jwt from "jsonwebtoken";
 import type { SignOptions } from "jsonwebtoken";
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * JWT SECRET
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 function getJwtSecret(): string {
@@ -22,14 +22,25 @@ function getJwtSecret(): string {
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * TOKEN TYPES
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export type AuthTokenType =
   | "access"
   | "refresh";
+
+/*
+ * =========================================================
+ * TOKEN PAYLOAD
+ * =========================================================
+ *
+ * `sub` is always the permanent database User ID.
+ *
+ * address/email are authentication attributes and are
+ * included for compatibility and convenience.
+ */
 
 export interface AuthTokenPayload {
   sub: string;
@@ -44,9 +55,9 @@ export interface AuthTokenPayload {
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * TOKEN EXPIRATION
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export const ACCESS_TOKEN_EXPIRES_IN =
@@ -56,9 +67,9 @@ export const REFRESH_TOKEN_EXPIRES_IN =
   "7d" as SignOptions["expiresIn"];
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * REFRESH COOKIE
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export const REFRESH_COOKIE_NAME =
@@ -68,9 +79,9 @@ export const REFRESH_COOKIE_MAX_AGE =
   7 * 24 * 60 * 60 * 1000;
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * CREATE ACCESS TOKEN
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function createAccessToken(
@@ -96,9 +107,9 @@ export function createAccessToken(
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * CREATE REFRESH TOKEN
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function createRefreshToken(
@@ -124,9 +135,9 @@ export function createRefreshToken(
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * VERIFY TOKEN
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function verifyAuthToken(
@@ -134,13 +145,14 @@ export function verifyAuthToken(
 ): AuthTokenPayload {
   const secret = getJwtSecret();
 
-  const decoded = jwt.verify(
-    token,
-    secret,
-    {
-      algorithms: ["HS256"],
-    }
-  );
+  const decoded =
+    jwt.verify(
+      token,
+      secret,
+      {
+        algorithms: ["HS256"],
+      }
+    );
 
   if (
     typeof decoded !== "object" ||
@@ -154,6 +166,11 @@ export function verifyAuthToken(
   const payload =
     decoded as Partial<AuthTokenPayload>;
 
+  /*
+   * `sub` is mandatory because it is the
+   * canonical user identity.
+   */
+
   if (
     typeof payload.sub !== "string"
   ) {
@@ -161,6 +178,10 @@ export function verifyAuthToken(
       "JWT subject is missing"
     );
   }
+
+  /*
+   * Token type is mandatory.
+   */
 
   if (
     payload.type !== "access" &&
@@ -177,13 +198,17 @@ export function verifyAuthToken(
     address:
       typeof payload.address ===
       "string"
-        ? payload.address.toLowerCase()
+        ? payload.address
+            .trim()
+            .toLowerCase()
         : undefined,
 
     email:
       typeof payload.email ===
       "string"
-        ? payload.email.toLowerCase()
+        ? payload.email
+            .trim()
+            .toLowerCase()
         : undefined,
 
     username:
@@ -192,14 +217,15 @@ export function verifyAuthToken(
         ? payload.username
         : undefined,
 
-    type: payload.type,
+    type:
+      payload.type,
   };
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * REFRESH COOKIE OPTIONS
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function getRefreshCookieOptions() {
@@ -225,9 +251,9 @@ export function getRefreshCookieOptions() {
 }
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * CLEAR REFRESH COOKIE OPTIONS
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function getClearRefreshCookieOptions() {

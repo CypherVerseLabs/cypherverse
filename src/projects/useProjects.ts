@@ -10,7 +10,7 @@ import {
 
 import type {
   Scene,
-} from "../../editor/scene/objectTypes";
+} from "../editor/scene/objectTypes";
 
 
 /* =========================================================
@@ -35,10 +35,13 @@ export type Project = {
 
   scene?: Scene | null;
 
+  slug?: string;
+
   createdAt: string;
 
   updatedAt: string;
 };
+
 
 
 /* =========================================================
@@ -144,41 +147,46 @@ function normalizeProject(
 
 
   return {
-    id:
-      String(raw.id),
+  id:
+    String(raw.id),
 
-    ownerId:
-      String(
-        raw.ownerId ??
-        raw.owner_id ??
-        ""
-      ),
+  ownerId:
+    String(
+      raw.ownerId ??
+      raw.owner_id ??
+      ""
+    ),
 
-    name:
-      raw.name ||
-      "Untitled World",
+  name:
+    raw.name ||
+    "Untitled World",
 
-    description:
-      raw.description ||
-      undefined,
+  description:
+    raw.description ||
+    undefined,
 
-    template:
-      raw.template === "found"
-        ? "found"
-        : "editor",
+  template:
+    raw.template === "found"
+      ? "found"
+      : "editor",
 
-    scene,
+  scene,
 
-    createdAt:
-      raw.createdAt ??
-      raw.created_at ??
-      "",
+  slug:
+    raw.slug ||
+    undefined,
 
-    updatedAt:
-      raw.updatedAt ??
-      raw.updated_at ??
-      "",
-  };
+  createdAt:
+    raw.createdAt ??
+    raw.created_at ??
+    "",
+
+  updatedAt:
+    raw.updatedAt ??
+    raw.updated_at ??
+    "",
+};
+
 }
 
 

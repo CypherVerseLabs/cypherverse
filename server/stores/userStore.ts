@@ -341,5 +341,66 @@ export async function updateUserByEmail(
       },
     });
 
+    
+
+  return toUser(updated);
+}
+
+export async function updateUserById(
+  id: string,
+  updates: {
+    email?: string;
+    username?: string;
+    passwordHash?: string;
+  }
+): Promise<User | undefined> {
+  const existing =
+    await prisma.user.findUnique({
+      where: {
+        id,
+      },
+    });
+
+  if (!existing) {
+    return undefined;
+  }
+
+  const updated =
+    await prisma.user.update({
+      where: {
+        id,
+      },
+
+      data: {
+        ...(updates.email !== undefined
+          ? {
+              email:
+                updates.email
+                  ? updates.email
+                      .trim()
+                      .toLowerCase()
+                  : null,
+            }
+          : {}),
+
+        ...(updates.username !== undefined
+          ? {
+              username:
+                updates.username
+                  ? updates.username.trim()
+                  : null,
+            }
+          : {}),
+
+        ...(updates.passwordHash !== undefined
+          ? {
+              passwordHash:
+                updates.passwordHash ||
+                null,
+            }
+          : {}),
+      },
+    });
+
   return toUser(updated);
 }

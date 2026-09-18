@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =========================================================
+// ENUMS
+// =========================================================
+
+enum ProjectTemplate {
+  editor
+  found
+}
+
+enum ParcelStatus {
+  available
+  owned
+  reserved
+  for_sale
+}
+
+// =========================================================
+// USER
+// =========================================================
+
+model User {
+  id           String  @id @default(uuid())
+  address      String? @unique
+  email        String? @unique
+  passwordHash String?
+  username     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+
+  // Parcel marketplace
+  parcelsOwned       Parcel[]
+  parcelListings     ParcelListing[]
+  parcelReservations ParcelReservation[]
+}
+
+// =========================================================
+// PROJECT
+// =========================================================
+
+model Project {
+  id          String  @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+
+  template ProjectTemplate @default(editor)
+
+  scene Json?
+
+  // Public publishing
+  slug        String?   @unique
+  publishedAt DateTime?
+
+  // Optional parcel this project is built on
+  parcelId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  assets ProjectAsset[]
+
+  parcel Parcel? @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId])
+  @@index([publishedAt])
+  @@index([parcelId])
+}
+
+// =========================================================
+// PROJECT ASSETS
+// =========================================================
+
+model ProjectAsset {
+  id String @id @default(uuid())
+
+  projectId String
+
+  originalName String
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@unique([projectId, storageKey])
+}
+
+// =========================================================
+// PARCEL
+// =========================================================
+
+model Parcel {
+  id String @id @default(uuid())
+
+  // -------------------------------------------------------
+  // Static world identity
+  // -------------------------------------------------------
+
+  estateId String @unique
+
+  x Int
+  y Int
+
+  // -------------------------------------------------------
+  // Dynamic marketplace state
+  // -------------------------------------------------------
+
+  status ParcelStatus @default(available)
+
+  // Current CypherVerse owner
+  ownerId String?
+
+  // Marketplace price
+  price Int?
+
+  // -------------------------------------------------------
+  // Optional display information
+  // -------------------------------------------------------
+
+  name        String?
+  description String?
+
+  // -------------------------------------------------------
+  // Optional blockchain identity
+  // -------------------------------------------------------
+
+  blockchainAddress String?
+  tokenId           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // -------------------------------------------------------
+  // Relations
+  // -------------------------------------------------------
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  listings ParcelListing[]
+
+  reservations ParcelReservation[]
+
+  projects Project[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([x, y])
+}
+
+// =========================================================
+// PARCEL LISTING
+// =========================================================
+
+model ParcelListing {
+  id String @id @default(uuid())
+
+  parcelId String
+  sellerId String
+
+  price Int
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([parcelId])
+  @@index([sellerId])
+  @@index([active])
+}
+
+// =========================================================
+// PARCEL RESERVATION
+// =========================================================
+
+model ParcelReservation {
+  id String @id @default(uuid())
+
+  parcelId String
+  userId   String
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([parcelId])
+  @@index([userId])
+  @@index([expiresAt])
+}

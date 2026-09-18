@@ -12,11 +12,11 @@ import {
 
 import {
   Scene,
-} from "../editor/scene/objectTypes";
+} from "../../editor/scene/objectTypes";
 
 import {
   sceneToWorld,
-} from "../editor/scene/sceneToWorld";
+} from "../../editor/scene/sceneToWorld";
 
 
 /* =========================================================

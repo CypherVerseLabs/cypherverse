@@ -27,23 +27,14 @@ import {
 import SceneObjectContent from "./SceneObjectContent";
 
 
-/* =========================================
-   TYPES
-========================================= */
-
 type SceneObjectProps = {
   object: SceneObjectData;
 };
 
 
-/* =========================================
-   SCENE OBJECT
-========================================= */
-
 export default function SceneObject({
   object,
 }: SceneObjectProps): ReactElement {
-
   const {
     scene,
     selectedId,
@@ -55,37 +46,16 @@ export default function SceneObject({
     editorActive,
   } = useEditor();
 
-
-  /* =======================================
-     GROUP REF
-  ======================================= */
-
-  const groupRef =
-    useRef<Group>(null);
-
-
-  /* =======================================
-     SELECTION
-  ======================================= */
+  const groupRef = useRef<Group>(null);
 
   const isSelected =
     selectedId === object.id;
-
-
-  /* =======================================
-     TRANSFORM
-  ======================================= */
 
   const {
     position,
     rotation,
     scale,
   } = object.transform;
-
-
-  /* =======================================
-     CHILDREN
-  ======================================= */
 
   const children =
     scene.objects.filter(
@@ -94,32 +64,21 @@ export default function SceneObject({
     );
 
 
-  /* =======================================
-     CLICK
-  ======================================= */
-
   const handleClick = (
     event: ThreeEvent<MouseEvent>
   ) => {
-
-    event.stopPropagation();
-
     if (!editorActive) {
       return;
     }
+
+    event.stopPropagation();
 
     select(object.id);
   };
 
 
-  /* =======================================
-     OBJECT CHANGE
-  ======================================= */
-
   const handleObjectChange = () => {
-
-    const group =
-      groupRef.current;
+    const group = groupRef.current;
 
     if (!group) {
       return;
@@ -152,10 +111,6 @@ export default function SceneObject({
   };
 
 
-  /* =======================================
-     OBJECT GROUP
-  ======================================= */
-
   const content = (
     <group
       ref={groupRef}
@@ -166,39 +121,23 @@ export default function SceneObject({
       visible={
         object.visible !== false
       }
-      raycast={
-        editorActive
-          ? undefined
-          : () => null
-      }
       onClick={
         editorActive
           ? handleClick
           : undefined
       }
     >
-
-      {/* ===================================
-          OBJECT CONTENT
-      =================================== */}
-
       <SceneObjectContent
         object={object}
       />
 
-
-      {/* ===================================
-          SELECTION
-      =================================== */}
+      {editorActive && (
+        <EditorSelectionMesh />
+      )}
 
       {isSelected && editorActive && (
         <SelectionIndicator />
       )}
-
-
-      {/* ===================================
-          CHILDREN
-      =================================== */}
 
       {children.map(
         (child) => (
@@ -208,14 +147,9 @@ export default function SceneObject({
           />
         )
       )}
-
     </group>
   );
 
-
-  /* =======================================
-     TRANSFORM CONTROLS
-  ======================================= */
 
   if (
     !isSelected ||
@@ -227,25 +161,59 @@ export default function SceneObject({
 
 
   return (
-  <TransformControls
-    mode={transformMode}
-    enabled={editorActive && isSelected && !object.locked}
-    onMouseDown={() => {
-      beginTransform(object.id);
-    }}
-    onObjectChange={handleObjectChange}
-    onMouseUp={() => {
-      endTransform();
-    }}
-  >
-    {content}
-  </TransformControls>
-);
+    <TransformControls
+      mode={transformMode}
+      enabled={
+        editorActive &&
+        isSelected &&
+        !object.locked
+      }
+      onMouseDown={() => {
+        beginTransform(object.id);
+      }}
+      onObjectChange={
+        handleObjectChange
+      }
+      onMouseUp={() => {
+        endTransform();
+      }}
+    >
+      {content}
+    </TransformControls>
+  );
 }
 
 
 /* =========================================
-   SELECTION INDICATOR
+   INVISIBLE EDITOR SELECTION MESH
+========================================= */
+
+function EditorSelectionMesh(): ReactElement {
+  return (
+    <mesh
+      name="editor-selection-hit-area"
+    >
+      <boxGeometry
+        args={[
+          1.25,
+          1.25,
+          1.25,
+        ]}
+      />
+
+      <meshBasicMaterial
+        transparent
+        opacity={0}
+        depthWrite={false}
+        depthTest={false}
+      />
+    </mesh>
+  );
+}
+
+
+/* =========================================
+   SELECTED OBJECT OUTLINE
 ========================================= */
 
 function SelectionIndicator(): ReactElement {

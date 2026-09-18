@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Parcel" ALTER COLUMN "price" SET DATA TYPE DECIMAL(12,2);
+
+-- AlterTable
+ALTER TABLE "ParcelListing" ALTER COLUMN "price" SET DATA TYPE DECIMAL(12,2);

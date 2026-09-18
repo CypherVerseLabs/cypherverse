@@ -1,3 +1,5 @@
+// server/routes/auth/me.ts
+
 import {
   Router,
   Request,
@@ -10,11 +12,23 @@ import {
 
 import {
   getUserById,
-  getUserByAddress,
-  getUserByEmail,
 } from "../../stores/userStore.js";
 
 const router = Router();
+
+/*
+ * =========================================================
+ * GET CURRENT USER
+ * =========================================================
+ *
+ * GET /auth/me
+ *
+ * Authorization:
+ *
+ * Bearer <access-token>
+ *
+ * The JWT `sub` is the canonical User.id.
+ */
 
 router.get(
   "/",
@@ -24,6 +38,12 @@ router.get(
   ) => {
     const authHeader =
       req.headers.authorization;
+
+    /*
+     * -------------------------------------------------------
+     * AUTHORIZATION HEADER
+     * -------------------------------------------------------
+     */
 
     if (
       !authHeader ||
@@ -48,11 +68,17 @@ router.get(
     }
 
     try {
+      /*
+       * -----------------------------------------------------
+       * VERIFY JWT
+       * -----------------------------------------------------
+       */
+
       const decoded =
         verifyAuthToken(token);
 
       /*
-       * /auth/me only accepts access tokens.
+       * /auth/me accepts access tokens only.
        */
 
       if (
@@ -66,37 +92,17 @@ router.get(
       }
 
       /*
-       * Canonical lookup.
+       * -----------------------------------------------------
+       * CANONICAL USER LOOKUP
+       * -----------------------------------------------------
+       *
+       * The database User.id is the source of truth.
        */
 
-      let user =
+      const user =
         await getUserById(
           decoded.sub
         );
-
-      /*
-       * Legacy fallback.
-       */
-
-      if (
-        !user &&
-        decoded.address
-      ) {
-        user =
-          await getUserByAddress(
-            decoded.address
-          );
-      }
-
-      if (
-        !user &&
-        decoded.email
-      ) {
-        user =
-          await getUserByEmail(
-            decoded.email
-          );
-      }
 
       if (!user) {
         return res.status(404).json({
@@ -106,31 +112,29 @@ router.get(
       }
 
       /*
-       * JWT must identify this exact account.
-       */
-
-      if (
-        user.id !==
-        decoded.sub
-      ) {
-        return res.status(401).json({
-          error:
-            "Token does not match user account",
-        });
-      }
-
-      /*
+       * -----------------------------------------------------
+       * RESPONSE
+       * -----------------------------------------------------
+       *
        * Never expose passwordHash.
        */
 
-      return res.json({
+      return res.status(200).json({
         user: {
           id: user.id,
-          address: user.address,
-          email: user.email,
-          username: user.username,
+
+          address:
+            user.address,
+
+          email:
+            user.email,
+
+          username:
+            user.username,
+
           createdAt:
             user.createdAt,
+
           updatedAt:
             user.updatedAt,
         },

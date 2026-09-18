@@ -10,7 +10,7 @@ import {
 } from "cyengine";
 
 import Analytics from "ideas/Analytics";
-import Title from "ideas/Title";
+import Title from "ideas/inputs/Title";
 import { createOrientationDialogue } from "ideas/Dialogues/useOrientationDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";
 
@@ -52,25 +52,41 @@ export default function Orientation() {
    * Editor / Found
    */
 
-  const projectId = sessionStorage.getItem(
-    "cypherverse-project-id"
-  );
+const projectId =
+  typeof window !== "undefined"
+    ? sessionStorage.getItem(
+        "cypherverse-project-id"
+      )
+    : null;
 
-  const templateValue = sessionStorage.getItem(
-    "cypherverse-template"
-  );
+const templateValue =
+  typeof window !== "undefined"
+    ? sessionStorage.getItem(
+        "cypherverse-template"
+      )
+    : null;
 
-  const templateRoute = sessionStorage.getItem(
-    "cypherverse-template-route"
-  );
+const templateRoute =
+  typeof window !== "undefined"
+    ? sessionStorage.getItem(
+        "cypherverse-template-route"
+      )
+    : null;
 
-  const worldName = sessionStorage.getItem(
-    "cypherverse-world-name"
-  );
+const worldName =
+  typeof window !== "undefined"
+    ? sessionStorage.getItem(
+        "cypherverse-world-name"
+      )
+    : null;
 
-  const creationSession = sessionStorage.getItem(
-    "cypherverse-creation-session"
-  );
+const creationSession =
+  typeof window !== "undefined"
+    ? sessionStorage.getItem(
+        "cypherverse-creation-session"
+      )
+    : null;
+
 
   /*
    * =========================================================

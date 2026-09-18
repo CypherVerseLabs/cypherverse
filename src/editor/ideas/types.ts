@@ -1,6 +1,3 @@
-import type {
-  ComponentType,
-} from "react";
 
 import {
   SceneObject,
@@ -8,97 +5,88 @@ import {
 
 
 /* =========================================
-   IDEA TYPE
+   BASIC IDEA TYPES
 ========================================= */
 
 export type IdeaType =
   SceneObject["type"];
 
 
-/* =========================================
-   FIELD TYPES
-========================================= */
-
 export type IdeaFieldType =
   | "string"
+  | "number"
+  | "integer"
+  | "float"
+  | "boolean"
+  | "color"
   | "image"
-  | "video"
   | "audio"
+  | "video"
+  | "font"
   | "gltf"
-  | "number"
-  | "float"
-  | "integer"
+  | "position"
+  | "rotation"
+  | "scale"
   | "radius"
-  | "color"
-  | "boolean"
   | "vector2"
-  | "array";
+  | "array"
+  | "object"
+  | "unknown";
+
+
+export type IdeaArrayItemType = 
+| "string" 
+| "number" 
+| "integer" 
+| "float" 
+| "boolean" 
+| "color" 
+| "image" 
+| "video" 
+| "audio" 
+| "font" 
+| "gltf" 
+| "position" 
+| "rotation" 
+| "scale" 
+| "radius";
 
 
 /* =========================================
-   ARRAY ITEM TYPE
+   EDITOR FIELD
 ========================================= */
 
-export type IdeaArrayItemType =
-  | "string"
-  | "number"
-  | "float"
-  | "integer"
-  | "radius"
-  | "color"
-  | "boolean"
-  | "vector2";
-
-
-/* =========================================
-   BASE FIELD
-========================================= */
-
-type BaseIdeaField = {
+export type IdeaField = {
   name: string;
+
+  type: IdeaFieldType;
 
   label?: string;
 
+  description?: string;
+
   placeholder?: string;
 
+  required?: boolean;
+
+  min?: number;
+
+  max?: number;
+
   step?: number;
+
+  itemType?: IdeaArrayItemType;
 };
 
 
 /* =========================================
-   IDEA FIELD
-========================================= */
-
-export type IdeaField =
-  | (BaseIdeaField & {
-      type:
-        | "string"
-        | "image"
-        | "video"
-        | "audio"
-        | "gltf"
-        | "number"
-        | "float"
-        | "integer"
-        | "radius"
-        | "color"
-        | "boolean"
-        | "vector2";
-    })
-  | (BaseIdeaField & {
-      type: "array";
-
-      itemType: IdeaArrayItemType;
-    });
-
-
-/* =========================================
-   IDEA DEFINITION
+   RUNTIME IDEA DEFINITION
 ========================================= */
 
 export type IdeaDefinition<
-  T extends SceneObject
+  T extends SceneObject = SceneObject
 > = {
+
   type: T["type"];
 
   name: string;
@@ -107,33 +95,23 @@ export type IdeaDefinition<
 
   schema: IdeaField[];
 
-  create: (
-    overrides?: Partial<T>
-  ) => T;
-
   ai?: {
+
     description?: string;
 
     tags?: string[];
 
     skills?: string[];
   };
+
+  create: (
+    overrides?: Partial<T>
+  ) => T;
 };
 
 
-/* =========================================
-   ANY IDEA DEFINITION
-========================================= */
-
-export type AnyIdeaDefinition = {
-  [K in SceneObject["type"]]:
-    IdeaDefinition<
-      Extract<
-        SceneObject,
-        { type: K }
-      >
-    >;
-}[SceneObject["type"]];
+export type AnyIdeaDefinition =
+  IdeaDefinition<any>;
 
 
 /* =========================================
@@ -146,10 +124,11 @@ export type IdeaKind =
 
 
 /* =========================================
-   IDEA SCHEMA FIELD
+   AI SCHEMA FIELD
 ========================================= */
 
 export type IdeaSchemaField = {
+
   name: string;
 
   type: string;
@@ -161,29 +140,132 @@ export type IdeaSchemaField = {
 
 
 /* =========================================
+   EXTENDED IDEA METADATA
+========================================= */
+
+export type IdeaMetadata = {
+
+  /*
+   * Canonical runtime type/id.
+   *
+   * Example:
+   *
+   * "link"
+   * "speaker"
+   * "cloudySky"
+   */
+  id: string;
+
+  /*
+   * Optional explicit type.
+   *
+   * Usually the same as id.
+   */
+  type?: string;
+
+  /*
+   * Human-readable name.
+   */
+  name: string;
+
+  /*
+   * Human-readable description.
+   */
+  description?: string;
+
+  /*
+   * Runtime/editor category.
+   */
+  category: string;
+
+  /*
+   * Idea kind.
+   */
+  kind?: IdeaKind;
+
+  /*
+   * Search/AI tags.
+   */
+  tags?: string[];
+
+  /*
+   * AI capabilities/skills.
+   */
+  skills?: string[];
+
+  /*
+   * AI-readable schema.
+   */
+  schema?: IdeaSchemaField[];
+
+  /*
+   * Optional legacy/history information.
+   */
+  predecessor?: string;
+
+  /*
+   * Legacy purpose text.
+   */
+  purpose?: string;
+
+  /*
+   * Package dependencies used by the Idea.
+   */
+  npm_dependencies?: Record<
+    string,
+    string
+  >;
+
+  /*
+   * Optional data URL.
+   */
+  data_url?: string | null;
+
+  /*
+   * Additional AI metadata.
+   */
+  ai?: {
+
+    description?: string;
+
+    tags?: string[];
+
+    skills?: string[];
+
+    examples?: string[];
+
+    synonyms?: string[];
+
+    instructions?: string;
+  };
+};
+
+
+/* =========================================
    REGISTERED SCENE OBJECT
 ========================================= */
 
-export type RegisteredSceneObjectIdea<
-  T extends AnyIdeaDefinition = AnyIdeaDefinition
-> = {
-  id: T["type"];
+export type RegisteredSceneObjectIdea = {
 
-  name: T["name"];
+  id: string;
 
-  category: T["category"];
+  name: string;
+
+  category: string;
 
   kind: "scene-object";
 
-  definition: T;
+  definition: AnyIdeaDefinition;
 
   description?: string;
 
-  tags?: string[];
+  tags: string[];
 
-  skills?: string[];
+  skills: string[];
 
-  schema?: IdeaSchemaField[];
+  schema: IdeaSchemaField[];
+
+  metadata?: IdeaMetadata;
 };
 
 
@@ -192,6 +274,7 @@ export type RegisteredSceneObjectIdea<
 ========================================= */
 
 export type RegisteredComponentIdea = {
+
   id: string;
 
   name: string;
@@ -200,15 +283,17 @@ export type RegisteredComponentIdea = {
 
   kind: "component";
 
-  component: ComponentType;
+  definition?: unknown;
 
   description?: string;
 
-  tags?: string[];
+  tags: string[];
 
-  skills?: string[];
+  skills: string[];
 
-  schema?: IdeaSchemaField[];
+  schema: IdeaSchemaField[];
+
+  metadata?: IdeaMetadata;
 };
 
 
@@ -220,32 +305,39 @@ export type RegisteredIdea =
   | RegisteredSceneObjectIdea
   | RegisteredComponentIdea;
 
+
 /* =========================================
-   SCENE OBJECT PLUGIN
+   PLUGINS
 ========================================= */
 
 export type IdeaPlugin = {
+
+  id: string;
+
   name: string;
 
   ideas: AnyIdeaDefinition[];
 };
 
 
-/* =========================================
-   COMPONENT PLUGIN
-========================================= */
-
 export type ComponentIdeaPlugin = {
+
+  id: string;
+
   name: string;
 
   ideas: RegisteredComponentIdea[];
 };
 
 
-/* =========================================
-   PLUGIN
-========================================= */
+export type ExtendedIdeaPlugin = {
 
-export type ExtendedIdeaPlugin =
-  | IdeaPlugin
-  | ComponentIdeaPlugin;
+  id: string;
+
+  name: string;
+
+  ideas?: AnyIdeaDefinition[];
+
+  components?: RegisteredComponentIdea[];
+};
+

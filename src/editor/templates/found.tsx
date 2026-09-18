@@ -8,19 +8,68 @@ import {
   EditorTemplate,
 } from "./types";
 
-export const foundTemplate: EditorTemplate = {
-  id: "found",
+import {
+  createSceneObject,
+} from "../ideas";
 
-  name: "Found",
+import {
+  SceneObject,
+} from "../scene/objectTypes";
 
-  description:
-    "A neon green rainy world with the CyBuilder logo and links to the CypherVerse spaces.",
 
-  scene: {
-    objects: [
+/* =========================================
+   FOUND OBJECT BUILDER
+========================================= */
+
+/**
+ * Creates an object from the editor idea registry,
+ * then applies Found's template-specific values.
+ *
+ * The registry remains the source of truth for the
+ * object's type/default structure.
+ *
+ * Found remains free to customize the composition.
+ */
+function foundObject<T extends SceneObject>(
+  type: T["type"],
+  overrides: Partial<T>
+): T {
+
+  const object =
+    createSceneObject(type) as unknown as T;
+
+  return {
+    ...object,
+    ...overrides,
+
+    transform: {
+      ...object.transform,
+      ...(overrides.transform ?? {}),
+    },
+
+    props: {
+      ...object.props,
+      ...(overrides.props ?? {}),
+    },
+  } as T;
+}
+
+
+/* =========================================
+   FOUND SCENE
+========================================= */
+
+const foundScene = {
+  objects: [
+
+    /* =======================================
+       CLOUDY SKY
+    ======================================= */
+
+    foundObject(
+      "cloudySky",
       {
         id: "sky-1",
-        type: "cloudySky",
 
         transform: {
           position: [0, 0, 0],
@@ -38,11 +87,18 @@ export const foundTemplate: EditorTemplate = {
             0.1, 0.2, 0.5,
           ],
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       RAIN
+    ======================================= */
+
+    foundObject(
+      "rain",
       {
         id: "rain-1",
-        type: "rain",
 
         transform: {
           position: [0, 0, 0],
@@ -55,11 +111,18 @@ export const foundTemplate: EditorTemplate = {
           color: "#02e83c",
           size: 0.1,
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       GROUND
+    ======================================= */
+
+    foundObject(
+      "ground",
       {
         id: "ground-1",
-        type: "ground",
 
         transform: {
           position: [0, 0, 0],
@@ -71,11 +134,18 @@ export const foundTemplate: EditorTemplate = {
           size: 500,
           gridSize: 100,
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       TITLE
+    ======================================= */
+
+    foundObject(
+      "title",
       {
         id: "title-1",
-        type: "title",
 
         transform: {
           position: [0, 1.2, -0.75],
@@ -87,11 +157,18 @@ export const foundTemplate: EditorTemplate = {
           text: "welcome to Found",
           image: "",
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       MODEL
+    ======================================= */
+
+    foundObject(
+      "model",
       {
         id: "model-1",
-        type: "model",
 
         transform: {
           position: [0, 2, -1.5],
@@ -104,11 +181,18 @@ export const foundTemplate: EditorTemplate = {
           center: false,
           normalize: false,
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       LINK 1
+    ======================================= */
+
+    foundObject(
+      "link",
       {
         id: "link-1",
-        type: "link",
 
         transform: {
           position: [-1.5, 0.8, 0.75],
@@ -120,11 +204,18 @@ export const foundTemplate: EditorTemplate = {
           href: "/multiplayer",
           text: "visit multiplayer page",
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       LINK 2
+    ======================================= */
+
+    foundObject(
+      "link",
       {
         id: "link-2",
-        type: "link",
 
         transform: {
           position: [-1, 0.8, 0],
@@ -136,11 +227,18 @@ export const foundTemplate: EditorTemplate = {
           href: "/decentral_station",
           text: "Decentral Station",
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       LINK 3
+    ======================================= */
+
+    foundObject(
+      "link",
       {
         id: "link-3",
-        type: "link",
 
         transform: {
           position: [1, 0.8, 0],
@@ -152,11 +250,18 @@ export const foundTemplate: EditorTemplate = {
           href: "/workshop",
           text: "visit workshop page",
         },
-      },
+      }
+    ),
 
+
+    /* =======================================
+       SPEAKER
+    ======================================= */
+
+    foundObject(
+      "speaker",
       {
         id: "speaker-1",
-        type: "speaker",
 
         transform: {
           position: [1, 0, -4],
@@ -172,12 +277,30 @@ export const foundTemplate: EditorTemplate = {
 
           volume: 1,
         },
-      },
-    ],
-  },
+      }
+    ),
+
+  ],
+};
+
+
+/* =========================================
+   FOUND TEMPLATE
+========================================= */
+
+export const foundTemplate: EditorTemplate = {
+  id: "found",
+
+  name: "Found",
+
+  description:
+    "A neon green rainy world with the CyBuilder logo and links to the CypherVerse spaces.",
+
+  scene: foundScene,
 
   environment: (
     <group name="found-world">
+
       <Background
         color="black"
       />
@@ -190,6 +313,7 @@ export const foundTemplate: EditorTemplate = {
         position-y={5}
         intensity={1.5}
       />
+
     </group>
   ),
 };

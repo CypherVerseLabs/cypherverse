@@ -1,4 +1,7 @@
-import React from "react";
+import React, {
+  useLayoutEffect,
+  useRef,
+} from "react";
 
 import {
   Audio,
@@ -12,18 +15,24 @@ import {
 
 import {
   ColorRepresentation,
+  Group,
+  Object3D,
 } from "three";
 
 import CloudySky from "../../ideas/CloudySky";
-import { Rain } from "../../ideas/Rain";
-import Title from "../../ideas/Title";
-import Link from "../../ideas/Link";
+import { Rain } from "../../ideas/environments/Rain";
+import Title from "../../ideas/inputs/Title";
+import Link from "../../ideas/inputs/Link";
 import Speaker from "../../ideas/players/Speaker";
 import Ground from "../../ideas/Ground";
 
 import {
   SceneObject,
 } from "./objectTypes";
+
+import {
+  useEditor,
+} from "../context/EditorContext";
 
 
 /* =========================================
@@ -36,27 +45,199 @@ type SceneObjectContentProps = {
 
 
 /* =========================================
+   ENVIRONMENT TYPES
+========================================= */
+
+const ENVIRONMENT_TYPES =
+  new Set<SceneObject["type"]>([
+    "ground",
+    "cloudySky",
+    "rain",
+    "fog",
+    "background",
+    "hdri",
+    "infinitePlane",
+    "lostFloor",
+  ]);
+
+
+/* =========================================
+   NON-INTERACTIVE ENVIRONMENT
+========================================= */
+
+/*
+ * Environment objects remain visible in View
+ * Mode but do not steal pointer events from
+ * interactive runtime objects.
+ *
+ * In Edit Mode, their original raycasts are
+ * restored so they can be selected.
+ */
+
+function NonInteractiveEnvironment({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  const groupRef = useRef<Group>(null);
+
+  const {
+    editorActive,
+  } = useEditor();
+
+  useLayoutEffect(() => {
+    const group = groupRef.current;
+
+    if (!group) {
+      return;
+    }
+
+    const originalRaycasts = new Map<
+      Object3D,
+      Object3D["raycast"]
+    >();
+
+    group.traverse((child) => {
+      if (
+        "raycast" in child &&
+        typeof child.raycast === "function"
+      ) {
+        originalRaycasts.set(
+          child,
+          child.raycast
+        );
+
+        if (!editorActive) {
+          child.raycast = () => {};
+        }
+      }
+    });
+
+    return () => {
+      originalRaycasts.forEach(
+        (raycast, child) => {
+          child.raycast = raycast;
+        }
+      );
+    };
+  }, [
+    editorActive,
+  ]);
+
+  return (
+    <group ref={groupRef}>
+      {children}
+    </group>
+  );
+}
+
+
+/* =========================================
+   EDITOR INTERACTION SHIELD
+========================================= */
+
+/*
+ * Runtime Ideas such as Link, Speaker, and
+ * other interactive components may contain
+ * their own pointer handlers.
+ *
+ * In Edit Mode, the parent SceneObject must
+ * receive the selection click instead of the
+ * Idea activating its runtime behavior.
+ *
+ * Disabling raycasts on the rendered content
+ * prevents child meshes from receiving pointer
+ * events while editing.
+ *
+ * The parent SceneObject group still receives
+ * the click through its own editor handler.
+ */
+
+function EditorInteractionShield({
+  children,
+  enabled,
+}: {
+  children: React.ReactNode;
+  enabled: boolean;
+}): React.ReactElement {
+  const groupRef = useRef<Group>(null);
+
+  useLayoutEffect(() => {
+    const group = groupRef.current;
+
+    if (!group) {
+      return;
+    }
+
+    const originalRaycasts = new Map<
+      Object3D,
+      Object3D["raycast"]
+    >();
+
+    group.traverse((child) => {
+      if (
+        "raycast" in child &&
+        typeof child.raycast === "function"
+      ) {
+        originalRaycasts.set(
+          child,
+          child.raycast
+        );
+
+        if (enabled) {
+          child.raycast = () => {};
+        }
+      }
+    });
+
+    return () => {
+      originalRaycasts.forEach(
+        (raycast, child) => {
+          child.raycast = raycast;
+        }
+      );
+    };
+  }, [
+    enabled,
+  ]);
+
+  return (
+    <group ref={groupRef}>
+      {children}
+    </group>
+  );
+}
+
+
+/* =========================================
    SCENE OBJECT CONTENT
 ========================================= */
 
 export default function SceneObjectContent({
   object,
 }: SceneObjectContentProps): React.ReactElement | null {
+  const {
+    editorActive,
+  } = useEditor();
+
+  let content:
+    React.ReactElement | null;
+
+
+  /* =======================================
+     IMAGE
+  ======================================= */
 
   switch (object.type) {
-
-    /* =====================================
-       IMAGE
-    ===================================== */
-
     case "image":
-      return object.props.src ? (
+      content = object.props.src ? (
         <Image
           src={object.props.src}
         />
       ) : (
         <ImagePlaceholder />
       );
+      break;
 
 
     /* =====================================
@@ -64,7 +245,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "model":
-      return object.props.src ? (
+      content = object.props.src ? (
         <Model
           src={object.props.src}
           center={object.props.center}
@@ -73,6 +254,7 @@ export default function SceneObjectContent({
       ) : (
         <ModelPlaceholder />
       );
+      break;
 
 
     /* =====================================
@@ -80,7 +262,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "video":
-      return object.props.src ? (
+      content = object.props.src ? (
         <Video
           src={object.props.src}
           size={object.props.size}
@@ -91,6 +273,7 @@ export default function SceneObjectContent({
       ) : (
         <VideoPlaceholder />
       );
+      break;
 
 
     /* =====================================
@@ -98,7 +281,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "audio":
-      return object.props.url ? (
+      content = object.props.url ? (
         <Audio
           url={object.props.url}
           volume={object.props.volume}
@@ -107,6 +290,7 @@ export default function SceneObjectContent({
       ) : (
         <AudioPlaceholder />
       );
+      break;
 
 
     /* =====================================
@@ -119,7 +303,8 @@ export default function SceneObjectContent({
        * the actual CyEngine HDRI component
        * later.
        */
-      return null;
+      content = null;
+      break;
 
 
     /* =====================================
@@ -127,7 +312,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "background":
-      return (
+      content = (
         <color
           attach="background"
           args={[
@@ -135,6 +320,7 @@ export default function SceneObjectContent({
           ]}
         />
       );
+      break;
 
 
     /* =====================================
@@ -142,15 +328,20 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "fog":
-      return (
+      content = (
         <Fog
           color={
             object.props.color as ColorRepresentation
           }
-          near={object.props.near}
-          far={object.props.far}
+          near={
+            object.props.near
+          }
+          far={
+            object.props.far
+          }
         />
       );
+      break;
 
 
     /* =====================================
@@ -158,13 +349,20 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "infinitePlane":
-      return (
+      content = (
         <InfinitePlane
-          height={object.props.height}
-          size={object.props.size}
-          visible={object.props.visible}
+          height={
+            object.props.height
+          }
+          size={
+            object.props.size
+          }
+          visible={
+            object.props.visible
+          }
         />
       );
+      break;
 
 
     /* =====================================
@@ -172,9 +370,10 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "lostFloor":
-      return object.props.visible ? (
+      content = object.props.visible ? (
         <LostFloor />
       ) : null;
+      break;
 
 
     /* =====================================
@@ -182,12 +381,17 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "cloudySky":
-      return (
+      content = (
         <CloudySky
-          color={object.props.color}
-          colors={object.props.colors}
+          color={
+            object.props.color
+          }
+          colors={
+            object.props.colors
+          }
         />
       );
+      break;
 
 
     /* =====================================
@@ -195,15 +399,20 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "rain":
-      return (
+      content = (
         <Rain
-          count={object.props.count}
+          count={
+            object.props.count
+          }
           color={
             object.props.color as ColorRepresentation
           }
-          size={object.props.size}
+          size={
+            object.props.size
+          }
         />
       );
+      break;
 
 
     /* =====================================
@@ -211,7 +420,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "title":
-      return (
+      content = (
         <Title
           image={
             object.props.image ||
@@ -221,6 +430,7 @@ export default function SceneObjectContent({
           {object.props.text}
         </Title>
       );
+      break;
 
 
     /* =====================================
@@ -228,13 +438,16 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "link":
-      return (
+      content = (
         <Link
-          href={object.props.href}
+          href={
+            object.props.href
+          }
         >
           {object.props.text}
         </Link>
       );
+      break;
 
 
     /* =====================================
@@ -242,7 +455,7 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "speaker":
-      return (
+      content = (
         <Speaker
           audioUrl={
             object.props.audioUrl
@@ -255,6 +468,7 @@ export default function SceneObjectContent({
           }
         />
       );
+      break;
 
 
     /* =====================================
@@ -262,14 +476,17 @@ export default function SceneObjectContent({
     ===================================== */
 
     case "ground":
-      return (
+      content = (
         <Ground
-          size={object.props.size}
+          size={
+            object.props.size
+          }
           gridSize={
             object.props.gridSize
           }
         />
       );
+      break;
 
 
     /* =====================================
@@ -277,8 +494,48 @@ export default function SceneObjectContent({
     ===================================== */
 
     default:
-      return null;
+      content = null;
+      break;
   }
+
+
+  /* =========================================
+     EMPTY CONTENT
+  ========================================= */
+
+  if (!content) {
+    return null;
+  }
+
+
+  /* =========================================
+     ENVIRONMENT
+  ========================================= */
+
+  if (
+    ENVIRONMENT_TYPES.has(
+      object.type
+    )
+  ) {
+    return (
+      <NonInteractiveEnvironment>
+        {content}
+      </NonInteractiveEnvironment>
+    );
+  }
+
+
+  /* =========================================
+     NORMAL OBJECT
+  ========================================= */
+
+  return (
+    <EditorInteractionShield
+      enabled={editorActive}
+    >
+      {content}
+    </EditorInteractionShield>
+  );
 }
 
 
@@ -290,7 +547,10 @@ function ImagePlaceholder(): React.ReactElement {
   return (
     <mesh>
       <planeGeometry
-        args={[1, 1]}
+        args={[
+          1,
+          1,
+        ]}
       />
 
       <meshBasicMaterial
@@ -311,10 +571,13 @@ function ImagePlaceholder(): React.ReactElement {
 function ModelPlaceholder(): React.ReactElement {
   return (
     <group>
-
       <mesh>
         <boxGeometry
-          args={[1, 1, 1]}
+          args={[
+            1,
+            1,
+            1,
+          ]}
         />
 
         <meshBasicMaterial
@@ -327,14 +590,17 @@ function ModelPlaceholder(): React.ReactElement {
 
       <mesh>
         <sphereGeometry
-          args={[0.08, 12, 12]}
+          args={[
+            0.08,
+            12,
+            12,
+          ]}
         />
 
         <meshBasicMaterial
           color="#ffffff"
         />
       </mesh>
-
     </group>
   );
 }
@@ -348,7 +614,10 @@ function VideoPlaceholder(): React.ReactElement {
   return (
     <mesh>
       <planeGeometry
-        args={[1.6, 0.9]}
+        args={[
+          1.6,
+          0.9,
+        ]}
       />
 
       <meshBasicMaterial
@@ -369,10 +638,13 @@ function VideoPlaceholder(): React.ReactElement {
 function AudioPlaceholder(): React.ReactElement {
   return (
     <group>
-
       <mesh>
         <sphereGeometry
-          args={[0.2, 16, 16]}
+          args={[
+            0.2,
+            16,
+            16,
+          ]}
         />
 
         <meshBasicMaterial
@@ -383,14 +655,17 @@ function AudioPlaceholder(): React.ReactElement {
 
       <mesh>
         <coneGeometry
-          args={[0.12, 0.3, 8]}
+          args={[
+            0.12,
+            0.3,
+            8,
+          ]}
         />
 
         <meshBasicMaterial
           color="#ffaa00"
         />
       </mesh>
-
     </group>
   );
 }

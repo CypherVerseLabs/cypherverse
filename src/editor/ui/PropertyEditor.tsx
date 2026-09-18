@@ -24,9 +24,11 @@ type PropertyEditorProps = {
   definition: AnyIdeaDefinition;
 
   onChange: (
-    object: SceneObject
+    key: string,
+    value: unknown
   ) => void;
 };
+
 
 
 /* =========================================
@@ -43,22 +45,16 @@ export default function PropertyEditor({
      UPDATE PROPERTY
   ----------------------------------------- */
 
-  const updateProp = (
-    key: string,
-    value: unknown
-  ) => {
+ const updateProp = (
+  key: string,
+  value: unknown
+) => {
+  onChange(
+    key,
+    value
+  );
+};
 
-    onChange({
-      ...object,
-
-      props: {
-        ...object.props,
-
-        [key]: value,
-      },
-
-    } as SceneObject);
-  };
 
 
   /* -----------------------------------------

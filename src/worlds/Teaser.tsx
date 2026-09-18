@@ -11,7 +11,7 @@ import {
 
 
 import Analytics from "ideas/Analytics";
-import Title from "ideas/Title";
+import Title from "ideas/inputs/Title";
 
 
 export default function Teaser() {

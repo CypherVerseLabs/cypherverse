@@ -25,6 +25,10 @@ import {
 
 import crypto from "crypto";
 
+import {
+  Prisma,
+} from "../../generated/prisma/client.js";
+
 const router = Router();
 
 /**
@@ -45,8 +49,6 @@ const router = Router();
  * =========================================================
  * GET /api/projects
  * =========================================================
- *
- * Get all projects owned by the authenticated user.
  */
 router.get(
   "/",
@@ -87,15 +89,6 @@ router.get(
  * =========================================================
  * POST /api/projects
  * =========================================================
- *
- * Create a project for the authenticated user.
- *
- * Request:
- *
- * {
- *   "name": "My Project",
- *   "description": "Project description"
- * }
  */
 router.post(
   "/",
@@ -112,25 +105,22 @@ router.post(
       }
 
       const {
-  name,
-  description,
-  template,
-} = req.body;
+        name,
+        description,
+        template,
+      } = req.body;
 
       if (
-  template !== undefined &&
-  template !== "editor" &&
-  template !== "found"
-) {
-  return res.status(400).json({
-    error:
-      "Project template must be 'editor' or 'found'",
-  });
-}
+        template !== undefined &&
+        template !== "editor" &&
+        template !== "found"
+      ) {
+        return res.status(400).json({
+          error:
+            "Project template must be 'editor' or 'found'",
+        });
+      }
 
-      /**
-       * Validate name.
-       */
       if (
         typeof name !== "string" ||
         !name.trim()
@@ -141,9 +131,6 @@ router.post(
         });
       }
 
-      /**
-       * Prevent unbounded project names.
-       */
       if (
         name.trim().length > 200
       ) {
@@ -153,9 +140,6 @@ router.post(
         });
       }
 
-      /**
-       * Validate description if supplied.
-       */
       if (
         description !== undefined &&
         description !== null &&
@@ -167,9 +151,6 @@ router.post(
         });
       }
 
-      /**
-       * Prevent unbounded descriptions.
-       */
       if (
         typeof description === "string" &&
         description.trim().length > 5000
@@ -180,18 +161,13 @@ router.post(
         });
       }
 
-      /**
-       * IMPORTANT:
-       *
-       * ownerId comes from the verified JWT.
-       */
       const project =
-  await createProject(
-    req.user.id,
-    name,
-    description,
-    template
-  );
+        await createProject(
+          req.user.id,
+          name,
+          description,
+          template
+        );
 
       return res.status(201).json({
         project,
@@ -210,8 +186,20 @@ router.post(
   }
 );
 
-
-
+/**
+ * =========================================================
+ * MULTER
+ * =========================================================
+ *
+ * Publishing sends:
+ *
+ *   scene
+ *   assetManifest
+ *   asset-<assetId>
+ *
+ * The actual asset files are uploaded as multipart
+ * file fields.
+ */
 const publishUpload =
   multer({
     storage:
@@ -228,20 +216,37 @@ const publishUpload =
     },
   });
 
-
-// =========================================================
-// POST /api/projects/:id/publish
-// =========================================================
-//
-// Publish the current project scene and assets.
-//
-// Multipart fields:
-//
-//   scene
-//   assetManifest
-//   asset-<assetId>
-// =========================================================
-
+/**
+ * =========================================================
+ * POST /api/projects/:id/publish
+ * =========================================================
+ *
+ * Multipart fields:
+ *
+ *   scene
+ *   assetManifest
+ *
+ * Multipart files:
+ *
+ *   asset-<assetId>
+ *
+ * Manifest format:
+ *
+ * [
+ *   {
+ *     assetId: "...",
+ *     name: "image.png",
+ *     fieldName: "asset-..."
+ *   }
+ * ]
+ *
+ * IMPORTANT:
+ *
+ * There is NO objectUrl here.
+ *
+ * objectUrl is browser-local and must never be
+ * sent to the server.
+ */
 router.post(
   "/:id/publish",
   authenticateToken,
@@ -250,14 +255,13 @@ router.post(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-
     console.log(
       "🔥 PUBLISH ROUTE HIT:",
       req.method,
       req.originalUrl,
       req.params.id
-    ); 
-    
+    );
+
     try {
       /* -----------------------------------------------
          AUTH
@@ -276,7 +280,7 @@ router.post(
       const projectId =
         req.params.id;
 
-        console.log(
+      console.log(
         "🔥 PUBLISH PROJECT ID:",
         projectId
       );
@@ -358,9 +362,11 @@ router.post(
         typeof scene !==
           "object" ||
         !Array.isArray(
-          (scene as {
-            objects?: unknown;
-          }).objects
+          (
+            scene as {
+              objects?: unknown;
+            }
+          ).objects
         )
       ) {
         return res.status(400).json({
@@ -393,10 +399,16 @@ router.post(
          PARSE MANIFEST
       ----------------------------------------------- */
 
-      let assetManifest: {
-        assetId: string;
-        objectUrl: string;
-      }[];
+      type AssetManifestEntry = {
+      assetId: string;
+      name: string;
+      fieldName: string;
+      path: string;
+    };
+
+
+      let assetManifest:
+        AssetManifestEntry[];
 
       try {
         assetManifest =
@@ -422,6 +434,113 @@ router.post(
       }
 
       /* -----------------------------------------------
+         VALIDATE MANIFEST
+      ----------------------------------------------- */
+
+const manifestAssetIds =
+  new Set<string>();
+
+const manifestFieldNames =
+  new Set<string>();
+
+const manifestPaths =
+  new Set<string>();
+
+for (
+  const manifestAsset of
+    assetManifest
+) {
+  if (
+    !manifestAsset ||
+    typeof manifestAsset.assetId !== "string" ||
+    !manifestAsset.assetId.trim() ||
+    typeof manifestAsset.name !== "string" ||
+    !manifestAsset.name.trim() ||
+    typeof manifestAsset.fieldName !== "string" ||
+    !manifestAsset.fieldName.trim() ||
+    typeof manifestAsset.path !== "string" ||
+    !manifestAsset.path.trim()
+  ) {
+    return res.status(400).json({
+      error:
+        "Invalid asset manifest entry",
+    });
+  }
+
+  if (
+  manifestAsset.fieldName !==
+  `asset-${manifestAsset.assetId}`
+) {
+  return res.status(400).json({
+    error:
+      `Invalid asset field name for ${manifestAsset.assetId}`,
+  });
+}
+
+if (
+  manifestAsset.path.includes("..") ||
+  manifestAsset.path.includes("\\") ||
+  !manifestAsset.path.startsWith("assets/")
+) {
+  return res.status(400).json({
+    error:
+      `Invalid asset path for ${manifestAsset.assetId}`,
+  });
+}
+
+if (
+  manifestAssetIds.has(
+    manifestAsset.assetId
+  )
+) {
+  return res.status(400).json({
+    error:
+      `Duplicate asset ID: ${manifestAsset.assetId}`,
+  });
+}
+
+if (
+  manifestFieldNames.has(
+    manifestAsset.fieldName
+  )
+) {
+  return res.status(400).json({
+    error:
+      `Duplicate asset field: ${manifestAsset.fieldName}`,
+  });
+}
+
+if (
+  manifestPaths.has(
+    manifestAsset.path
+  )
+) {
+  return res.status(400).json({
+    error:
+      `Duplicate asset path: ${manifestAsset.path}`,
+  });
+}
+
+manifestAssetIds.add(
+  manifestAsset.assetId
+);
+
+manifestFieldNames.add(
+  manifestAsset.fieldName
+);
+
+manifestPaths.add(
+  manifestAsset.path
+);
+}
+
+
+
+      /* -----------------------------------------------
+         FILES
+      ----------------------------------------------- */
+
+           /* -----------------------------------------------
          FILES
       ----------------------------------------------- */
 
@@ -438,10 +557,52 @@ router.post(
         const file of
           uploadedFiles
       ) {
+        /*
+         * Reject duplicate field names.
+         */
+        if (
+          filesByField.has(
+            file.fieldname
+          )
+        ) {
+          return res.status(400).json({
+            error:
+              `Duplicate asset file field: ${file.fieldname}`,
+          });
+        }
+
         filesByField.set(
           file.fieldname,
           file
         );
+      }
+
+      /* -----------------------------------------------
+         REJECT UNEXPECTED FILES
+      ----------------------------------------------- */
+
+      const expectedFields =
+        new Set(
+          assetManifest.map(
+            (asset) =>
+              asset.fieldName
+          )
+        );
+
+      for (
+        const fieldName of
+          filesByField.keys()
+      ) {
+        if (
+          !expectedFields.has(
+            fieldName
+          )
+        ) {
+          return res.status(400).json({
+            error:
+              `Unexpected asset file field: ${fieldName}`,
+          });
+        }
       }
 
       /* -----------------------------------------------
@@ -459,6 +620,7 @@ router.post(
             >;
           }[];
         };
+
 
       /* -----------------------------------------------
          ASSET RECORDS
@@ -479,21 +641,8 @@ router.post(
         const manifestAsset of
           assetManifest
       ) {
-        if (
-          !manifestAsset ||
-          typeof manifestAsset.assetId !==
-            "string" ||
-          typeof manifestAsset.objectUrl !==
-            "string"
-        ) {
-          return res.status(400).json({
-            error:
-              "Invalid asset manifest entry",
-          });
-        }
-
         const fieldName =
-          `asset-${manifestAsset.assetId}`;
+          manifestAsset.fieldName;
 
         const file =
           filesByField.get(
@@ -507,21 +656,30 @@ router.post(
           });
         }
 
+        /*
+         * Use the manifest name for the logical
+         * asset name, but use the actual uploaded
+         * file for storage.
+         */
+        const safeOriginalName =
+          sanitizeStorageName(
+            manifestAsset.name
+          );
+
         const storageKey =
-          `projects/${projectId}/assets/${crypto.randomUUID()}-${sanitizeStorageName(
-            file.originalname
-          )}`;
+          `projects/${projectId}/assets/${crypto.randomUUID()}-${safeOriginalName}`;
 
         const publicUrl =
           await uploadToR2(
             storageKey,
             file.buffer,
-            file.mimetype
+            file.mimetype ||
+              "application/octet-stream"
           );
 
         projectAssets.push({
           originalName:
-            file.originalname,
+            manifestAsset.name,
 
           storageKey,
 
@@ -533,35 +691,54 @@ router.post(
             file.size,
         });
 
-        /* -------------------------------------------
-           REWRITE SCENE REFERENCES
-        ------------------------------------------- */
+        /*
+ * The manifest provides the exact portable path
+ * used by the scene.
+ *
+ * Example:
+ *
+ *     manifestAsset.path
+ *       -> "assets/image.png"
+ *
+ * Replace that client-safe portable path with
+ * the permanent R2 URL.
+ *
+ * We do NOT look for blob:http:// URLs.
+ */
+
+        const portablePath =
+  manifestAsset.path;
+
 
         for (
-          const object of
-            sceneToPublish.objects
-        ) {
-          if (
-            !object.props
-          ) {
-            continue;
-          }
+  const object of
+    sceneToPublish.objects
+) {
+  if (
+    !object.props
+  ) {
+    continue;
+  }
 
-          for (
-            const key of
-              Object.keys(
-                object.props
-              )
-          ) {
-            if (
-              object.props[key] ===
-              manifestAsset.objectUrl
-            ) {
-              object.props[key] =
-                publicUrl;
-            }
-          }
-        }
+  for (
+    const key of
+      Object.keys(
+        object.props
+      )
+  ) {
+    const value =
+      object.props[key];
+
+    if (
+      value ===
+      portablePath
+    ) {
+      object.props[key] =
+        publicUrl;
+    }
+  }
+}
+
       }
 
       /* -----------------------------------------------
@@ -605,14 +782,10 @@ router.post(
   }
 );
 
-  
-
 /**
  * =========================================================
  * GET /api/projects/:id
  * =========================================================
- *
- * Get one project belonging to the authenticated user.
  */
 router.get(
   "/:id",
@@ -671,8 +844,6 @@ router.get(
  * =========================================================
  * PATCH /api/projects/:id
  * =========================================================
- *
- * Update a project owned by the authenticated user.
  */
 router.patch(
   "/:id",
@@ -688,11 +859,13 @@ router.patch(
         });
       }
 
-      const projectId = req.params.id;
+      const projectId =
+        req.params.id;
 
       if (!projectId) {
         return res.status(400).json({
-          error: "Project ID is required",
+          error:
+            "Project ID is required",
         });
       }
 
@@ -700,25 +873,60 @@ router.patch(
         name,
         description,
         scene,
+        slug,
       } = req.body;
 
-      /**
-       * Don't perform an empty update.
-       */
+      /* -----------------------------------------------
+         SLUG
+      ----------------------------------------------- */
+
       if (
-        name === undefined &&
-        description === undefined &&
-        scene === undefined
+        slug !== undefined &&
+        typeof slug !== "string"
       ) {
         return res.status(400).json({
           error:
-            "No project fields were provided",
+            "Project URL must be a string",
         });
       }
 
-      /**
-       * Validate name.
-       */
+      const normalizedSlug =
+        typeof slug === "string"
+          ? slug
+              .trim()
+              .toLowerCase()
+              .replace(
+                /^\/+|\/+$/g,
+                ""
+              )
+          : undefined;
+
+      if (
+        normalizedSlug !== undefined &&
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(
+          normalizedSlug
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            "Project URL may only contain letters, numbers, and hyphens",
+        });
+      }
+
+      if (
+        normalizedSlug !== undefined &&
+        normalizedSlug.length > 60
+      ) {
+        return res.status(400).json({
+          error:
+            "Project URL must be 60 characters or less",
+        });
+      }
+
+      /* -----------------------------------------------
+         NAME
+      ----------------------------------------------- */
+
       if (
         name !== undefined &&
         typeof name !== "string"
@@ -749,9 +957,10 @@ router.patch(
         });
       }
 
-      /**
-       * Validate description.
-       */
+      /* -----------------------------------------------
+         DESCRIPTION
+      ----------------------------------------------- */
+
       if (
         description !== undefined &&
         description !== null &&
@@ -773,33 +982,42 @@ router.patch(
         });
       }
 
-      /**
-       * Validate scene.
-       *
-       * The scene must be JSON data.
-       * Limit serialized size to 10 MB.
-       */
-      if (scene !== undefined) {
+      /* -----------------------------------------------
+         SCENE
+      ----------------------------------------------- */
+
+      if (
+        scene !== undefined
+      ) {
         let sceneSize: number;
 
         try {
-          sceneSize = Buffer.byteLength(
-            JSON.stringify(scene),
-            "utf8"
-          );
+          sceneSize =
+            Buffer.byteLength(
+              JSON.stringify(scene),
+              "utf8"
+            );
         } catch {
           return res.status(400).json({
-            error: "Project scene must be valid JSON",
+            error:
+              "Project scene must be valid JSON",
           });
         }
 
-        if (sceneSize > 10 * 1024 * 1024) {
+        if (
+          sceneSize >
+          10 * 1024 * 1024
+        ) {
           return res.status(413).json({
             error:
               "Project scene must be 10 MB or smaller",
           });
         }
       }
+
+      /* -----------------------------------------------
+         UPDATE
+      ----------------------------------------------- */
 
       const project =
         await updateProject(
@@ -816,6 +1034,13 @@ router.patch(
 
             ...(scene !== undefined
               ? { scene }
+              : {}),
+
+            ...(normalizedSlug !== undefined
+              ? {
+                  slug:
+                    normalizedSlug,
+                }
               : {}),
           }
         );
@@ -835,6 +1060,17 @@ router.patch(
         error
       );
 
+      if (
+        error instanceof
+          Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return res.status(409).json({
+          error:
+            "That project URL is already in use",
+        });
+      }
+
       return res.status(500).json({
         error:
           "Failed to update project",
@@ -847,8 +1083,6 @@ router.patch(
  * =========================================================
  * DELETE /api/projects/:id
  * =========================================================
- *
- * Delete a project owned by the authenticated user.
  */
 router.delete(
   "/:id",
@@ -901,12 +1135,65 @@ router.delete(
   }
 );
 
+/**
+ * =========================================================
+ * ROUTE DEBUG
+ * =========================================================
+ */
+
+console.log(
+  "PROJECT ROUTER STACK:",
+  router.stack
+    .filter(
+      (layer: any) =>
+        layer.route
+    )
+    .map(
+      (layer: any) => ({
+        path:
+          layer.route.path,
+        methods:
+          layer.route.methods,
+      })
+    )
+);
+
 export default router;
 
+/**
+ * =========================================================
+ * HELPERS
+ * =========================================================
+ */
+
+/**
+ * Make an uploaded filename safe for storage.
+ */
 function sanitizeStorageName(
   originalname: string
 ): string {
   return originalname
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    )
+    .slice(0, 200);
+}
+
+/**
+ * Match the same filename sanitization used
+ * by the editor's asset path helper.
+ *
+ * Keep this compatible with the client-side
+ * sanitizeAssetFileName().
+ */
+function sanitizeAssetFileName(
+  name: string
+): string {
+  return name
+    .replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    )
     .slice(0, 200);
 }

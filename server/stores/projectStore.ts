@@ -1,9 +1,20 @@
+import crypto from "node:crypto";
+
 import { prisma } from "../lib/prisma.js";
 
 import {
   Prisma,
   ProjectTemplate,
 } from "../generated/prisma/client.js";
+
+import {
+  getIdeaById,
+} from "./ideaStore.js";
+
+
+
+
+
 
 export interface Project {
   id: string;
@@ -131,19 +142,48 @@ export async function createProject(
   template: ProjectTemplate =
     ProjectTemplate.editor
 ): Promise<Project> {
+  const idea =
+    await getIdeaById(
+      template
+    );
+
+  if (!idea) {
+    throw new Error(
+      `Unknown project template: ${template}`
+    );
+  }
+
   const project =
     await prisma.project.create({
       data: {
+        id: crypto.randomUUID(),
+
         ownerId,
-        name: name.trim(),
+
+        name:
+          name.trim(),
+
         description:
-          description?.trim() || null,
+          description?.trim() ||
+          null,
+
         template,
+
+        scene:
+          toPrismaJson(
+            idea.scene
+          ),
       },
     });
 
-  return toProject(project);
+  return toProject(
+    project
+  );
 }
+
+
+
+
 
 /* =========================================================
    GET PROJECTS
@@ -199,8 +239,10 @@ export async function updateProject(
     name?: string;
     description?: string;
     scene?: unknown;
+    slug?: string;
   }
 ): Promise<Project | undefined> {
+
   const existing =
     await prisma.project.findFirst({
       where: {
@@ -218,34 +260,42 @@ export async function updateProject(
       where: {
         id: existing.id,
       },
+
       data: {
-        ...(updates.name !== undefined
-          ? {
-              name: updates.name.trim(),
-            }
-          : {}),
+  ...(updates.name !== undefined
+    ? {
+        name: updates.name.trim(),
+      }
+    : {}),
 
-        ...(updates.description !==
-        undefined
-          ? {
-              description:
-                updates.description.trim() ||
-                null,
-            }
-          : {}),
+  ...(updates.description !== undefined
+    ? {
+        description:
+          updates.description.trim() ||
+          null,
+      }
+    : {}),
 
-        ...(updates.scene !== undefined
-          ? {
-              scene: toPrismaJson(
-                updates.scene
-              ),
-            }
-          : {}),
-      },
+  ...(updates.scene !== undefined
+    ? {
+        scene: toPrismaJson(
+          updates.scene
+        ),
+      }
+    : {}),
+
+  ...(updates.slug !== undefined
+    ? {
+        slug: updates.slug,
+      }
+    : {}),
+},
+
     });
 
   return toProject(project);
 }
+
 
 /* =========================================================
    CREATE ASSET

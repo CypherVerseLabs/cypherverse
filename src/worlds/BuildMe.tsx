@@ -9,12 +9,12 @@ import {
 } from "cyengine";
 
 import CloudySky from "ideas/CloudySky";
-import Link from "../ideas/Link";
-import PreloadImage from "ideas/PreloadImage";
-import { Rain } from "ideas/Rain";
+import Link from "../ideas/inputs/Link";
+import PreloadImage from "ideas/decorations/PreloadImage/PreloadImage";
+import { Rain } from "ideas/environments/Rain";
 import Speaker from "ideas/players/Speaker";
 import Analytics from "ideas/Analytics";
-import Title from "ideas/Title";
+import Title from "ideas/inputs/Title";
 
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
 import { useAuthContext } from "ideas/context/AuthContext";

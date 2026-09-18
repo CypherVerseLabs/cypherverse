@@ -1,9 +1,10 @@
+
 import {
   SceneObject,
 } from "../scene/objectTypes";
 
 import {
-  getRegisteredIdea,
+  getIdeaDefinition,
 } from "./registry";
 
 
@@ -15,30 +16,29 @@ export function createSceneObject(
   type: SceneObject["type"]
 ): SceneObject {
 
-  const idea =
-    getRegisteredIdea(
+  /*
+   * Scene objects must always resolve through
+   * the canonical scene-object definition.
+   *
+   * This intentionally does NOT use
+   * getRegisteredIdea() because the registry can
+   * also contain component ideas.
+   */
+
+  const definition =
+    getIdeaDefinition(
       type
     );
 
 
-  if (!idea) {
+  if (!definition) {
 
     throw new Error(
-      `No editor idea is registered for "${type}".`
+      `No scene-object definition is registered for "${type}".`
     );
   }
 
 
-  if (
-    idea.kind !==
-    "scene-object"
-  ) {
-
-    throw new Error(
-      `Idea "${type}" is not a scene-object definition.`
-    );
-  }
-
-
-  return idea.definition.create();
+  return definition.create();
 }
+

@@ -1,3 +1,4 @@
+
 import Ground from "../../ideas/Ground";
 import CloudySky from "../../ideas/CloudySky";
 import ProximityPicture from "../../ideas/decorations/ProximityPicture";
@@ -6,12 +7,17 @@ import {
   getIdeaDefinitions,
 } from "./definitions";
 
+import {
+  getIdeaMetadata,
+} from "./metadata";
+
 import type {
   AnyIdeaDefinition,
-  ComponentIdeaPlugin,
-  IdeaPlugin,
-  RegisteredComponentIdea,
+  IdeaSchemaField,
   RegisteredIdea,
+  RegisteredSceneObjectIdea,
+  RegisteredComponentIdea,
+  IdeaPlugin,
 } from "./types";
 
 
@@ -20,99 +26,290 @@ import type {
 ========================================= */
 
 const registry =
-  new Map<string, RegisteredIdea>();
-
-
-let coreInitialized = false;
+  new Map<
+    string,
+    RegisteredIdea
+  >();
 
 
 /* =========================================
-   REGISTER
+   HELPERS
 ========================================= */
 
-export function registerIdea(
-  idea: RegisteredIdea
-): void {
+function schemaToRegistrySchema(
+  definition: AnyIdeaDefinition
+):
+  IdeaSchemaField[] {
 
-  if (registry.has(idea.id)) {
-    throw new Error(
-      `[CyBuilder] Idea "${idea.id}" is already registered.`
-    );
-  }
+  return definition.schema.map(
+    (field) => ({
+      name:
+        field.name,
 
-  registry.set(
-    idea.id,
-    idea
+      type:
+        field.type === "array"
+          ? `array:${field.itemType ?? "unknown"}`
+          : field.type,
+
+      description:
+        field.description,
+
+      required:
+        field.required,
+    })
+  );
+}
+
+
+function mergeStringArray(
+  runtimeValue:
+    | string[]
+    | undefined,
+
+  metadataValue:
+    | string[]
+    | undefined
+):
+  string[] {
+
+  return Array.from(
+    new Set([
+      ...(runtimeValue ?? []),
+      ...(metadataValue ?? []),
+    ])
   );
 }
 
 
 /* =========================================
-   REGISTER MANY
+   REGISTER SCENE OBJECT
+========================================= */
+
+export function registerSceneObjectDefinition(
+  definition: AnyIdeaDefinition
+):
+  RegisteredSceneObjectIdea {
+
+  const metadata =
+    getIdeaMetadata(
+      definition.type
+    );
+
+
+  /*
+   * Runtime definitions are canonical.
+   *
+   * JSON metadata only enriches them.
+   */
+
+  const runtimeDescription =
+    definition.ai?.description;
+
+  const metadataDescription =
+    metadata?.description ??
+    metadata?.ai?.description;
+
+
+  const description =
+    runtimeDescription ??
+    metadataDescription;
+
+
+  const tags =
+    mergeStringArray(
+      definition.ai?.tags,
+      metadata?.tags ??
+      metadata?.ai?.tags
+    );
+
+
+  const skills =
+    mergeStringArray(
+      definition.ai?.skills,
+      metadata?.skills ??
+      metadata?.ai?.skills
+    );
+
+
+  const schema =
+    schemaToRegistrySchema(
+      definition
+    );
+
+
+  const registered:
+    RegisteredSceneObjectIdea = {
+
+    id:
+      definition.type,
+
+    name:
+      definition.name,
+
+    category:
+      definition.category,
+
+    kind:
+      "scene-object",
+
+    definition,
+
+    description,
+
+    tags,
+
+    skills,
+
+    schema,
+
+    metadata,
+  };
+
+
+  registry.set(
+    registered.id,
+    registered
+  );
+
+
+  return registered;
+}
+
+
+/* =========================================
+   REGISTER COMPONENT
+========================================= */
+
+export function registerComponentIdea(
+  id: string,
+
+  name: string,
+
+  category: string,
+
+  definition: unknown,
+
+  options: {
+    description?: string;
+
+    tags?: string[];
+
+    skills?: string[];
+
+    schema?: IdeaSchemaField[];
+  } = {}
+):
+  RegisteredComponentIdea {
+
+  const metadata =
+    getIdeaMetadata(
+      id
+    );
+
+
+  const registered:
+    RegisteredComponentIdea = {
+
+    id,
+
+    name,
+
+    category,
+
+    kind:
+      "component",
+
+    definition,
+
+    description:
+      options.description ??
+      metadata?.description ??
+      metadata?.ai?.description,
+
+    tags:
+      mergeStringArray(
+        options.tags,
+        metadata?.tags ??
+        metadata?.ai?.tags
+      ),
+
+    skills:
+      mergeStringArray(
+        options.skills,
+        metadata?.skills ??
+        metadata?.ai?.skills
+      ),
+
+    schema:
+      options.schema ??
+      metadata?.schema ??
+      [],
+
+    metadata,
+  };
+
+
+  registry.set(
+    registered.id,
+    registered
+  );
+
+
+  return registered;
+}
+
+
+/* =========================================
+   REGISTER IDEA
+========================================= */
+
+export function registerIdea(
+  idea: RegisteredIdea
+):
+  RegisteredIdea {
+
+  registry.set(
+    idea.id,
+    idea
+  );
+
+  return idea;
+}
+
+
+/* =========================================
+   REGISTER IDEAS
 ========================================= */
 
 export function registerIdeas(
   ideas: RegisteredIdea[]
-): void {
+):
+  void {
 
-  for (const idea of ideas) {
-    registerIdea(idea);
+  for (
+    const idea
+    of ideas
+  ) {
+
+    registerIdea(
+      idea
+    );
   }
 }
 
 
 /* =========================================
-   SCENE OBJECT DEFINITION
+   REGISTER PLUGIN
 ========================================= */
 
-function registerSceneObjectDefinition(
-  definition: AnyIdeaDefinition
-): void {
-
-  registerIdea({
-    id: definition.type,
-
-    name: definition.name,
-
-    category: definition.category,
-
-    kind: "scene-object",
-
-    definition,
-
-    description:
-      definition.ai?.description,
-
-    tags:
-      definition.ai?.tags,
-
-    skills:
-      definition.ai?.skills,
-
-    schema:
-      definition.schema.map(
-        (field) => ({
-          name: field.name,
-
-          type:
-            field.type === "array"
-              ? `array:${field.itemType}`
-              : field.type,
-        })
-      ),
-  });
-}
-
-
-/* =========================================
-   SCENE OBJECT IDEAS
-========================================= */
-
-function registerSceneObjectIdeas(): void {
+export function registerPlugin(
+  plugin: IdeaPlugin
+):
+  void {
 
   for (
-    const definition of
-      getIdeaDefinitions()
+    const definition
+    of plugin.ideas
   ) {
 
     registerSceneObjectDefinition(
@@ -123,33 +320,26 @@ function registerSceneObjectIdeas(): void {
 
 
 /* =========================================
-   CORE COMPONENT IDEAS
+   COMPONENT IDEAS
 ========================================= */
 
-function getCoreComponentIdeas():
-  RegisteredComponentIdea[] {
+function registerComponentIdeas():
+  void {
 
-  return [
-
+  registerComponentIdea(
+    "ground",
+    "Ground",
+    "Environment",
+    Ground,
     {
-      id: "component:ground",
-
-      name: "Ground",
-
-      category: "Environment",
-
-      kind: "component",
-
-      component: Ground,
-
       description:
-        "Interactive grid ground surface.",
+        "Creates an interactive grid-based ground surface.",
 
       tags: [
         "ground",
         "floor",
+        "grid",
         "surface",
-        "terrain",
       ],
 
       skills: [
@@ -163,29 +353,25 @@ function getCoreComponentIdeas():
         },
         {
           name: "gridSize",
-          type: "number",
+          type: "integer",
         },
       ],
-    },
+    }
+  );
 
 
+  registerComponentIdea(
+    "cloudySky",
+    "Cloudy Sky",
+    "Environment",
+    CloudySky,
     {
-      id: "component:cloudy-sky",
-
-      name: "Cloudy Sky",
-
-      category: "Environment",
-
-      kind: "component",
-
-      component: CloudySky,
-
       description:
-        "Procedural animated cloudy sky.",
+        "Creates a large cloudy procedural sky surrounding the scene.",
 
       tags: [
         "sky",
-        "cloud",
+        "clouds",
         "environment",
         "atmosphere",
       ],
@@ -201,194 +387,96 @@ function getCoreComponentIdeas():
         },
         {
           name: "colors",
-          type: "number[]",
+          type: "array:number",
         },
       ],
-    },
+    }
+  );
 
 
+  registerComponentIdea(
+    "proximityPicture",
+    "Proximity Picture",
+    "Media",
+    ProximityPicture,
     {
-      id: "component:proximity-picture",
-
-      name: "Proximity Picture",
-
-      category: "Decorations",
-
-      kind: "component",
-
-      component:
-        ProximityPicture,
-
       description:
-        "An image that appears when the player approaches it.",
+        "Displays user content when the player enters a defined radius.",
 
       tags: [
         "image",
+        "video",
         "picture",
         "proximity",
-        "decoration",
         "media",
       ],
 
       skills: [
-        "decoration.proximity-picture",
+        "media.proximity",
       ],
-
-      schema: [
-        {
-          name: "image",
-          type: "image",
-        },
-        {
-          name: "position",
-          type: "position",
-        },
-        {
-          name: "scale",
-          type: "scale",
-        },
-        {
-          name: "rotation",
-          type: "rotation",
-        },
-        {
-          name: "radius",
-          type: "radius",
-        },
-        {
-          name: "framed",
-          type: "boolean",
-        },
-      ],
-    },
-
-  ];
-}
-
-
-/* =========================================
-   REGISTER CORE COMPONENTS
-========================================= */
-
-function registerComponentIdeas(): void {
-
-  registerIdeas(
-    getCoreComponentIdeas()
-  );
-}
-
-
-/* =========================================
-   PLUGIN
-========================================= */
-
-export function registerPlugin(
-  plugin:
-    | IdeaPlugin
-    | ComponentIdeaPlugin
-): void {
-
-  for (const idea of plugin.ideas) {
-
-    if (isSceneObjectDefinition(idea)) {
-
-      registerSceneObjectDefinition(
-        idea
-      );
-
-      continue;
     }
-
-    registerIdea(
-      idea
-    );
-  }
-}
-
-
-/* =========================================
-   SCENE OBJECT TYPE GUARD
-========================================= */
-
-function isSceneObjectDefinition(
-  idea:
-    | AnyIdeaDefinition
-    | RegisteredComponentIdea
-): idea is AnyIdeaDefinition {
-
-  return (
-    "create" in idea &&
-    "type" in idea &&
-    "schema" in idea
   );
 }
 
 
 /* =========================================
-   CORE INITIALIZATION
+   INITIALIZE CORE IDEAS
 ========================================= */
 
-export function initializeCoreIdeas(): void {
+export function initializeCoreIdeas():
+  void {
 
-  if (coreInitialized) {
+  /*
+   * Prevent duplicate initialization.
+   */
+
+  if (
+    registry.size > 0
+  ) {
     return;
   }
 
-  registerSceneObjectIdeas();
+
+  for (
+    const definition
+    of getIdeaDefinitions()
+  ) {
+
+    registerSceneObjectDefinition(
+      definition
+    );
+  }
+
 
   registerComponentIdeas();
-
-  coreInitialized = true;
 }
 
 
 /* =========================================
-   INITIALIZE CORE
-========================================= */
-
-initializeCoreIdeas();
-
-
-/* =========================================
-   LOOKUP
+   GET REGISTERED IDEA
 ========================================= */
 
 export function getRegisteredIdea(
   id: string
-): RegisteredIdea | undefined {
+):
+  RegisteredIdea | undefined {
 
-  return registry.get(id);
+  initializeCoreIdeas();
+
+  return registry.get(
+    id
+  );
 }
 
 
 /* =========================================
-   SCENE OBJECT DEFINITION
-========================================= */
-
-export function getIdeaDefinition(
-  type: AnyIdeaDefinition["type"]
-): AnyIdeaDefinition | undefined {
-
-  const idea =
-    registry.get(type);
-
-  if (
-    !idea ||
-    idea.kind !== "scene-object"
-  ) {
-    return undefined;
-  }
-
-  return idea.definition;
-}
-
-
-/* =========================================
-   ALL
+   GET ALL REGISTERED IDEAS
 ========================================= */
 
 export function getRegisteredIdeas():
   RegisteredIdea[] {
+
+  initializeCoreIdeas();
 
   return Array.from(
     registry.values()
@@ -401,11 +489,18 @@ export function getRegisteredIdeas():
 ========================================= */
 
 export function getSceneObjectIdeas():
-  RegisteredIdea[] {
+  RegisteredSceneObjectIdea[] {
 
-  return getRegisteredIdeas().filter(
-    (idea) =>
-      idea.kind === "scene-object"
+  initializeCoreIdeas();
+
+  return Array.from(
+    registry.values()
+  ).filter(
+    (
+      idea
+    ): idea is RegisteredSceneObjectIdea =>
+      idea.kind ===
+      "scene-object"
   );
 }
 
@@ -415,13 +510,68 @@ export function getSceneObjectIdeas():
 ========================================= */
 
 export function getComponentIdeas():
-  RegisteredIdea[] {
+  RegisteredComponentIdea[] {
 
-  return getRegisteredIdeas().filter(
-    (idea) =>
-      idea.kind === "component"
+  initializeCoreIdeas();
+
+  return Array.from(
+    registry.values()
+  ).filter(
+    (
+      idea
+    ): idea is RegisteredComponentIdea =>
+      idea.kind ===
+      "component"
   );
 }
+
+
+/* =========================================
+   GET DEFINITION
+========================================= */
+
+
+export function getIdeaDefinition(
+  type: AnyIdeaDefinition["type"]
+): AnyIdeaDefinition | undefined {
+
+  /*
+   * Runtime scene-object definitions are canonical.
+   *
+   * Do not allow a component/metadata registration
+   * with the same id to shadow an actual scene object.
+   */
+
+  const registered =
+    registry.get(type);
+
+
+  if (
+    registered &&
+    registered.kind === "scene-object"
+  ) {
+    return registered.definition;
+  }
+
+
+  /*
+   * Fallback directly to the canonical definition list.
+   *
+   * This protects createSceneObject() from registry
+   * collisions introduced by plugins, metadata, or
+   * legacy component registrations.
+   */
+
+  const definition =
+    getIdeaDefinitions().find(
+      (idea) =>
+        idea.type === type
+    );
+
+
+  return definition;
+}
+
 
 
 /* =========================================
@@ -431,9 +581,13 @@ export function getComponentIdeas():
 export function getIdeaCategories():
   string[] {
 
+  initializeCoreIdeas();
+
   return Array.from(
     new Set(
-      getRegisteredIdeas().map(
+      Array.from(
+        registry.values()
+      ).map(
         (idea) =>
           idea.category
       )
@@ -443,32 +597,41 @@ export function getIdeaCategories():
 
 
 /* =========================================
-   SCENE OBJECT CATEGORY
+   IDEAS BY CATEGORY
 ========================================= */
 
 export function getIdeasByCategory(
   category: string
-): RegisteredIdea[] {
+):
+  RegisteredIdea[] {
 
-  return getSceneObjectIdeas().filter(
+  initializeCoreIdeas();
+
+  return Array.from(
+    registry.values()
+  ).filter(
     (idea) =>
-      idea.category === category
+      idea.category ===
+      category
   );
 }
 
 
 /* =========================================
-   COMPONENT CATEGORY
+   COMPONENTS BY CATEGORY
 ========================================= */
 
 export function getComponentsByCategory(
   category: string
-): RegisteredIdea[] {
+):
+  RegisteredComponentIdea[] {
 
-  return getComponentIdeas().filter(
-    (idea) =>
-      idea.category === category
-  );
+  return getComponentIdeas()
+    .filter(
+      (idea) =>
+        idea.category ===
+        category
+    );
 }
 
 
@@ -478,36 +641,50 @@ export function getComponentsByCategory(
 
 export function searchRegisteredIdeas(
   query: string
-): RegisteredIdea[] {
+):
+  RegisteredIdea[] {
+
+  initializeCoreIdeas();
 
   const normalized =
     query
       .trim()
       .toLowerCase();
 
-  if (!normalized) {
+
+  if (
+    !normalized
+  ) {
+
     return getRegisteredIdeas();
   }
 
-  return getRegisteredIdeas().filter(
-    (idea) => {
 
-      const text = [
-        idea.id,
-        idea.name,
-        idea.category,
-        idea.description ?? "",
-        ...(idea.tags ?? []),
-        ...(idea.skills ?? []),
-      ]
-        .join(" ")
-        .toLowerCase();
+  return getRegisteredIdeas()
+    .filter(
+      (idea) => {
 
-      return text.includes(
-        normalized
-      );
-    }
-  );
+        const haystack =
+          [
+            idea.id,
+            idea.name,
+            idea.category,
+            idea.description,
+            ...idea.tags,
+            ...idea.skills,
+            ...(idea.metadata?.ai?.synonyms ?? []),
+            ...(idea.metadata?.ai?.examples ?? []),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+
+
+        return haystack.includes(
+          normalized
+        );
+      }
+    );
 }
 
 
@@ -515,9 +692,72 @@ export function searchRegisteredIdeas(
    CLEAR
 ========================================= */
 
-export function clearIdeaRegistry(): void {
+export function clearIdeaRegistry():
+  void {
 
   registry.clear();
-
-  coreInitialized = false;
 }
+
+
+/* =========================================
+   EXPORT METADATA SNAPSHOT
+========================================= */
+
+export function getIdeaMetadataIndex():
+  Array<{
+    id: string;
+
+    name: string;
+
+    category: string;
+
+    kind: string;
+
+    description?: string;
+
+    tags: string[];
+
+    skills: string[];
+
+    schema: IdeaSchemaField[];
+  }> {
+
+  initializeCoreIdeas();
+
+  return getRegisteredIdeas()
+    .map(
+      (idea) => ({
+        id:
+          idea.id,
+
+        name:
+          idea.name,
+
+        category:
+          idea.category,
+
+        kind:
+          idea.kind,
+
+        description:
+          idea.description,
+
+        tags:
+          idea.tags,
+
+        skills:
+          idea.skills,
+
+        schema:
+          idea.schema,
+      })
+    );
+}
+
+
+/* =========================================
+   INITIALIZE
+========================================= */
+
+initializeCoreIdeas();
+

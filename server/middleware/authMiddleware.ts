@@ -6,82 +6,46 @@ import {
   NextFunction,
 } from "express";
 
-import jwt from "jsonwebtoken";
+import {
+  verifyAuthToken,
+} from "../utils/auth.js";
 
 /*
- * ---------------------------------------------------------
+ * =========================================================
  * AUTHENTICATED REQUEST
- * ---------------------------------------------------------
+ * =========================================================
  *
- * This is the identity extracted from the JWT.
+ * req.user represents the authenticated identity extracted
+ * from the JWT.
  *
- * It is NOT the complete User record.
+ * The canonical identity is:
  *
- * JWT
- *  ↓
- * req.user
- *  ↓
- * userStore
- *  ↓
- * complete User
+ *     req.user.id
+ *
+ * which equals:
+ *
+ *     JWT.sub
+ *
+ * This is the database User.id.
  */
 
 export interface AuthenticatedRequest
   extends Request {
   user?: {
-    id?: string;
+    id: string;
+
     address?: string;
+
     email?: string;
+
     username?: string;
   };
 }
 
 /*
- * ---------------------------------------------------------
- * JWT PAYLOAD
- * ---------------------------------------------------------
- *
- * New CyBuilder JWT:
- *
- * {
- *   sub: "user-id",
- *   id: "user-id",
- *   address: "0x...",
- *   iat: ...,
- *   exp: ...
- * }
- *
- * Email accounts may contain:
- *
- * {
- *   sub: "user-id",
- *   id: "user-id",
- *   email: "user@example.com",
- *   iat: ...,
- *   exp: ...
- * }
- */
-
-interface JwtPayload {
-  sub?: string;
-
-  id?: string;
-
-  address?: string;
-
-  email?: string;
-
-  username?: string;
-
-  iat?: number;
-
-  exp?: number;
-}
-
-/*
- * ---------------------------------------------------------
+ * =========================================================
  * AUTHENTICATE TOKEN
- * ---------------------------------------------------------
+ * =========================================================
  */
 
 export function authenticateToken(
@@ -89,26 +53,6 @@ export function authenticateToken(
   res: Response,
   next: NextFunction
 ) {
-  const JWT_SECRET =
-    process.env.JWT_SECRET;
-
-  /*
-   * -------------------------------------------------------
-   * SERVER CONFIGURATION
-   * -------------------------------------------------------
-   */
-
-  if (!JWT_SECRET) {
-    console.error(
-      "JWT_SECRET is not configured."
-    );
-
-    return res.status(500).json({
-      error:
-        "Server authentication configuration error",
-    });
-  }
-
   /*
    * -------------------------------------------------------
    * GET AUTHORIZATION HEADER
@@ -153,45 +97,23 @@ export function authenticateToken(
    */
 
   try {
-    const decoded =
-      jwt.verify(
-        token,
-        JWT_SECRET
-      ) as JwtPayload;
+    const payload =
+      verifyAuthToken(token);
 
     /*
      * -----------------------------------------------------
-     * DETERMINE USER ID
+     * ACCESS TOKEN ONLY
      * -----------------------------------------------------
      *
-     * `sub` is the standard JWT subject.
-     *
-     * `id` is kept for compatibility with our
-     * current CyBuilder tokens.
-     */
-
-    const userId =
-      decoded.sub ||
-      decoded.id;
-
-    /*
-     * -----------------------------------------------------
-     * VALIDATE IDENTITY
-     * -----------------------------------------------------
-     *
-     * A valid token must identify an account somehow.
-     *
-     * New accounts should always have `sub`.
+     * Refresh tokens must NEVER authenticate API requests.
      */
 
     if (
-      !userId &&
-      !decoded.address &&
-      !decoded.email
+      payload.type !== "access"
     ) {
       return res.status(401).json({
         error:
-          "Invalid token payload",
+          "Invalid access token",
       });
     }
 
@@ -199,53 +121,40 @@ export function authenticateToken(
      * -----------------------------------------------------
      * NORMALIZE REQUEST USER
      * -----------------------------------------------------
+     *
+     * `sub` is the canonical User.id.
      */
 
     req.user = {
-      id: userId,
+      id: payload.sub,
 
-      address:
-        decoded.address
-          ?.toLowerCase(),
+      ...(payload.address
+        ? {
+            address:
+              payload.address,
+          }
+        : {}),
 
-      email:
-        decoded.email
-          ?.toLowerCase(),
+      ...(payload.email
+        ? {
+            email:
+              payload.email,
+          }
+        : {}),
 
-      username:
-        decoded.username,
+      ...(payload.username
+        ? {
+            username:
+              payload.username,
+          }
+        : {}),
     };
 
-    /*
-     * -----------------------------------------------------
-     * CONTINUE
-     * -----------------------------------------------------
-     */
-
-    next();
+    return next();
   } catch (error) {
     /*
      * -----------------------------------------------------
-     * EXPIRED TOKEN
-     * -----------------------------------------------------
-     *
-     * AuthContext.authFetch() can use this 401 to
-     * automatically call /auth/refresh.
-     */
-
-    if (
-      error instanceof
-      jwt.TokenExpiredError
-    ) {
-      return res.status(401).json({
-        error:
-          "Access token expired",
-      });
-    }
-
-    /*
-     * -----------------------------------------------------
-     * INVALID TOKEN
+     * TOKEN ERROR
      * -----------------------------------------------------
      */
 
@@ -254,9 +163,9 @@ export function authenticateToken(
       error
     );
 
-    return res.status(403).json({
+    return res.status(401).json({
       error:
-        "Invalid authentication token",
+        "Invalid or expired access token",
     });
   }
 }

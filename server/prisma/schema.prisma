@@ -7,10 +7,65 @@ datasource db {
   provider = "postgresql"
 }
 
+// =========================================================
+// ENUMS
+// =========================================================
+
 enum ProjectTemplate {
   editor
   found
 }
+
+enum ParcelStatus {
+  available
+  owned
+  reserved
+  for_sale
+}
+
+// =========================================================
+// MARKETPLACE ORDER STATUS
+// =========================================================
+
+enum MarketplaceOrderStatus {
+  PENDING
+  PAYMENT_PROCESSING
+  PAID
+  GRANTED
+  CANCELLED
+  FAILED
+}
+
+// =========================================================
+// MARKETPLACE PAYMENT STATUS
+// =========================================================
+
+enum MarketplacePaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+// =========================================================
+// MARKETPLACE PAYMENT ENVIRONMENT
+// =========================================================
+
+enum MarketplacePaymentEnvironment {
+  TEST
+}
+
+// =========================================================
+// MARKETPLACE ENTITLEMENT STATUS
+// =========================================================
+
+enum MarketplaceEntitlementStatus {
+  GRANTED
+}
+
+// =========================================================
+// USER
+// =========================================================
 
 model User {
   id           String  @id @default(uuid())
@@ -23,10 +78,36 @@ model User {
   updatedAt DateTime @updatedAt
 
   projects Project[]
+
+  // -------------------------------------------------------
+  // Parcel marketplace
+  // -------------------------------------------------------
+
+  parcelsOwned       Parcel[]
+  parcelListings     ParcelListing[]
+  parcelReservations ParcelReservation[]
+
+  // -------------------------------------------------------
+  // Marketplace purchases
+  // -------------------------------------------------------
+
+  marketplaceOrders MarketplaceOrder[]
+
+  marketplacePayments MarketplacePayment[]
+
+  marketplaceEntitlements MarketplaceEntitlement[]
+
+  marketplaceIdempotencyKeys MarketplaceIdempotencyKey[]
+
+  marketplacePaymentEvents MarketplacePaymentEvent[]
 }
 
+// =========================================================
+// PROJECT
+// =========================================================
+
 model Project {
-  id          String  @id @default(uuid())
+  id          String
   ownerId     String
   name        String
   description String?
@@ -39,6 +120,9 @@ model Project {
   slug        String?   @unique
   publishedAt DateTime?
 
+  // Optional parcel this project is built on
+  parcelId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -46,9 +130,17 @@ model Project {
 
   assets ProjectAsset[]
 
+  parcel Parcel? @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+
+  @@id([id])
   @@index([ownerId])
   @@index([publishedAt])
+  @@index([parcelId])
 }
+
+// =========================================================
+// PROJECT ASSETS
+// =========================================================
 
 model ProjectAsset {
   id String @id @default(uuid())
@@ -65,6 +157,382 @@ model ProjectAsset {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([projectId])
   @@unique([projectId, storageKey])
+  @@index([projectId])
+}
+
+// =========================================================
+// PARCEL
+// =========================================================
+
+model Parcel {
+  id String @id @default(uuid())
+
+  // -------------------------------------------------------
+  // Static world identity
+  // -------------------------------------------------------
+
+  estateId String @unique
+
+  x Int
+  y Int
+
+  // -------------------------------------------------------
+  // Dynamic marketplace state
+  // -------------------------------------------------------
+
+  status ParcelStatus @default(available)
+
+  // Current CypherVerse owner
+  ownerId String?
+
+  // Marketplace price
+  price Decimal? @db.Decimal(12, 2)
+
+  // -------------------------------------------------------
+  // Optional display information
+  // -------------------------------------------------------
+
+  name        String?
+  description String?
+
+  // -------------------------------------------------------
+  // Optional blockchain identity
+  // -------------------------------------------------------
+
+  blockchainAddress String?
+  tokenId           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // -------------------------------------------------------
+  // Relations
+  // -------------------------------------------------------
+
+  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+
+  listings ParcelListing[]
+
+  reservations ParcelReservation[]
+
+  projects Project[]
+
+  // -------------------------------------------------------
+  // Marketplace purchase relations
+  // -------------------------------------------------------
+
+  marketplaceOrders MarketplaceOrder[]
+
+  marketplaceEntitlements MarketplaceEntitlement[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([x, y])
+}
+
+// =========================================================
+// PARCEL LISTING
+// =========================================================
+
+model ParcelListing {
+  id String @id @default(uuid())
+
+  parcelId String
+  sellerId String
+
+  price Decimal @db.Decimal(12, 2)
+
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  seller            User               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  marketplaceOrders MarketplaceOrder[]
+
+  @@index([parcelId])
+  @@index([sellerId])
+  @@index([active])
+}
+
+// =========================================================
+// PARCEL RESERVATION
+// =========================================================
+
+model ParcelReservation {
+  id String @id @default(uuid())
+
+  parcelId String
+  userId   String
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([parcelId])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// =========================================================
+// MARKETPLACE ORDER
+// =========================================================
+//
+// One authoritative server-side purchase/order.
+//
+// The client never controls:
+// - userId
+// - price
+// - currency
+// - status
+// - payment status
+// - entitlement status
+//
+// For the current marketplace implementation,
+// `product` points to Parcel.
+//
+
+model MarketplaceOrder {
+  id String @id @default(uuid())
+
+  // Authenticated buyer
+  userId String
+
+  // Purchased marketplace product
+  productId String
+
+  // Optional existing listing involved in purchase
+  listingId String?
+
+  // Quantity supported by the purchase model.
+  // Current parcel marketplace should use quantity = 1.
+  quantity Int @default(1)
+
+  // Server-authoritative snapshot of price/currency.
+  //
+  // Keeping the amount on the order prevents later product
+  // price changes from silently changing an existing order.
+  amount Decimal @db.Decimal(12, 2)
+
+  currency String @default("USD")
+
+  status MarketplaceOrderStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  product Parcel @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  listing ParcelListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  payments MarketplacePayment[]
+
+  entitlements MarketplaceEntitlement[]
+
+  paymentEvents MarketplacePaymentEvent[]
+
+  idempotencyKeys MarketplaceIdempotencyKey[]
+
+  @@index([userId])
+  @@index([productId])
+  @@index([listingId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =========================================================
+// MARKETPLACE PAYMENT
+// =========================================================
+//
+// Server-created payment record.
+//
+// The test payment provider creates this record.
+// The client cannot mark it paid.
+//
+
+model MarketplacePayment {
+  id String @id @default(uuid())
+
+  // The order being paid.
+  orderId String
+
+  // Authenticated user who initiated the payment.
+  userId String
+
+  // Unique sandbox/test transaction identifier.
+  providerTransactionId String @unique
+
+  // Server-authoritative amount.
+  amount Decimal @db.Decimal(12, 2)
+
+  // Server-authoritative currency.
+  currency String
+
+  status MarketplacePaymentStatus @default(PENDING)
+
+  environment MarketplacePaymentEnvironment @default(TEST)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  paidAt DateTime?
+
+  failedAt DateTime?
+
+  cancelledAt DateTime?
+
+  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  events MarketplacePaymentEvent[]
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([environment])
+}
+
+// =========================================================
+// MARKETPLACE PAYMENT EVENT
+// =========================================================
+//
+// Durable payment event record.
+//
+// providerEventId is unique so duplicate callbacks/events
+// cannot be processed twice.
+//
+
+model MarketplacePaymentEvent {
+  id String @id @default(uuid())
+
+  providerEventId String @unique
+
+  providerTransactionId String?
+
+  orderId String
+
+  userId String
+
+  status MarketplacePaymentStatus
+
+  environment MarketplacePaymentEnvironment @default(TEST)
+
+  processed Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  payment MarketplacePayment? @relation(fields: [providerTransactionId], references: [providerTransactionId], onDelete: SetNull)
+
+  @@index([providerTransactionId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+// =========================================================
+// MARKETPLACE ENTITLEMENT
+// =========================================================
+//
+// Durable "grant exactly once" record.
+//
+// For non-consumable parcel ownership:
+//
+//     userId + productId
+//
+// is unique.
+//
+// This database constraint is the final protection against
+// duplicate entitlement grants during concurrent requests,
+// retries, duplicate callbacks, etc.
+//
+
+model MarketplaceEntitlement {
+  id String @id @default(uuid())
+
+  userId String
+
+  productId String
+
+  orderId String
+
+  quantity Int @default(1)
+
+  status MarketplaceEntitlementStatus @default(GRANTED)
+
+  grantedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  product Parcel @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+  @@index([orderId])
+  @@index([status])
+}
+
+// =========================================================
+// MARKETPLACE IDEMPOTENCY KEY
+// =========================================================
+//
+// Durable idempotency record.
+//
+// Scoped to:
+//
+//     user + operation + key
+//
+// This survives:
+// - process restarts
+// - concurrent requests
+// - multiple server instances
+//
+
+model MarketplaceIdempotencyKey {
+  id String @id @default(uuid())
+
+  userId String
+
+  operation String
+
+  key String
+
+  orderId String?
+
+  responseStatus Int?
+
+  responseJson Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  order MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, operation, key])
+  @@index([userId])
+  @@index([orderId])
+  @@index([createdAt])
 }

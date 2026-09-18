@@ -50,3 +50,5 @@ export function getEditorTemplate(
 
 export const defaultEditorTemplate =
   lostWorldTemplate;
+
+export { foundTemplate };

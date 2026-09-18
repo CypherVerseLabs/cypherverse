@@ -5,11 +5,14 @@ import {
   Model,
 } from "cyengine";
 
-import { useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 
 import { Text } from "@react-three/drei";
 
-import Title from "./Title";
+import Title from "./inputs/Title";
 
 import { useAuthContext } from "ideas/context/AuthContext";
 
@@ -19,15 +22,17 @@ import { useAuthContext } from "ideas/context/AuthContext";
  * =========================================================
  */
 
-type TemplateId = "editor" | "found";
+type TemplateId = string;
 
 type Template = {
-  id: TemplateId;
+  id: string;
   name: string;
   description: string;
   route: string;
   previewImage: string;
+  scene: unknown;
 };
+
 
 type CreatedProject = {
   id: string;
@@ -35,17 +40,16 @@ type CreatedProject = {
   name: string;
   template: TemplateId;
   description?: string;
+  slug?: string;
   createdAt?: string;
   updatedAt?: string;
 };
+
 
 /*
  * =========================================================
  * SESSION STORAGE KEYS
  * =========================================================
- *
- * Keep these keys centralized so TemplateSelector and
- * Orientation use the exact same creation-session contract.
  */
 
 const SESSION_KEYS = {
@@ -68,40 +72,15 @@ const API_URL =
 
 /*
  * =========================================================
- * TEMPLATES
- * =========================================================
- */
-
-const TEMPLATES: Template[] = [
-  {
-    id: "editor",
-    name: "Editor",
-    description:
-      "Start with a blank world and build it yourself.",
-    route: "/editor",
-    previewImage: "/editor_preview.png",
-  },
-
-  {
-    id: "found",
-    name: "Found",
-    description:
-      "Begin with a ready-made world and make it your own.",
-    route: "/found",
-    previewImage: "/found_preview.png",
-  },
-];
-
-/*
- * =========================================================
  * SESSION HELPERS
  * =========================================================
- *
- * These helpers make the creation handoff explicit and
- * consistent.
  */
 
 const clearCreationSession = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   sessionStorage.removeItem(
     SESSION_KEYS.projectId
   );
@@ -132,61 +111,110 @@ const saveCreationSession = ({
   template: Template;
   worldName: string;
 }) => {
-  /*
-   * Project ID
-   */
+  if (typeof window === "undefined") {
+    return;
+  }
 
   sessionStorage.setItem(
     SESSION_KEYS.projectId,
     projectId
   );
 
-  /*
-   * IMPORTANT:
-   *
-   * Store the template ID here:
-   *
-   *   "editor"
-   *   "found"
-   *
-   * NOT:
-   *
-   *   "/editor"
-   *   "/found"
-   */
-
   sessionStorage.setItem(
     SESSION_KEYS.template,
     template.id
   );
-
-  /*
-   * Keep the route separately for consumers that need it.
-   */
 
   sessionStorage.setItem(
     SESSION_KEYS.templateRoute,
     template.route
   );
 
-  /*
-   * World / project name
-   */
-
   sessionStorage.setItem(
     SESSION_KEYS.worldName,
     worldName
   );
-
-  /*
-   * Explicitly mark this as an active creation session.
-   */
 
   sessionStorage.setItem(
     SESSION_KEYS.creationSession,
     "true"
   );
 };
+
+/*
+ * =========================================================
+ * NORMALIZE TEMPLATE
+ * =========================================================
+ *
+ * This is the important part.
+ *
+ * The API might return a template with a missing field.
+ * We make sure every value used by the 3D UI is a string.
+ */
+
+const normalizeTemplate = (
+  value: any
+): Template | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const id =
+    typeof value.id === "string"
+      ? value.id
+      : "";
+
+  const name =
+    typeof value.name === "string"
+      ? value.name
+      : id || "Untitled Template";
+
+  const description =
+    typeof value.description === "string"
+      ? value.description
+      : "";
+
+  const route =
+    typeof value.route === "string"
+      ? value.route
+      : id
+        ? `/${id}`
+        : "";
+
+  const previewImage =
+    typeof value.previewImage === "string"
+      ? value.previewImage
+      : "";
+
+  const scene =
+    value.scene &&
+    typeof value.scene === "object"
+      ? value.scene
+      : null;
+
+  /*
+   * A template without an ID is not usable.
+   */
+
+  if (!id) {
+    console.warn(
+      "Ignoring template without an id:",
+      value
+    );
+
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    description,
+    route,
+    previewImage,
+    scene,
+  };
+};
+
 
 /*
  * =========================================================
@@ -199,6 +227,28 @@ function TemplatePreview({
 }: {
   template: Template;
 }) {
+  /*
+   * Extra protection.
+   *
+   * These are guaranteed strings even if something
+   * unexpected reaches this component.
+   */
+
+  const name =
+    typeof template.name === "string"
+      ? template.name
+      : "Untitled Template";
+
+  const description =
+    typeof template.description === "string"
+      ? template.description
+      : "";
+
+  const previewImage =
+    typeof template.previewImage === "string"
+      ? template.previewImage
+      : "";
+
   return (
     <>
       {/* =====================================================
@@ -217,21 +267,7 @@ function TemplatePreview({
           src="./3dpanelmodel.glb"
         />
 
-        <Image
-          src={template.previewImage}
-          size={1}
-          position={[
-            0,
-            0,
-            -0.05,
-          ]}
-          rotation={[
-            0,
-            Math.PI,
-            0,
-          ]}
-          framed
-        />
+        
       </group>
 
       {/* =====================================================
@@ -251,23 +287,25 @@ function TemplatePreview({
         ]}
       >
         <Title>
-          {template.name}
+          {name}
         </Title>
 
-        <Text
-          color="white"
-          fontSize={0.11}
-          maxWidth={2}
-          position={[
-            0,
-            -0.45,
-            0,
-          ]}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {template.description}
-        </Text>
+        {description && (
+          <Text
+            color="white"
+            fontSize={0.11}
+            maxWidth={2}
+            position={[
+              0,
+              -0.45,
+              0,
+            ]}
+            anchorX="center"
+            anchorY="middle"
+          >
+            {description}
+          </Text>
+        )}
       </group>
     </>
   );
@@ -285,8 +323,39 @@ export default function TemplateSelector() {
     isAuthenticated,
   } = useAuthContext();
 
-  const [index, setIndex] =
-    useState(0);
+  /*
+   * =======================================================
+   * TEMPLATE STATE
+   * =======================================================
+   */
+
+  const [
+    templates,
+    setTemplates,
+  ] = useState<Template[]>([]);
+
+  const [
+    loadingTemplates,
+    setLoadingTemplates,
+  ] = useState(true);
+
+  const [
+    templateError,
+    setTemplateError,
+  ] = useState<string | null>(
+    null
+  );
+
+  const [
+    index,
+    setIndex,
+  ] = useState(0);
+
+  /*
+   * =======================================================
+   * SELECTED TEMPLATE
+   * =======================================================
+   */
 
   const [
     selectedTemplate,
@@ -296,10 +365,22 @@ export default function TemplateSelector() {
       null
     );
 
+  /*
+   * =======================================================
+   * WORLD NAME
+   * =======================================================
+   */
+
   const [
     worldName,
     setWorldName,
   ] = useState("");
+
+  /*
+   * =======================================================
+   * CREATED PROJECT
+   * =======================================================
+   */
 
   const [
     createdProject,
@@ -308,6 +389,12 @@ export default function TemplateSelector() {
     useState<CreatedProject | null>(
       null
     );
+
+  /*
+   * =======================================================
+   * CREATION STATE
+   * =======================================================
+   */
 
   const [
     creating,
@@ -322,8 +409,133 @@ export default function TemplateSelector() {
       null
     );
 
+  /*
+   * =========================================================
+   * LOAD TEMPLATES
+   * =========================================================
+   */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTemplates =
+      async () => {
+        try {
+          setLoadingTemplates(
+            true
+          );
+
+          setTemplateError(
+            null
+          );
+
+          const response =
+            await authFetch(
+              `${API_URL}/api/ideas`
+            );
+
+          const data =
+            await response
+              .json()
+              .catch(() => null);
+
+          if (!response.ok) {
+            throw new Error(
+              data?.error ||
+                data?.message ||
+                "Failed to load templates."
+            );
+          }
+
+          /*
+           * Support both:
+           *
+           * [...]
+           *
+           * and:
+           *
+           * { ideas: [...] }
+           */
+
+          const rawIdeas =
+            Array.isArray(data)
+              ? data
+              : Array.isArray(
+                  data?.ideas
+                )
+                ? data.ideas
+                : [];
+
+          /*
+           * Normalize EVERY template.
+           *
+           * This prevents undefined values from reaching
+           * Title, Image, Button, etc.
+           */
+
+          const normalizedTemplates: Template[] =
+  rawIdeas
+    .map(normalizeTemplate)
+    .filter(
+      (item: Template | null): item is Template =>
+        item !== null
+    );
+
+          console.log(
+            "Loaded templates:",
+            normalizedTemplates
+          );
+
+          if (cancelled) {
+            return;
+          }
+
+          setTemplates(
+            normalizedTemplates
+          );
+
+          setIndex(0);
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            "Failed to load templates:",
+            error
+          );
+
+          setTemplateError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load templates."
+          );
+
+          setTemplates([]);
+        } finally {
+          if (!cancelled) {
+            setLoadingTemplates(
+              false
+            );
+          }
+        }
+      };
+
+    loadTemplates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authFetch]);
+
+  /*
+   * =========================================================
+   * CURRENT TEMPLATE
+   * =========================================================
+   */
+
   const template =
-    TEMPLATES[index];
+    templates[index];
 
   /*
    * =========================================================
@@ -332,10 +544,14 @@ export default function TemplateSelector() {
    */
 
   const nextTemplate = () => {
+    if (!templates.length) {
+      return;
+    }
+
     setIndex(
       (current) =>
         (current + 1) %
-        TEMPLATES.length
+        templates.length
     );
   };
 
@@ -346,10 +562,9 @@ export default function TemplateSelector() {
    */
 
   const useTemplate = () => {
-    /*
-     * Clear any stale creation session before starting a
-     * completely new project flow.
-     */
+    if (!template) {
+      return;
+    }
 
     clearCreationSession();
 
@@ -373,10 +588,6 @@ export default function TemplateSelector() {
    */
 
   const cancel = () => {
-    /*
-     * Do not leave an old project/template handoff behind.
-     */
-
     clearCreationSession();
 
     setSelectedTemplate(
@@ -396,14 +607,6 @@ export default function TemplateSelector() {
    * =========================================================
    * CREATE PROJECT
    * =========================================================
-   *
-   * Creates the actual project in Neon.
-   *
-   * POST /api/projects
-   *
-   * The authenticated server determines the owner from
-   * the JWT. The client does NOT send ownerId.
-   * =========================================================
    */
 
   const createWorld = async () => {
@@ -422,10 +625,6 @@ export default function TemplateSelector() {
       return;
     }
 
-    /*
-     * User must be authenticated.
-     */
-
     if (!isAuthenticated) {
       setError(
         "Please sign in before creating a website."
@@ -433,10 +632,6 @@ export default function TemplateSelector() {
 
       return;
     }
-
-    /*
-     * Prevent duplicate requests.
-     */
 
     if (creating) {
       return;
@@ -460,13 +655,6 @@ export default function TemplateSelector() {
             body: JSON.stringify({
               name,
 
-              /*
-               * Server expects the template ID.
-               *
-               * "editor"
-               * "found"
-               */
-
               template:
                 selectedTemplate.id,
             }),
@@ -478,10 +666,6 @@ export default function TemplateSelector() {
           .json()
           .catch(() => null);
 
-      /*
-       * Server error.
-       */
-
       if (!response.ok) {
         throw new Error(
           data?.error ||
@@ -489,10 +673,6 @@ export default function TemplateSelector() {
             "Failed to create your website."
         );
       }
-
-      /*
-       * Server must return the created project.
-       */
 
       if (!data?.project) {
         throw new Error(
@@ -503,10 +683,6 @@ export default function TemplateSelector() {
       const project =
         data.project as CreatedProject;
 
-      /*
-       * Validate the important server response fields.
-       */
-
       if (
         !project.id ||
         !project.name
@@ -515,20 +691,6 @@ export default function TemplateSelector() {
           "The server returned an invalid project."
         );
       }
-
-      /*
-       * =====================================================
-       * SAVE CREATION SESSION
-       * =====================================================
-       *
-       * This is the handoff:
-       *
-       * TemplateSelector
-       *        ↓
-       * Orientation
-       *
-       * Orientation will read these exact values.
-       */
 
       saveCreationSession({
         projectId:
@@ -540,10 +702,6 @@ export default function TemplateSelector() {
         worldName:
           project.name,
       });
-
-      /*
-       * Project successfully exists in Neon.
-       */
 
       setCreatedProject(
         project
@@ -568,14 +726,6 @@ export default function TemplateSelector() {
    * =========================================================
    * CREATE WEBSITE
    * =========================================================
-   *
-   * At this point the project already exists.
-   *
-   * This function does NOT create another project.
-   *
-   * It refreshes the creation-session handoff and sends the
-   * user to Orientation.
-   * =========================================================
    */
 
   const createWebsite = () => {
@@ -585,13 +735,6 @@ export default function TemplateSelector() {
     ) {
       return;
     }
-
-    /*
-     * Refresh the complete creation session.
-     *
-     * This makes the flow resilient even if something
-     * modified sessionStorage while the user was here.
-     */
 
     saveCreationSession({
       projectId:
@@ -604,13 +747,99 @@ export default function TemplateSelector() {
         createdProject.name,
     });
 
-    /*
-     * Continue into Orientation.
-     */
-
     window.location.href =
       "/orientation";
   };
+
+  /*
+   * =========================================================
+   * LOADING
+   * =========================================================
+   */
+
+  if (loadingTemplates) {
+    return null;
+  }
+
+  /*
+   * =========================================================
+   * TEMPLATE LOAD ERROR
+   * =========================================================
+   */
+
+  if (
+    templateError &&
+    !templates.length
+  ) {
+    return (
+      <group
+        position={[0, 0.8, 0]}
+      >
+        <Text
+          color="#ff6b6b"
+          fontSize={0.12}
+          maxWidth={3}
+          position={[
+            0,
+            0,
+            -1.55,
+          ]}
+          rotation={[
+            0,
+            Math.PI,
+            0,
+          ]}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {templateError}
+        </Text>
+      </group>
+    );
+  }
+
+  /*
+   * =========================================================
+   * NO TEMPLATES
+   * =========================================================
+   */
+
+  if (!templates.length) {
+    return (
+      <group
+        position={[0, 0.8, 0]}
+      >
+        <Text
+          color="white"
+          fontSize={0.14}
+          position={[
+            0,
+            0,
+            -1.55,
+          ]}
+          rotation={[
+            0,
+            Math.PI,
+            0,
+          ]}
+          anchorX="center"
+          anchorY="middle"
+        >
+          No templates are currently available.
+        </Text>
+      </group>
+    );
+  }
+
+  /*
+   * =========================================================
+   * SAFETY CHECK
+   * =========================================================
+   */
+
+  if (!template) {
+    return null;
+  }
 
   /*
    * =========================================================
@@ -623,19 +852,11 @@ export default function TemplateSelector() {
       <group
         position={[0, 0.8, 0]}
       >
-        {/* =================================================
-            PREVIEW
-            ================================================= */}
-
         <TemplatePreview
           template={
             selectedTemplate
           }
         />
-
-        {/* =================================================
-            BEFORE PROJECT CREATION
-            ================================================= */}
 
         {!createdProject ? (
           <group
@@ -688,10 +909,6 @@ export default function TemplateSelector() {
               }}
             />
 
-            {/* =================================================
-                ERROR
-                ================================================= */}
-
             {error && (
               <Text
                 color="#ff6b6b"
@@ -714,10 +931,6 @@ export default function TemplateSelector() {
               </Text>
             )}
 
-            {/* =================================================
-                CANCEL
-                ================================================= */}
-
             <Button
               position={[
                 -0.45,
@@ -733,10 +946,6 @@ export default function TemplateSelector() {
             >
               Cancel
             </Button>
-
-            {/* =================================================
-                CREATE
-                ================================================= */}
 
             {worldName.trim() && (
               <Button
@@ -761,12 +970,6 @@ export default function TemplateSelector() {
             )}
           </group>
         ) : (
-          /*
-           * =================================================
-           * PROJECT CREATED
-           * =================================================
-           */
-
           <group
             position={[
               0,
@@ -867,17 +1070,9 @@ export default function TemplateSelector() {
     <group
       position={[0, 0.8, 0]}
     >
-      {/* =====================================================
-          PREVIEW
-          ===================================================== */}
-
       <TemplatePreview
         template={template}
       />
-
-      {/* =====================================================
-          TEMPLATE ACTIONS
-          ===================================================== */}
 
       <group
         position={[
@@ -901,7 +1096,7 @@ export default function TemplateSelector() {
             nextTemplate
           }
         >
-          {`Use ${template.name}`}
+          Next Template
         </Button>
 
         <Button

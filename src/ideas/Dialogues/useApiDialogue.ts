@@ -101,59 +101,71 @@ export function useApiDialogue(): DialogueFSM {
     ===================================== */
 
     {
-      key: "menu",
-      text: isAuthenticated
-        ? `Welcome back, ${displayName}! What would you like to do next?`
-        : `Hi ${displayName}! What would you like to do?`,
-      decisions: isAuthenticated
-        ? [
-            {
-              name: "Create a Website",
-              nextKey: "template_selector",
-            },
-            {
-              name: "Manage My Websites",
-              nextKey: "manage_websites",
-            },
-            {
-              name: "Logout",
-              nextKey: "logout",
-            },
-          ]
-        : [
-            {
-              name: "Login with Wallet",
-              nextKey: "login_wallet",
-            },
-            {
-              name: "Login with Email",
-              nextKey: "login_email",
-            },
-            {
-              name: "Signup",
-              nextKey: "signup_email",
-            },
-            {
-              name: "What is Cypherverse?",
-              nextKey: "about",
-            },
-          ],
+  key: "menu",
+  text: isAuthenticated
+    ? `Welcome back, ${displayName}! What would you like to do next?`
+    : `Hi ${displayName}! What would you like to do?`,
+  decisions: isAuthenticated
+    ? [
+        {
+          name: "Create a Website",
+          nextKey: "visit_template_selector",
+        },
+        {
+          name: "Manage My Websites",
+          nextKey: "manage_websites",
+        },
+        {
+          name: "Logout",
+          nextKey: "logout",
+        },
+      ]
+    : [
+        {
+          name: "Login with Wallet",
+          nextKey: "login_wallet",
+        },
+        {
+          name: "Login with Email",
+          nextKey: "login_email",
+        },
+        {
+          name: "Signup",
+          nextKey: "signup_email",
+        },
+        {
+          name: "What is Cypherverse?",
+          nextKey: "about",
+        },
+      ],
+},
+{
+  key: "visit_template_selector",
+  text: "Go visit the Template Selector.",
+  decisions: [
+    {
+      name: "Continue",
+      nextKey: "menu",
     },
+  ],
+},
+
 
     /* =====================================
        MANAGE WEBSITES
     ===================================== */
 
     {
-      key: "manage_websites",
-      text: "Your websites will appear here.",
-      decisions: [
-        {
-          name: "Back to Menu",
-          nextKey: "menu",
-        },
-      ],
+  key: "manage_websites",
+  text: "Visit the Website Manager.",
+  decisions: [
+    {
+      name: "Continue",
+      nextKey: "menu",
     },
+  ],
+},
+
 
     /* =====================================
        EMAIL LOGIN

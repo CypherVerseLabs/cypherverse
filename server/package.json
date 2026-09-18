@@ -32,11 +32,11 @@
     "nodemon": "^3.1.10",
     "prisma": "^7.9.1",
     "ts-node": "^10.9.2",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "server": "nodemon --watch . --ext ts --exec node --loader ts-node/esm ./index.ts",
+    "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
     "frontend": "next dev -p 3000",
     "dev": "concurrently \"yarn server\" \"yarn frontend\""
   }

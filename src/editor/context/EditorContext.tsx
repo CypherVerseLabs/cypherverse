@@ -60,6 +60,26 @@ type SceneFile = {
 };
 
 /* =========================================
+   ASSET MANIFEST
+========================================= */
+
+type AssetManifestEntry = {
+  assetId: string;
+  name: string;
+  fieldName: string;
+  path: string;
+};
+
+
+type PreparedAssets = {
+  scene: Scene;
+
+  manifest: AssetManifestEntry[];
+
+  fileNames: Map<string, string>;
+};
+
+/* =========================================
    SCENE FILE
 ========================================= */
 
@@ -72,10 +92,6 @@ export const SCENE_FILE_VERSION =
 /* =========================================
    CONSTANTS
 ========================================= */
-
-const API_URL =
-  (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
-
 
 const MAX_HISTORY_SIZE = 100;
 
@@ -284,13 +300,70 @@ function cloneTransform(
 ========================================= */
 
 /**
- * Converts browser object URLs into
- * portable assets/<filename> paths.
+ * Creates one stable filename per LocalAsset.
+ *
+ * The same asset always gets the same path,
+ * regardless of how many scene objects reference it.
  */
-function rewriteSceneForSave(
+function createAssetFileNames(
+  assets: LocalAsset[]
+): Map<string, string> {
+  const fileNames =
+    new Map<string, string>();
+
+  const usedNames =
+    new Set<string>();
+
+  for (
+    const asset of assets
+  ) {
+    const safeName =
+      sanitizeAssetFileName(
+        asset.name
+      );
+
+    let fileName =
+      safeName;
+
+    let counter = 1;
+
+    while (
+      usedNames.has(
+        fileName
+      )
+    ) {
+      fileName =
+        `${counter}-${safeName}`;
+
+      counter++;
+    }
+
+    usedNames.add(
+      fileName
+    );
+
+    fileNames.set(
+      asset.id,
+      fileName
+    );
+  }
+
+  return fileNames;
+}
+
+/**
+ * Converts local browser object URLs into
+ * portable assets/<filename> paths.
+ *
+ * IMPORTANT:
+ *
+ * The filename is assigned per asset ID,
+ * not per reference.
+ */
+function rewriteSceneForAssets(
   scene: Scene,
   assets: LocalAsset[]
-): Scene {
+): PreparedAssets {
   const assetByUrl =
     new Map<string, LocalAsset>();
 
@@ -303,11 +376,13 @@ function rewriteSceneForSave(
     );
   }
 
+  const fileNames =
+    createAssetFileNames(
+      assets
+    );
+
   const cloned =
     cloneScene(scene);
-
-  const usedNames =
-    new Map<string, number>();
 
   for (
     const object of cloned.objects
@@ -346,32 +421,70 @@ function rewriteSceneForSave(
         continue;
       }
 
-      const safeName =
-        sanitizeAssetFileName(
-          asset.name
+      const fileName =
+        fileNames.get(
+          asset.id
         );
 
-      const count =
-        usedNames.get(
-          safeName
-        ) ?? 0;
-
-      usedNames.set(
-        safeName,
-        count + 1
-      );
-
-      const finalName =
-        count === 0
-          ? safeName
-          : `${count}-${safeName}`;
+      if (!fileName) {
+        continue;
+      }
 
       props[key] =
-        `assets/${finalName}`;
+        `assets/${fileName}`;
     }
   }
 
-  return cloned;
+  const manifest: AssetManifestEntry[] =
+  assets.flatMap((asset) => {
+    const fileName =
+      fileNames.get(asset.id);
+
+    if (!fileName) {
+      return [];
+    }
+
+    return [{
+      assetId: asset.id,
+      name: asset.name,
+      fieldName: `asset-${asset.id}`,
+      path: `assets/${fileName}`,
+    }];
+  });
+
+
+
+
+  return {
+    scene:
+      cloned,
+
+    manifest,
+
+    fileNames,
+  };
+}
+
+/* =========================================
+   NORMALIZE ASSET PATH
+========================================= */
+
+function normalizeAssetPath(
+  value: string
+): string {
+  return value
+    .replace(
+      /\\/g,
+      "/"
+    )
+    .replace(
+      /^\.\/+/,
+      ""
+    )
+    .replace(
+      /^\/+/,
+      ""
+    );
 }
 
 /* =========================================
@@ -637,8 +750,8 @@ export function EditorProvider({
         const zip =
           new JSZip();
 
-        const sceneForSave =
-          rewriteSceneForSave(
+        const prepared =
+          rewriteSceneForAssets(
             scene,
             assetsRef.current
           );
@@ -651,7 +764,7 @@ export function EditorProvider({
             SCENE_FILE_VERSION,
 
           scene:
-            sceneForSave,
+            prepared.scene,
         };
 
         zip.file(
@@ -667,37 +780,18 @@ export function EditorProvider({
            ASSETS
         --------------------------------- */
 
-        const usedNames =
-          new Set<string>();
-
         for (
           const asset of
             assetsRef.current
         ) {
-          const safeName =
-            sanitizeAssetFileName(
-              asset.name
+          const fileName =
+            prepared.fileNames.get(
+              asset.id
             );
 
-          let fileName =
-            safeName;
-
-          let counter = 1;
-
-          while (
-            usedNames.has(
-              fileName
-            )
-          ) {
-            fileName =
-              `${counter}-${safeName}`;
-
-            counter++;
+          if (!fileName) {
+            continue;
           }
-
-          usedNames.add(
-            fileName
-          );
 
           zip.file(
             `assets/${fileName}`,
@@ -713,6 +807,15 @@ export function EditorProvider({
           await zip.generateAsync({
             type: "blob",
           });
+
+        if (
+          blob.size >
+          MAX_SCENE_FILE_SIZE
+        ) {
+          throw new Error(
+            "CyBuilder project file is too large."
+          );
+        }
 
         const url =
           URL.createObjectURL(
@@ -872,7 +975,9 @@ export function EditorProvider({
             zip.files
           ).filter(
             (name) =>
-              name.startsWith(
+              normalizeAssetPath(
+                name
+              ).startsWith(
                 "assets/"
               ) &&
               !zip.files[name].dir
@@ -890,8 +995,13 @@ export function EditorProvider({
               "blob"
             );
 
+          const normalizedPath =
+            normalizeAssetPath(
+              path
+            );
+
           const fileName =
-            path.slice(
+            normalizedPath.slice(
               "assets/".length
             );
 
@@ -946,7 +1056,9 @@ export function EditorProvider({
             loadedAssets
         ) {
           assetByPath.set(
-            `assets/${asset.name}`,
+            normalizeAssetPath(
+              `assets/${asset.name}`
+            ),
             asset
           );
         }
@@ -990,7 +1102,9 @@ export function EditorProvider({
 
             const asset =
               assetByPath.get(
-                value
+                normalizeAssetPath(
+                  value
+                )
               );
 
             if (!asset) {
@@ -1088,8 +1202,8 @@ export function EditorProvider({
           data.project;
 
         /*
-         * The project scene is already JSON
-         * data returned by the API.
+         * The project scene is JSON data
+         * returned by the API.
          */
         if (
           !project.scene ||
@@ -1111,10 +1225,9 @@ export function EditorProvider({
          * Loading a server project replaces
          * the current editor scene.
          *
-         * Server projects do not contain the
-         * local File objects used by the
-         * .cybuilder ZIP format, so local
-         * assets are intentionally left alone.
+         * Server projects contain permanent
+         * asset URLs rather than local
+         * browser File objects.
          */
         transformTransaction.current =
           null;
@@ -1150,22 +1263,23 @@ export function EditorProvider({
         }
 
         /*
-         * Save the scene itself.
-         *
-         * IMPORTANT:
-         *
-         * Do not use rewriteSceneForSave()
-         * here because that converts browser
-         * object URLs into ZIP asset paths.
-         *
-         * The database project stores the
-         * actual scene JSON.
+         * Convert local browser object URLs
+         * into portable assets/<filename>
+         * paths before storing the scene.
          */
+        const prepared =
+          rewriteSceneForAssets(
+            scene,
+            assetsRef.current
+          );
+
         const sceneToSave =
-          cloneScene(scene);
+          prepared.scene;
 
         const sceneJson =
-          JSON.stringify(sceneToSave);
+          JSON.stringify(
+            sceneToSave
+          );
 
         const sceneSize =
           new TextEncoder()
@@ -1226,178 +1340,183 @@ export function EditorProvider({
      PUBLISH PROJECT
   ======================================= */
 
-  /* =======================================
-   PUBLISH PROJECT
-======================================= */
-
-const publishProject =
-  useCallback(
-    async (
-      projectId: string
-    ) => {
-      if (!projectId) {
-        throw new Error(
-          "Project ID is required."
-        );
-      }
-
-      /*
-       * The project was already created by
-       * TemplateSelector.
-       *
-       * Publishing updates that existing
-       * project. It does NOT create a project.
-       */
-
-      const sceneToPublish =
-        cloneScene(scene);
-
-      /* ---------------------------------
-         SCENE JSON
-      --------------------------------- */
-
-      let sceneJson: string;
-
-      try {
-        sceneJson =
-          JSON.stringify(
-            sceneToPublish
-          );
-      } catch {
-        throw new Error(
-          "Project scene could not be serialized."
-        );
-      }
-
-      const sceneSize =
-        new TextEncoder()
-          .encode(sceneJson)
-          .byteLength;
-
-      if (
-        sceneSize >
-        MAX_PUBLISH_SCENE_SIZE
-      ) {
-        throw new Error(
-          "Project scene must be 10 MB or smaller."
-        );
-      }
-
-      /* ---------------------------------
-         ASSET MANIFEST
-      --------------------------------- */
-
-      const currentAssets =
-        assetsRef.current;
-
-      const assetManifest =
-        currentAssets.map(
-          (asset) => ({
-            assetId:
-              asset.id,
-
-            objectUrl:
-              asset.objectUrl,
-          })
-        );
-
-      /* ---------------------------------
-         FORM DATA
-      --------------------------------- */
-
-      const formData =
-        new FormData();
-
-      /*
-       * These names MUST match the server:
-       *
-       * scene
-       * assetManifest
-       * asset-<assetId>
-       */
-
-      formData.append(
-        "scene",
-        sceneJson
-      );
-
-      formData.append(
-        "assetManifest",
-        JSON.stringify(
-          assetManifest
-        )
-      );
-
-      /* ---------------------------------
-         ASSET FILES
-      --------------------------------- */
-
-      for (
-        const asset of currentAssets
-      ) {
-        if (!asset.file) {
+  const publishProject =
+    useCallback(
+      async (
+        projectId: string
+      ) => {
+        if (!projectId) {
           throw new Error(
-            `Asset "${asset.name}" is missing its file.`
+            "Project ID is required."
           );
         }
 
+        /*
+         * The project was already created by
+         * TemplateSelector.
+         *
+         * Publishing updates that existing
+         * project. It does NOT create a project.
+         */
+
+        const currentAssets =
+          assetsRef.current;
+
+        /*
+         * Convert local object URLs into
+         * deterministic portable asset paths.
+         */
+        const prepared =
+          rewriteSceneForAssets(
+            scene,
+            currentAssets
+          );
+
+        /* ---------------------------------
+           SCENE JSON
+        --------------------------------- */
+
+        let sceneJson: string;
+
+        try {
+          sceneJson =
+            JSON.stringify(
+              prepared.scene
+            );
+        } catch {
+          throw new Error(
+            "Project scene could not be serialized."
+          );
+        }
+
+        const sceneSize =
+          new TextEncoder()
+            .encode(sceneJson)
+            .byteLength;
+
+        if (
+          sceneSize >
+          MAX_PUBLISH_SCENE_SIZE
+        ) {
+          throw new Error(
+            "Project scene must be 10 MB or smaller."
+          );
+        }
+
+        /* ---------------------------------
+           FORM DATA
+        --------------------------------- */
+
+        const formData =
+          new FormData();
+
+        /*
+         * Portable scene.
+         *
+         * Example:
+         *
+         * assets/my-image.png
+         *
+         * instead of:
+         *
+         * blob:http://localhost/...
+         */
         formData.append(
-          `asset-${asset.id}`,
-          asset.file,
-          asset.name
+          "scene",
+          sceneJson
         );
-      }
 
-      /* ---------------------------------
-         SEND TO EXISTING PROJECT
-      --------------------------------- */
-
-      const response =
-  await authFetch(
-    `/api/projects/${encodeURIComponent(
-      projectId
-    )}/publish`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-      /* ---------------------------------
-         RESPONSE
-      --------------------------------- */
-
-      const data =
-        await response
-          .json()
-          .catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            data?.message ||
-            "Failed to publish project."
+        /*
+         * Manifest maps:
+         *
+         * asset ID
+         *    ↓
+         * multipart field
+         *    ↓
+         * original asset name
+         */
+        formData.append(
+          "assetManifest",
+          JSON.stringify(
+            prepared.manifest
+          )
         );
-      }
 
-      if (!data?.project) {
-        throw new Error(
-          "Server did not return the published project."
+        /* ---------------------------------
+           ASSET FILES
+        --------------------------------- */
+
+        for (
+          const asset of currentAssets
+        ) {
+          if (!asset.file) {
+            throw new Error(
+              `Asset "${asset.name}" is missing its file.`
+            );
+          }
+
+          const fieldName =
+            `asset-${asset.id}`;
+
+          formData.append(
+            fieldName,
+            asset.file,
+            asset.name
+          );
+        }
+
+        /* ---------------------------------
+           SEND TO EXISTING PROJECT
+        --------------------------------- */
+
+        const response =
+          await authFetch(
+            `/api/projects/${encodeURIComponent(
+              projectId
+            )}/publish`,
+            {
+              method: "POST",
+
+              body:
+                formData,
+            }
+          );
+
+        /* ---------------------------------
+           RESPONSE
+        --------------------------------- */
+
+        const data =
+          await response
+            .json()
+            .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+              data?.message ||
+              "Failed to publish project."
+          );
+        }
+
+        if (!data?.project) {
+          throw new Error(
+            "Server did not return the published project."
+          );
+        }
+
+        console.log(
+          "✅ Project published:",
+          projectId
         );
-      }
 
-      console.log(
-        "✅ Project published:",
-        projectId
-      );
-
-      return data.project;
-    },
-    [
-      scene,
-      authFetch,
-    ]
-  );
+        return data.project;
+      },
+      [
+        scene,
+        authFetch,
+      ]
+    );
 
   /* =======================================
      BEGIN TRANSFORM
@@ -1821,29 +1940,27 @@ const publishProject =
                   .position[2],
               ],
 
-              rotation:
-                [
-                  original.transform
-                    .rotation[0],
+              rotation: [
+                original.transform
+                  .rotation[0],
 
-                  original.transform
-                    .rotation[1],
+                original.transform
+                  .rotation[1],
 
-                  original.transform
-                    .rotation[2],
-                ],
+                original.transform
+                  .rotation[2],
+              ],
 
-              scale:
-                [
-                  original.transform
-                    .scale[0],
+              scale: [
+                original.transform
+                  .scale[0],
 
-                  original.transform
-                    .scale[1],
+                original.transform
+                  .scale[1],
 
-                  original.transform
-                    .scale[2],
-                ],
+                original.transform
+                  .scale[2],
+              ],
             };
 
             const duplicate:

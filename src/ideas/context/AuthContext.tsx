@@ -330,41 +330,107 @@ export function AuthProvider({
    * -------------------------------------------------------
    */
 
-  const authFetch =
+    const authFetch =
     async (
       input: RequestInfo,
       init?: RequestInit
     ): Promise<Response> => {
+
       if (!jwt) {
         throw new Error(
           "No authenticated session."
         );
       }
 
+      /*
+       * -----------------------------------------------------
+       * BUILD API URL
+       * -----------------------------------------------------
+       *
+       * Relative API paths:
+       *
+       *   /api/marketplace/...
+       *
+       * become:
+       *
+       *   http://localhost:5000/api/marketplace/...
+       *
+       * Absolute URLs are left unchanged.
+       */
+
+      let requestUrl: RequestInfo = input;
+
+      if (
+        typeof input === "string" &&
+        input.startsWith("/")
+      ) {
+        requestUrl =
+          `${API_URL}${input}`;
+      }
+
+
+      /*
+       * -----------------------------------------------------
+       * FIRST REQUEST
+       * -----------------------------------------------------
+       */
+
       const headers =
-        new Headers(init?.headers);
+        new Headers(
+          init?.headers
+        );
 
       headers.set(
         "Authorization",
         `Bearer ${jwt}`
       );
 
+      headers.set(
+        "Accept",
+        "application/json"
+      );
+
+
       let response =
-        await fetch(input, {
-          ...init,
-          headers,
-          credentials: "include",
-        });
+        await fetch(
+          requestUrl,
+          {
+            ...init,
+
+            headers,
+
+            credentials:
+              "include",
+          }
+        );
+
 
       /*
-       * Token expired.
+       * -----------------------------------------------------
+       * TOKEN EXPIRED
+       * -----------------------------------------------------
+       *
+       * If the API returns 401:
+       *
+       *   1. Refresh the token
+       *   2. Save the new token
+       *   3. Retry the original request
        */
 
-      if (response.status === 401) {
+      if (
+        response.status === 401
+      ) {
+
         const newToken =
           await refreshToken();
 
+
+        /*
+         * Refresh failed.
+         */
+
         if (!newToken) {
+
           clearAuthState();
 
           throw new Error(
@@ -372,24 +438,48 @@ export function AuthProvider({
           );
         }
 
+
+        /*
+         * ---------------------------------------------------
+         * RETRY REQUEST
+         * ---------------------------------------------------
+         */
+
         const retryHeaders =
-          new Headers(init?.headers);
+          new Headers(
+            init?.headers
+          );
 
         retryHeaders.set(
           "Authorization",
           `Bearer ${newToken}`
         );
 
+        retryHeaders.set(
+          "Accept",
+          "application/json"
+        );
+
+
         response =
-          await fetch(input, {
-            ...init,
-            headers: retryHeaders,
-            credentials: "include",
-          });
+          await fetch(
+            requestUrl,
+            {
+              ...init,
+
+              headers:
+                retryHeaders,
+
+              credentials:
+                "include",
+            }
+          );
       }
+
 
       return response;
     };
+
 
   /*
    * -------------------------------------------------------

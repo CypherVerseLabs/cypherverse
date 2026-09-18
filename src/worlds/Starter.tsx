@@ -9,23 +9,23 @@ import {
 } from "cyengine";
 
 import CloudySky from "ideas/CloudySky";
-import { Rain } from "ideas/Rain";
+import { Rain } from "ideas/environments/Rain";
 import Speaker from "ideas/players/Speaker";
 import Analytics from "ideas/Analytics";
-import Title from "ideas/Title";
+import Title from "ideas/inputs/Title";
 
 import { useApiDialogue } from "../ideas/Dialogues/useApiDialogue";
 import { introDialogue } from "ideas/Dialogues/intro";
 import { useAuthContext } from "ideas/context/AuthContext";
 
 import TemplateSelector from "ideas/TemplateSelector";
-import Words from "ideas/Text";
+import Words from "ideas/inputs/Text";
 
 import WorldCard from "ideas/WorldCard";
 import {
   useProjects,
   type Project,
-} from "ideas/projects/useProjects";
+} from "projects/useProjects";
 
 import type { Scene } from "../editor/scene/objectTypes";
 import Cyrus from "ideas/characters/Cyrus";
@@ -143,7 +143,7 @@ export default function Starter() {
       ===================================================== */}
 
       <Fog
-        color="#00ff00"
+        color="#6f766f"
         near={10}
         far={50}
       />
@@ -268,7 +268,7 @@ export default function Starter() {
           Do NOT duplicate it inside the dialogue.
       ===================================================== */}
 
-      <group position={[3, -0.5, 7]}>
+      <group position={[6, -0.5, 17]}>
         <TemplateSelector />
       </group>
 
@@ -287,7 +287,7 @@ export default function Starter() {
 
         {projectsLoading && (
           <Words
-            color="#00FF88"
+            color="#fb00ff"
             position={[0, 2.2, 0]}
           >
             Loading your worlds...
@@ -366,7 +366,7 @@ export default function Starter() {
 
         
       <group
-  position={[10 , 0, 5,]}
+  position={[20 , 0, 5,]}
 >
   <ManageSite
     projects={projects}
@@ -382,6 +382,11 @@ export default function Starter() {
       <group position-y={0.1}>
         <Ground />
       </group>
+
+      <Model
+        position={[0, 0.2, 1.5]}
+        src="./decentral.glb"
+      />
 
 
     </StandardReality>
