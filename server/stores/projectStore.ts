@@ -23,6 +23,7 @@ export interface Project {
   description?: string;
   template: ProjectTemplate;
   scene?: unknown;
+  parcelId?: string;
 
   slug?: string;
   publishedAt?: string;
@@ -51,6 +52,7 @@ function toProject(project: {
   scene: unknown;
   slug: string | null;
   publishedAt: Date | null;
+  parcelId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): Project {
@@ -71,6 +73,12 @@ function toProject(project: {
     project.scene !== undefined
       ? {
           scene: project.scene,
+        }
+      : {}),
+
+    ...(project.parcelId
+      ? {
+          parcelId: project.parcelId,
         }
       : {}),
 
@@ -296,6 +304,104 @@ export async function updateProject(
   return toProject(project);
 }
 
+
+/* =========================================================
+   DEPLOY PROJECT TO PARCEL
+========================================================= */
+
+export class ParcelProjectConflictError extends Error {
+  readonly code = "PARCEL_ALREADY_HAS_PROJECT";
+
+  constructor() {
+    super("Parcel already has an active project");
+    this.name = "ParcelProjectConflictError";
+  }
+}
+
+export async function deployProjectToParcel(
+  projectId: string,
+  ownerId: string,
+  parcelId: string
+): Promise<Project | undefined> {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const project = await tx.project.findFirst({
+            where: {
+              id: projectId,
+              ownerId,
+            },
+          });
+
+          if (!project) {
+            return undefined;
+          }
+
+          if (project.parcelId === parcelId) {
+            return toProject(project);
+          }
+
+          const parcel = await tx.parcel.findFirst({
+            where: {
+              id: parcelId,
+              ownerId,
+            },
+            select: {
+              id: true,
+              project: {
+                select: {
+                  id: true,
+                },
+              },
+            },
+          });
+
+          if (!parcel) {
+            throw new Error("PARCEL_NOT_FOUND");
+          }
+
+          if (parcel.project) {
+            throw new ParcelProjectConflictError();
+          }
+
+          try {
+            const updated = await tx.project.update({
+              where: {
+                id: project.id,
+              },
+              data: {
+                parcelId: parcel.id,
+              },
+            });
+
+            return toProject(updated);
+          } catch (error: any) {
+            if (error?.code === "P2002") {
+              throw new ParcelProjectConflictError();
+            }
+
+            throw error;
+          }
+        },
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+        }
+      );
+    } catch (error: any) {
+      if (error?.code === "P2034" && attempt < MAX_RETRIES - 1) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Project deployment transaction failed");
+}
 
 /* =========================================================
    CREATE ASSET
