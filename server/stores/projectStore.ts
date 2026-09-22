@@ -392,7 +392,7 @@ export async function deployProjectToParcel(
             return toProject(updated);
           } catch (error: any) {
             if (error?.code === "P2002") {
-              throw new ParcelProjectConflictError();
+              throw new ParcelProjectConflictError(\n                "PARCEL_ALREADY_HAS_PROJECT",\n                "Parcel already has an active project"\n              );
             }
 
             throw error;
