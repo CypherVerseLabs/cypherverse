@@ -32,6 +32,14 @@ import {
 import Scene from "../editor/scene/Scene";
 
 import {
+  fetchPublicProject,
+} from "../projects/useProjects";
+
+import type {
+  Project,
+} from "../projects/useProjects";
+
+import {
   useMarketplace,
 } from "../marketplace";
 
@@ -224,8 +232,47 @@ const selectedParcel =
     ]
   );
 
-const selectedProject =
+const selectedParcelProject =
   selectedParcel?.project ?? null;
+
+const [
+  loadedParcelProject,
+  setLoadedParcelProject,
+] = useState<Project | null>(null);
+
+useEffect(() => {
+  let cancelled = false;
+
+  setLoadedParcelProject(null);
+
+  const slug =
+    selectedParcelProject?.slug ?? null;
+
+  if (!slug) {
+    return () => {
+      cancelled = true;
+    };
+  }
+
+  void fetchPublicProject(slug)
+    .then((project) => {
+      if (!cancelled) {
+        setLoadedParcelProject(project);
+      }
+    })
+    .catch((error) => {
+      if (!cancelled) {
+        console.error(
+          "Failed to load parcel project scene:",
+          error
+        );
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [selectedParcelProject?.slug]);
 
 
 
@@ -662,9 +709,9 @@ const selectedProject =
           PUBLISHED PROJECT ON SELECTED PARCEL
           =================================================== */}
 
-      {selectedProject?.scene && (
+      {loadedParcelProject?.scene && (
         <EditorProvider
-          initialScene={selectedProject.scene}
+          initialScene={loadedParcelProject.scene}
           editorActive={false}
         >
           <Scene />
