@@ -26,6 +26,12 @@ import type {
 } from "../parcels/types";
 
 import {
+  EditorProvider,
+} from "../editor/context/EditorContext";
+
+import Scene from "../editor/scene/Scene";
+
+import {
   useMarketplace,
 } from "../marketplace";
 
@@ -651,6 +657,19 @@ const selectedProject =
       }}
 
     >
+
+      {/* ===================================================
+          PUBLISHED PROJECT ON SELECTED PARCEL
+          =================================================== */}
+
+      {selectedProject?.scene && (
+        <EditorProvider
+          initialScene={selectedProject.scene}
+          editorActive={false}
+        >
+          <Scene />
+        </EditorProvider>
+      )}
 
       {/* ===================================================
           WORLD
