@@ -255,6 +255,8 @@ type EditorProviderProps = {
   children: ReactNode;
 
   initialScene?: Scene;
+
+  editorActive?: boolean;
 };
 
 /* =========================================
@@ -494,6 +496,7 @@ function normalizeAssetPath(
 export function EditorProvider({
   children,
   initialScene,
+  editorActive: initialEditorActive = true,
 }: EditorProviderProps) {
 
   /* =======================================
@@ -578,7 +581,7 @@ export function EditorProvider({
   const [
     editorActive,
     setEditorActiveState,
-  ] = useState(true);
+  ] = useState(initialEditorActive);
 
   /* =======================================
      ADD ASSET
