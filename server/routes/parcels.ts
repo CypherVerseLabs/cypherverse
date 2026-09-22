@@ -193,6 +193,9 @@ router.get(
 
                     publishedAt:
                       parcel.project.publishedAt,
+
+                    scene:
+                      parcel.project.scene,
                   }
                 : null,
           })
