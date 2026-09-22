@@ -1,3 +1,5 @@
+import type { Scene } from "../editor/scene/objectTypes";
+
 /**
  * =========================================================
  * PARCEL TYPES
@@ -106,6 +108,12 @@ export interface ParcelProject {
    */
 
   publishedAt?: string | null;
+
+  /**
+   * Authoritative project scene.
+   */
+
+  scene?: Scene | null;
 }
 
 
