@@ -83,6 +83,7 @@ export async function getParcelById(
     template: true,
     slug: true,
     publishedAt: true,
+    scene: true,
   },
 },
 
@@ -133,6 +134,7 @@ export async function getParcelByEstateId(
     template: true,
     slug: true,
     publishedAt: true,
+    scene: true,
   },
 },
 
@@ -444,6 +446,7 @@ export async function getParcelsByOwnerId(
     template: true,
     slug: true,
     publishedAt: true,
+    scene: true,
   },
 },
 
@@ -858,6 +861,7 @@ export async function buyParcel(
     template: true,
     slug: true,
     publishedAt: true,
+    scene: true,
   },
 },
 
@@ -1023,6 +1027,7 @@ export async function reserveParcel(
     template: true,
     slug: true,
     publishedAt: true,
+    scene: true,
   },
 },
 
