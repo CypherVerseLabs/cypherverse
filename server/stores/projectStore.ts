@@ -306,11 +306,17 @@ export async function updateProject(
 ========================================================= */
 
 export class ParcelProjectConflictError extends Error {
-  readonly code = "PARCEL_ALREADY_HAS_PROJECT";
+  readonly code: string;
 
-  constructor() {
-    super("Parcel already has an active project");
+  constructor(
+    code:
+      | "PARCEL_ALREADY_HAS_PROJECT"
+      | "PROJECT_ALREADY_DEPLOYED",
+    message: string
+  ) {
+    super(message);
     this.name = "ParcelProjectConflictError";
+    this.code = code;
   }
 }
 
@@ -340,6 +346,13 @@ export async function deployProjectToParcel(
             return toProject(project);
           }
 
+          if (project.parcelId) {
+            throw new ParcelProjectConflictError(
+              "PROJECT_ALREADY_DEPLOYED",
+              "Project is already deployed to another parcel"
+            );
+          }
+
           const parcel = await tx.parcel.findFirst({
             where: {
               id: parcelId,
@@ -360,7 +373,10 @@ export async function deployProjectToParcel(
           }
 
           if (parcel.project) {
-            throw new ParcelProjectConflictError();
+            throw new ParcelProjectConflictError(
+              "PARCEL_ALREADY_HAS_PROJECT",
+              "Parcel already has an active project"
+            );
           }
 
           try {
