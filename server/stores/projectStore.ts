@@ -23,7 +23,7 @@ export interface Project {
   description?: string;
   template: ProjectTemplate;
   scene?: unknown;
-  parcelId?: string;
+  parcelId: string | null;
 
   slug?: string;
   publishedAt?: string;
@@ -76,11 +76,7 @@ function toProject(project: {
         }
       : {}),
 
-    ...(project.parcelId
-      ? {
-          parcelId: project.parcelId,
-        }
-      : {}),
+    parcelId: project.parcelId,
 
     ...(project.slug
       ? {
