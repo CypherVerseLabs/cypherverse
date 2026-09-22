@@ -238,6 +238,7 @@ export async function getParcels(options?: {
       template: true,
       slug: true,
       publishedAt: true,
+      scene: true,
     },
   },
 },
