@@ -35,7 +35,7 @@ export type Project = {
 
   scene?: Scene | null;
 
-  parcelId?: string | null;
+  parcelId: string | null;
 
   slug?: string;
 
