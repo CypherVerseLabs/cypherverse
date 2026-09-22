@@ -15,6 +15,8 @@ import {
   updateProject,
   deleteProject,
   publishProjectWithAssets,
+  deployProjectToParcel,
+  ParcelProjectConflictError,
 } from "../../stores/projectStore.js";
 
 import multer from "multer";
@@ -182,6 +184,64 @@ router.post(
         error:
           "Failed to create project",
       });
+    }
+  }
+);
+
+/**
+ * =========================================================
+ * POST /api/projects/:id/deploy
+ * =========================================================
+ */
+router.post(
+  "/:id/deploy",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const projectId = req.params.id;
+      const { parcelId } = req.body ?? {};
+
+      if (!projectId) {
+        return res.status(400).json({ error: "Project ID is required" });
+      }
+
+      if (typeof parcelId !== "string" || !parcelId.trim()) {
+        return res.status(400).json({ error: "Parcel ID is required" });
+      }
+
+      try {
+        const project = await deployProjectToParcel(
+          projectId,
+          req.user.id,
+          parcelId.trim()
+        );
+
+        if (!project) {
+          return res.status(404).json({ error: "Project not found" });
+        }
+
+        return res.json({ project });
+      } catch (error) {
+        if (error instanceof ParcelProjectConflictError) {
+          return res.status(409).json({
+            error: error.message,
+            code: error.code,
+          });
+        }
+
+        if (error instanceof Error && error.message === "PARCEL_NOT_FOUND") {
+          return res.status(404).json({ error: "Parcel not found" });
+        }
+
+        throw error;
+      }
+    } catch (error) {
+      console.error("Deploy project error:", error);
+      return res.status(500).json({ error: "Failed to deploy project" });
     }
   }
 );
