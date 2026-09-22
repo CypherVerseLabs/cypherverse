@@ -191,18 +191,37 @@ export default function CypherVerse() {
   ]);
 
 
-  /**
-   * =======================================================
-   * SELECTED PARCEL
-   * =======================================================
-   */
+/**
+ * =======================================================
+ * SELECTED PARCEL
+ * =======================================================
+ */
 
-  const [
-    selectedParcelId,
-    setSelectedParcelId,
-  ] = useState<string | null>(
-    null
+const [
+  selectedParcelId,
+  setSelectedParcelId,
+] = useState<string | null>(
+  null
+);
+
+const selectedParcel =
+  useMemo(
+    () =>
+      parcels.find(
+        parcel =>
+          parcel.id ===
+          selectedParcelId
+      ) ?? null,
+    [
+      parcels,
+      selectedParcelId,
+    ]
   );
+
+const selectedProject =
+  selectedParcel?.project ?? null;
+
+
 
 
   /**

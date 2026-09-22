@@ -38,7 +38,6 @@ router.get(
     res: Response
   ) => {
     try {
-
       /**
        * =====================================================
        * PARSE COORDINATE BOUNDS
@@ -46,23 +45,21 @@ router.get(
        */
 
       const parseNumber = (
-  value: unknown
-): number | undefined => {
-  if (
-    typeof value !== "string" &&
-    typeof value !== "number"
-  ) {
-    return undefined;
-  }
+        value: unknown
+      ): number | undefined => {
+        if (
+          typeof value !== "string" &&
+          typeof value !== "number"
+        ) {
+          return undefined;
+        }
 
-  const parsed = Number(value);
+        const parsed = Number(value);
 
-  return Number.isFinite(parsed)
-    ? parsed
-    : undefined;
-};
-
-
+        return Number.isFinite(parsed)
+          ? parsed
+          : undefined;
+      };
 
       const minX =
         parseNumber(
@@ -83,7 +80,6 @@ router.get(
         parseNumber(
           req.query.maxY
         );
-
 
       /**
        * =====================================================
@@ -113,7 +109,6 @@ router.get(
         });
       }
 
-
       /**
        * =====================================================
        * LOAD PARCELS
@@ -128,14 +123,17 @@ router.get(
           maxY,
         });
 
-
       /**
        * =====================================================
-       * SERIALIZE DECIMAL PRICE
+       * SERIALIZE PARCELS
        * =====================================================
        *
        * Prisma Decimal values should be converted before
        * sending them to the browser.
+       *
+       * Project data is intentionally lightweight.
+       * The full project scene should be loaded separately
+       * through /api/projects/:id.
        */
 
       const serializedParcels =
@@ -174,9 +172,31 @@ router.get(
 
             tokenId:
               parcel.tokenId,
+
+            project:
+              parcel.project
+                ? {
+                    id:
+                      parcel.project.id,
+
+                    name:
+                      parcel.project.name,
+
+                    description:
+                      parcel.project.description,
+
+                    template:
+                      parcel.project.template,
+
+                    slug:
+                      parcel.project.slug,
+
+                    publishedAt:
+                      parcel.project.publishedAt,
+                  }
+                : null,
           })
         );
-
 
       /**
        * =====================================================
@@ -190,7 +210,6 @@ router.get(
       });
 
     } catch (error) {
-
       console.error(
         "Get parcels error:",
         error
@@ -216,7 +235,6 @@ router.get(
     res: Response
   ) => {
     try {
-
       if (!req.user?.id) {
         return res.status(401).json({
           error: "Unauthorized",
@@ -233,7 +251,6 @@ router.get(
       });
 
     } catch (error) {
-
       console.error(
         "Get owned parcels error:",
         error
@@ -258,7 +275,6 @@ router.get(
     res: Response
   ) => {
     try {
-
       const parcelId =
         req.params.id;
 
@@ -286,7 +302,6 @@ router.get(
       });
 
     } catch (error) {
-
       console.error(
         "Get parcel error:",
         error

@@ -75,15 +75,17 @@ export async function getParcelById(
         },
       },
 
-      projects: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          slug: true,
-          publishedAt: true,
-        },
-      },
+      project: {
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    template: true,
+    slug: true,
+    publishedAt: true,
+  },
+},
+
     },
   });
 }
@@ -123,14 +125,17 @@ export async function getParcelByEstateId(
         },
       },
 
-      projects: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          publishedAt: true,
-        },
-      },
+      project: {
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    template: true,
+    slug: true,
+    publishedAt: true,
+  },
+},
+
     },
   });
 }
@@ -203,26 +208,38 @@ export async function getParcels(options?: {
     ],
 
     include: {
-      owner: {
-        select: {
-          id: true,
-          address: true,
-          username: true,
-        },
-      },
-
-      listings: {
-        where: {
-          active: true,
-        },
-
-        orderBy: {
-          createdAt: "desc",
-        },
-
-        take: 1,
-      },
+  owner: {
+    select: {
+      id: true,
+      address: true,
+      username: true,
     },
+  },
+
+  listings: {
+    where: {
+      active: true,
+    },
+
+    orderBy: {
+      createdAt: "desc",
+    },
+
+    take: 1,
+  },
+
+  project: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      template: true,
+      slug: true,
+      publishedAt: true,
+    },
+  },
+},
+
   });
 }
 
@@ -419,14 +436,17 @@ export async function getParcelsByOwnerId(
         },
       },
 
-      projects: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          publishedAt: true,
-        },
-      },
+      project: {
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    template: true,
+    slug: true,
+    publishedAt: true,
+  },
+},
+
     },
   });
 }
@@ -830,15 +850,17 @@ export async function buyParcel(
             },
           },
 
-          projects: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              slug: true,
-              publishedAt: true,
-            },
-          },
+          project: {
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    template: true,
+    slug: true,
+    publishedAt: true,
+  },
+},
+
         },
       });
     }
@@ -993,15 +1015,17 @@ export async function reserveParcel(
             },
           },
 
-          projects: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              slug: true,
-              publishedAt: true,
-            },
-          },
+          project: {
+  select: {
+    id: true,
+    name: true,
+    description: true,
+    template: true,
+    slug: true,
+    publishedAt: true,
+  },
+},
+
         },
       });
     }

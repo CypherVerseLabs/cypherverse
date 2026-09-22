@@ -121,7 +121,8 @@ model Project {
   publishedAt DateTime?
 
   // Optional parcel this project is built on
-  parcelId String?
+  // One parcel can have at most one project.
+  parcelId String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -135,7 +136,6 @@ model Project {
   @@id([id])
   @@index([ownerId])
   @@index([publishedAt])
-  @@index([parcelId])
 }
 
 // =========================================================
@@ -216,7 +216,8 @@ model Parcel {
 
   reservations ParcelReservation[]
 
-  projects Project[]
+  // One parcel can have zero or one project
+  project Project?
 
   // -------------------------------------------------------
   // Marketplace purchase relations

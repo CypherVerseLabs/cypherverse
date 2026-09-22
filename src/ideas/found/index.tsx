@@ -76,7 +76,7 @@ export const scene: Scene = {
       },
 
       props: {
-        text: "welcome to hound",
+        text: "welcome to Found",
         image: "",
       },
     },
