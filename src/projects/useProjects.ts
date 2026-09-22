@@ -35,6 +35,8 @@ export type Project = {
 
   scene?: Scene | null;
 
+  parcelId?: string | null;
+
   slug?: string;
 
   createdAt: string;
@@ -171,6 +173,11 @@ function normalizeProject(
       : "editor",
 
   scene,
+
+  parcelId:
+    raw.parcelId ??
+    raw.parcel_id ??
+    null,
 
   slug:
     raw.slug ||
@@ -418,6 +425,42 @@ export function useProjects() {
 
 
   /* =======================================================
+     DEPLOY PROJECT
+  ======================================================= */
+
+  const deployProject =
+    useCallback(
+      async (
+        projectId: string,
+        parcelId: string
+      ): Promise<Project> => {
+        const response = await authFetch(
+          API_URL + "/api/projects/" + projectId + "/deploy",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ parcelId }),
+          }
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || !data?.project) {
+          throw new Error(
+            data?.error ||
+            data?.message ||
+            "Failed to deploy project (" + response.status + ")"
+          );
+        }
+
+        return normalizeProject(data.project);
+      },
+      [authFetch]
+    );
+
+  /* =======================================================
      AUTH CHANGE
   ======================================================= */
 
@@ -468,5 +511,7 @@ export function useProjects() {
 
     refreshProjects:
       loadProjects,
+
+    deployProject,
   };
 }
