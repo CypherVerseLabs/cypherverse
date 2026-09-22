@@ -198,6 +198,30 @@ function normalizeProject(
 
 
 /* =========================================================
+   PUBLIC PROJECT LOADER
+========================================================= */
+
+export async function fetchPublicProject(
+  slug: string
+): Promise<Project> {
+  const response = await fetch(
+    API_URL + "/api/public/projects/" + encodeURIComponent(slug)
+  );
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.project) {
+    throw new Error(
+      data?.error ||
+      data?.message ||
+      "Failed to load public project (" + response.status + ")"
+    );
+  }
+
+  return normalizeProject(data.project);
+}
+
+/* =========================================================
    HOOK
 ========================================================= */
 
