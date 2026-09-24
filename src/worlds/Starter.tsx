@@ -200,7 +200,8 @@ export default function Starter() {
           <Speaker position={[1, 0, -4]} />
 
           <Cyrus
-            position={[0, 0.0, 0]}
+            position={[1, 0.0, -25]}
+            
             dialogue="i'm daydreaming ... and i want to build what i see!"
           />
         </group>
@@ -212,7 +213,7 @@ export default function Starter() {
 
       <group>
         <Dialogue
-          position={[1, 1.3, 0.3]}
+          position={[-3, 1.3, -30.3]}
           dialogue={introDialogue}
           side="right"
           face
@@ -242,7 +243,7 @@ export default function Starter() {
       ===================================================== */}
 
       <Dialogue
-        position={[9, 1.3, 4.3]}
+        position={[-1, 1.0, -8.3]}
         dialogue={dialogue}
         side="right"
         face
@@ -268,7 +269,7 @@ export default function Starter() {
           Do NOT duplicate it inside the dialogue.
       ===================================================== */}
 
-      <group position={[6, -0.5, 17]}>
+      <group position={[-5, -0.3, -10]}>
         <TemplateSelector />
       </group>
 

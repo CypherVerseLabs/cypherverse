@@ -1,4 +1,3 @@
-
 import {
   Dispatch,
   SetStateAction,
@@ -23,7 +22,9 @@ type EditorLeftPanelProps = {
   leftPanelCollapsed: boolean;
 
   setLeftPanelCollapsed:
-    Dispatch<SetStateAction<boolean>>;
+    Dispatch<
+      SetStateAction<boolean>
+    >;
 
   scene: any;
 
@@ -45,7 +46,10 @@ type EditorLeftPanelProps = {
 
   updateTransform: (
     id: string,
-    transform: Partial<SceneObject["transform"]>
+    transform:
+      Partial<
+        SceneObject["transform"]
+      >
   ) => void;
 
   clipboardObject?: SceneObject;
@@ -76,29 +80,17 @@ type EditorLeftPanelProps = {
 ========================================= */
 
 export default function EditorLeftPanel({
-
   leftPanelCollapsed,
-
   setLeftPanelCollapsed,
-
   selectedObject,
-
   selectedDefinition,
-
   updateObject,
-
   updateTransform,
-
   clipboardObject,
-
   setClipboardObject,
-
   addObject,
-
   duplicateObject,
-
   removeObject,
-
 }: EditorLeftPanelProps) {
 
 
@@ -106,8 +98,9 @@ export default function EditorLeftPanel({
      COLLAPSED
   ======================================= */
 
-  if (leftPanelCollapsed) {
-
+  if (
+    leftPanelCollapsed
+  ) {
     return (
       <div
         style={{
@@ -350,7 +343,6 @@ export default function EditorLeftPanel({
       ================================= */}
 
       {!selectedObject && (
-
         <div
           style={{
             padding:
@@ -372,17 +364,18 @@ export default function EditorLeftPanel({
           Select an object to edit
           its properties.
         </div>
-
       )}
 
 
       {/* =================================
-          SELECTED IDEA
+          SELECTED OBJECT
       ================================= */}
 
       {selectedObject && (
-
         <>
+          {/* =================================
+              IDEA HEADER
+          ================================= */}
 
           <div
             style={{
@@ -446,36 +439,308 @@ export default function EditorLeftPanel({
           </div>
 
 
-          {/* =============================
+          {/* =================================
+              DEBUG ID / TYPE
+          ================================= */}
+
+          <DebugSection
+            title="Debug"
+          >
+
+            <DebugRow
+              label="ID"
+              value={
+                selectedObject.id
+              }
+            />
+
+            <DebugRow
+              label="Type"
+              value={
+                selectedObject.type
+              }
+            />
+
+            <DebugRow
+              label="Name"
+              value={
+                selectedObject.name ??
+                "—"
+              }
+            />
+
+          </DebugSection>
+
+
+          {/* =================================
+              TRANSFORM DEBUG
+          ================================= */}
+
+          <DebugSection
+            title="Transform"
+          >
+
+            <DebugVector
+              label="Position"
+              value={
+                selectedObject
+                  .transform
+                  .position
+              }
+            />
+
+            <DebugVector
+              label="Rotation"
+              value={
+                selectedObject
+                  .transform
+                  .rotation
+              }
+            />
+
+            <DebugVector
+              label="Scale"
+              value={
+                selectedObject
+                  .transform
+                  .scale
+              }
+            />
+
+          </DebugSection>
+
+
+          {/* =================================
+              SVG DEBUG
+          ================================= */}
+
+          {hasSvg(
+            selectedObject
+          ) && (
+            <DebugSection
+              title="SVG"
+            >
+              <DebugRow
+                label="SVG"
+                value={
+                  getSvgValue(
+                    selectedObject
+                  )
+                }
+              />
+            </DebugSection>
+          )}
+
+
+          {/* =================================
+              SPEAKER DEBUG
+          ================================= */}
+
+          {selectedObject.type ===
+            "speaker" && (
+            <DebugSection
+              title="Speaker"
+            >
+
+              <DebugRow
+                label="Audio"
+                value={
+                  String(
+                    selectedObject
+                      .props
+                      .audioUrl ??
+                    "—"
+                  )
+                }
+              />
+
+              <DebugRow
+                label="Distance"
+                value={
+                  String(
+                    selectedObject
+                      .props
+                      .distance ??
+                    "—"
+                  )
+                }
+              />
+
+              <DebugRow
+                label="Volume"
+                value={
+                  String(
+                    selectedObject
+                      .props
+                      .volume ??
+                    "—"
+                  )
+                }
+              />
+
+              <DebugRow
+                label="Props"
+                value={
+                  JSON.stringify(
+                    selectedObject.props
+                  )
+                }
+              />
+
+            </DebugSection>
+          )}
+
+
+          {/* =================================
               PROPERTIES
-          ============================= */}
+          ================================= */}
 
           {selectedDefinition && (
-
             <PropertyEditor
-              object={selectedObject}
-              definition={selectedDefinition}
-              onChange={(key, value) => {
+              object={
+                selectedObject
+              }
+
+              definition={
+                selectedDefinition
+              }
+
+              onChange={(
+                key,
+                value
+              ) => {
                 updateObject(
                   selectedObject.id,
                   {
                     props: {
-                      ...(selectedObject.props as Record<string, unknown>),
-                      [key]: value,
+                      ...(selectedObject.props as Record<
+                        string,
+                        unknown
+                      >),
+
+                      [key]:
+                        value,
                     },
                   } as Partial<SceneObject>
                 );
               }}
             />
-
-
-
           )}
 
 
-          {/* =============================
+          {/* =================================
+              TRANSFORM ACTIONS
+          ================================= */}
+
+          <div
+            style={{
+              marginTop:
+                12,
+
+              marginBottom:
+                10,
+
+              padding:
+                10,
+
+              border:
+                "1px solid #d7d7d7",
+
+              borderRadius:
+                7,
+
+              background:
+                "#f4f4f4",
+            }}
+          >
+
+            <div
+              style={{
+                fontSize:
+                  10,
+
+                fontWeight:
+                  700,
+
+                color:
+                  "#666",
+
+                marginBottom:
+                  7,
+              }}
+            >
+              Transform
+            </div>
+
+
+            <TransformInput
+              label="Position"
+              value={
+                selectedObject
+                  .transform
+                  .position
+              }
+              onChange={(
+                value
+              ) =>
+                updateTransform(
+                  selectedObject.id,
+                  {
+                    position:
+                      value,
+                  }
+                )
+              }
+            />
+
+
+            <TransformInput
+              label="Rotation"
+              value={
+                selectedObject
+                  .transform
+                  .rotation
+              }
+              onChange={(
+                value
+              ) =>
+                updateTransform(
+                  selectedObject.id,
+                  {
+                    rotation:
+                      value,
+                  }
+                )
+              }
+            />
+
+
+            <TransformInput
+              label="Scale"
+              value={
+                selectedObject
+                  .transform
+                  .scale
+              }
+              onChange={(
+                value
+              ) =>
+                updateTransform(
+                  selectedObject.id,
+                  {
+                    scale:
+                      value,
+                  }
+                )
+              }
+            />
+
+          </div>
+
+
+          {/* =================================
               ACTIONS
-          ============================= */}
+          ================================= */}
 
           <div
             style={{
@@ -497,16 +762,16 @@ export default function EditorLeftPanel({
               type="button"
 
               onClick={() => {
-
                 setClipboardObject(
                   structuredClone(
                     selectedObject
                   )
                 );
-
               }}
 
-              style={actionButtonStyle}
+              style={
+                actionButtonStyle
+              }
             >
               Copy
             </button>
@@ -520,37 +785,40 @@ export default function EditorLeftPanel({
               }
 
               onClick={() => {
-
                 if (
                   !clipboardObject
                 ) {
                   return;
                 }
 
-
                 const pasted =
                   structuredClone(
                     clipboardObject
                   );
-
 
                 pasted.id =
                   `${pasted.type}-${Math.random()
                     .toString(36)
                     .slice(2, 10)}`;
 
-
                 pasted.transform.position = [
-                  pasted.transform.position[0] + 0.75,
-                  pasted.transform.position[1],
-                  pasted.transform.position[2],
-                ];
+                  pasted
+                    .transform
+                    .position[0] +
+                    0.75,
 
+                  pasted
+                    .transform
+                    .position[1],
+
+                  pasted
+                    .transform
+                    .position[2],
+                ];
 
                 addObject(
                   pasted
                 );
-
               }}
 
               style={{
@@ -592,11 +860,9 @@ export default function EditorLeftPanel({
               type="button"
 
               onClick={() => {
-
                 removeObject(
                   selectedObject.id
                 );
-
               }}
 
               style={{
@@ -613,12 +879,206 @@ export default function EditorLeftPanel({
             </button>
 
           </div>
-
         </>
-
       )}
+    </div>
+  );
+}
+
+
+/* =========================================
+   DEBUG HELPERS
+========================================= */
+
+function DebugSection({
+  title,
+  children,
+}: {
+  title: string;
+
+  children:
+    | React.ReactNode
+    | React.ReactNode[];
+}) {
+  return (
+    <div
+      style={{
+        marginBottom:
+          10,
+
+        padding:
+          "8px 9px",
+
+        background:
+          "#eeeeee",
+
+        border:
+          "1px solid #d7d7d7",
+
+        borderRadius:
+          7,
+      }}
+    >
+
+      <div
+        style={{
+          fontSize:
+            9,
+
+          fontWeight:
+            800,
+
+          color:
+            "#666",
+
+          textTransform:
+            "uppercase",
+
+          letterSpacing:
+            0.5,
+
+          marginBottom:
+            6,
+        }}
+      >
+        {title}
+      </div>
+
+      {children}
 
     </div>
+  );
+}
+
+
+function DebugRow({
+  label,
+  value,
+}: {
+  label: string;
+
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        display:
+          "grid",
+
+        gridTemplateColumns:
+          "62px minmax(0, 1fr)",
+
+        gap:
+          6,
+
+        marginBottom:
+          4,
+
+        fontSize:
+          9,
+
+        lineHeight:
+          1.35,
+      }}
+    >
+
+      <span
+        style={{
+          color:
+            "#777",
+
+          fontWeight:
+            700,
+        }}
+      >
+        {label}
+      </span>
+
+      <span
+        style={{
+          color:
+            "#333",
+
+          overflowWrap:
+            "anywhere",
+        }}
+      >
+        {value}
+      </span>
+
+    </div>
+  );
+}
+
+
+function DebugVector({
+  label,
+  value,
+}: {
+  label: string;
+
+  value: [
+    number,
+    number,
+    number
+  ];
+}) {
+  return (
+    <DebugRow
+      label={label}
+      value={
+        `X ${formatNumber(
+          value[0]
+        )}  Y ${formatNumber(
+          value[1]
+        )}  Z ${formatNumber(
+          value[2]
+        )}`
+      }
+    />
+  );
+}
+
+
+function formatNumber(
+  value: number
+): string {
+  return Number.isFinite(
+    value
+  )
+    ? value.toFixed(3)
+    : "NaN";
+}
+
+
+function hasSvg(
+  object: SceneObject
+): boolean {
+  return Boolean(
+    (
+      object.props as Record<
+        string,
+        unknown
+      >
+    ).svg
+  );
+}
+
+
+function getSvgValue(
+  object: SceneObject
+): string {
+  const value =
+    (
+      object.props as Record<
+        string,
+        unknown
+      >
+    ).svg;
+
+  return String(
+    value ??
+      "—"
   );
 }
 
@@ -627,32 +1087,195 @@ export default function EditorLeftPanel({
    ACTION BUTTON
 ========================================= */
 
-const actionButtonStyle: React.CSSProperties = {
-  width:
-    "100%",
+const actionButtonStyle:
+  React.CSSProperties = {
+    width:
+      "100%",
 
-  height:
-    32,
+    height:
+      32,
 
-  border:
-    "1px solid #d0d0d0",
+    border:
+      "1px solid #d0d0d0",
 
-  borderRadius:
-    6,
+    borderRadius:
+      6,
 
-  background:
-    "#f4f4f4",
+    background:
+      "#f4f4f4",
 
-  color:
-    "#333",
+    color:
+      "#333",
 
-  cursor:
-    "pointer",
+    cursor:
+      "pointer",
 
-  fontSize:
-    11,
+    fontSize:
+      11,
 
-  fontWeight:
-    600,
-};
+    fontWeight:
+      600,
+  };
 
+
+/* =========================================
+   TRANSFORM INPUT
+========================================= */
+
+function TransformInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+
+  value: [
+    number,
+    number,
+    number
+  ];
+
+  onChange: (
+    value: [
+      number,
+      number,
+      number
+    ]
+  ) => void;
+}) {
+  return (
+    <div
+      style={{
+        marginBottom:
+          8,
+      }}
+    >
+
+      <div
+        style={{
+          fontSize:
+            9,
+
+          color:
+            "#777",
+
+          marginBottom:
+            4,
+
+          fontWeight:
+            700,
+        }}
+      >
+        {label}
+      </div>
+
+
+      <div
+        style={{
+          display:
+            "grid",
+
+          gridTemplateColumns:
+            "repeat(3, 1fr)",
+
+          gap:
+            4,
+        }}
+      >
+
+        {(
+          ["X", "Y", "Z"] as const
+        ).map(
+          (
+            axis,
+            index
+          ) => (
+            <input
+              key={
+                axis
+              }
+
+              type="number"
+
+              step="0.01"
+
+              value={
+                value[index]
+              }
+
+              onChange={(
+                event
+              ) => {
+                const next =
+                  Number(
+                    event.target
+                      .value
+                  );
+
+                if (
+                  !Number.isFinite(
+                    next
+                  )
+                ) {
+                  return;
+                }
+
+                const updated =
+                  [
+                    ...value,
+                  ] as [
+                    number,
+                    number,
+                    number
+                  ];
+
+                updated[
+                  index
+                ] =
+                  next;
+
+                onChange(
+                  updated
+                );
+              }}
+
+              aria-label={
+                `${label} ${axis}`
+              }
+
+              style={{
+                boxSizing:
+                  "border-box",
+
+                width:
+                  "100%",
+
+                padding:
+                  "6px",
+
+                border:
+                  "1px solid #d0d0d0",
+
+                borderRadius:
+                  5,
+
+                background:
+                  "#fff",
+
+                color:
+                  "#222",
+
+                fontSize:
+                  9,
+
+                outline:
+                  "none",
+              }}
+            />
+          )
+        )}
+
+      </div>
+    </div>
+  );
+}

@@ -4,7 +4,8 @@ import {
 
 import {
   ReactElement,
-  useRef,
+  useCallback,
+  useState,
 } from "react";
 
 import {
@@ -46,7 +47,29 @@ export default function SceneObject({
     editorActive,
   } = useEditor();
 
-  const groupRef = useRef<Group>(null);
+  /*
+   * The actual Three.js Group for this SceneObject.
+   *
+   * TransformControls attaches directly to this
+   * object when this SceneObject is selected.
+   */
+  const [
+    gizmoTarget,
+    setGizmoTarget,
+  ] = useState<Group | null>(null);
+
+  /*
+   * Keep the callback ref stable.
+   *
+   * This avoids the React ref callback being
+   * recreated on every render.
+   */
+  const setGroupRef = useCallback(
+    (node: Group | null): void => {
+      setGizmoTarget(node);
+    },
+    []
+  );
 
   const isSelected =
     selectedId === object.id;
@@ -57,12 +80,19 @@ export default function SceneObject({
     scale,
   } = object.transform;
 
+  /*
+   * Scene hierarchy remains unchanged.
+   */
   const children =
     scene.objects.filter(
       (child) =>
         child.parentId === object.id
     );
 
+
+  /* =========================================
+     OBJECT SELECTION
+  ========================================= */
 
   const handleClick = (
     event: ThreeEvent<MouseEvent>
@@ -74,11 +104,33 @@ export default function SceneObject({
     event.stopPropagation();
 
     select(object.id);
+
+    if (
+      process.env.NODE_ENV ===
+      "development"
+    ) {
+      console.log(
+        "[Editor] Selected Idea:",
+        {
+          id: object.id,
+          type: object.type,
+          position: object.transform.position,
+          rotation: object.transform.rotation,
+          scale: object.transform.scale,
+          props: object.props,
+        }
+      );
+    }
   };
 
 
+  /* =========================================
+     GIZMO TRANSFORM → EDITOR STATE
+  ========================================= */
+
   const handleObjectChange = () => {
-    const group = groupRef.current;
+    const group =
+      gizmoTarget;
 
     if (!group) {
       return;
@@ -104,16 +156,41 @@ export default function SceneObject({
       ],
     };
 
+    /*
+     * EditorContext remains the single
+     * authoritative transform state.
+     */
     updateTransform(
       object.id,
       transform
     );
+
+    if (
+      process.env.NODE_ENV ===
+      "development"
+    ) {
+      console.log(
+        "[Editor] Gizmo transform:",
+        {
+          id: object.id,
+          type: object.type,
+          mode: transformMode,
+          position: transform.position,
+          rotation: transform.rotation,
+          scale: transform.scale,
+        }
+      );
+    }
   };
 
 
+  /* =========================================
+     OBJECT CONTENT
+  ========================================= */
+
   const content = (
     <group
-      ref={groupRef}
+      ref={setGroupRef}
       name={`scene-object-${object.id}`}
       position={position}
       rotation={rotation}
@@ -151,35 +228,89 @@ export default function SceneObject({
   );
 
 
+  /*
+   * Unselected objects render normally.
+   *
+   * No gizmo exists unless this object
+   * is actually selected.
+   */
   if (
     !isSelected ||
     !editorActive ||
-    object.locked
+    object.locked ||
+    !gizmoTarget
   ) {
     return content;
   }
 
 
+  /*
+   * IMPORTANT:
+   *
+   * TransformControls is a sibling of the
+   * selected Group and explicitly targets
+   * that Group.
+   *
+   * It no longer wraps the object's content.
+   */
   return (
-    <TransformControls
-      mode={transformMode}
-      enabled={
-        editorActive &&
-        isSelected &&
-        !object.locked
-      }
-      onMouseDown={() => {
-        beginTransform(object.id);
-      }}
-      onObjectChange={
-        handleObjectChange
-      }
-      onMouseUp={() => {
-        endTransform();
-      }}
-    >
+    <>
       {content}
-    </TransformControls>
+
+      <TransformControls
+        object={
+          gizmoTarget
+        }
+
+        mode={
+          transformMode
+        }
+
+        enabled={
+          editorActive &&
+          isSelected &&
+          !object.locked
+        }
+
+        onMouseDown={() => {
+          beginTransform(
+            object.id
+          );
+
+          if (
+            process.env.NODE_ENV ===
+            "development"
+          ) {
+            console.log(
+              "[Editor] Gizmo mounted:",
+              {
+                id: object.id,
+                type: object.type,
+                mode: transformMode,
+              }
+            );
+          }
+        }}
+
+        onObjectChange={
+          handleObjectChange
+        }
+
+        onMouseUp={() => {
+          endTransform();
+
+          if (
+            process.env.NODE_ENV ===
+            "development"
+          ) {
+            console.log(
+              "[Editor] Gizmo transform ended:",
+              object.id
+            );
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -213,19 +344,20 @@ function EditorSelectionMesh(): ReactElement {
 
 
 /* =========================================
-   SELECTED OBJECT OUTLINE
+   SELECTED OBJECT HIGHLIGHT
 ========================================= */
 
 function SelectionIndicator(): ReactElement {
   return (
     <mesh
+      name="editor-selected-indicator"
       raycast={() => null}
     >
       <boxGeometry
         args={[
-          1.05,
-          1.05,
-          1.05,
+          1.08,
+          1.08,
+          1.08,
         ]}
       />
 
@@ -233,8 +365,9 @@ function SelectionIndicator(): ReactElement {
         color="#4c7dff"
         wireframe
         transparent
-        opacity={0.35}
+        opacity={0.55}
         depthTest={false}
+        depthWrite={false}
       />
     </mesh>
   );

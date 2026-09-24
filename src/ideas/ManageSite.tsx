@@ -12,40 +12,34 @@ import {
 
 import { Text } from "@react-three/drei";
 
-import type { Project } from "../projects/useProjects";
+import type {
+  Project,
+} from "../projects/useProjects";
+
 import Words from "./inputs/Text";
 import Title from "./inputs/Title";
 
+
 type ManageSiteProps = {
   projects: Project[];
+
   loading?: boolean;
+
   error?: string | null;
 };
+
 
 /*
  * =========================================================
  * MANAGE SITE
  * =========================================================
  *
- * This component manages the user's ACTUAL projects.
+ * This component manages the authenticated user's projects.
  *
- * It is intentionally separate from TemplateSelector.
+ * Project ownership is NOT determined here.
  *
- * TemplateSelector:
- *
- *   Templates -> create project
- *
- * ManageSite:
- *
- *   Projects -> manage / visit project
- *
- * IMPORTANT:
- *
- * We do NOT require project.scene here.
- *
- * A project is a project because it has an ID.
- *
- * The scene is only the website/world content.
+ * The backend /api/projects endpoints enforce ownership
+ * using the authenticated user's JWT.
  * =========================================================
  */
 
@@ -65,18 +59,10 @@ export default function ManageSite({
     setIndex,
   ] = useState(0);
 
+
   /*
    * =======================================================
-   * URL
-   * =======================================================
-   *
-   * Your current Project type does not contain a URL field.
-   *
-   * Therefore we temporarily derive the site URL from the
-   * project ID.
-   *
-   * Once the backend has a real slug/url column, replace
-   * this with project.slug / project.url.
+   * PROJECT SLUG
    * =======================================================
    */
 
@@ -84,6 +70,7 @@ export default function ManageSite({
     siteUrl,
     setSiteUrl,
   ] = useState("");
+
 
   /*
    * =======================================================
@@ -103,6 +90,7 @@ export default function ManageSite({
     null
   );
 
+
   /*
    * =======================================================
    * CURRENT PROJECT
@@ -111,6 +99,7 @@ export default function ManageSite({
 
   const project =
     projects[index];
+
 
   /*
    * =======================================================
@@ -124,7 +113,10 @@ export default function ManageSite({
       return;
     }
 
-    if (index >= projects.length) {
+    if (
+      index >=
+      projects.length
+    ) {
       setIndex(
         projects.length - 1
       );
@@ -134,6 +126,7 @@ export default function ManageSite({
     index,
   ]);
 
+
   /*
    * =======================================================
    * LOAD CURRENT PROJECT URL
@@ -141,19 +134,20 @@ export default function ManageSite({
    */
 
   useEffect(() => {
-  if (!project) {
-    setSiteUrl("");
-    return;
-  }
+    if (!project) {
+      setSiteUrl("");
+      return;
+    }
 
-  setSiteUrl(
-    project.slug ?? ""
-  );
+    setSiteUrl(
+      project.slug ?? ""
+    );
 
-  setSaveMessage(null);
-}, [
-  project,
-]);
+    setSaveMessage(null);
+  }, [
+    project,
+  ]);
+
 
   /*
    * =======================================================
@@ -173,6 +167,7 @@ export default function ManageSite({
     );
   };
 
+
   /*
    * =======================================================
    * PREVIOUS PROJECT
@@ -191,101 +186,132 @@ export default function ManageSite({
     );
   };
 
+
+  /*
+   * =======================================================
+   * OPEN EDITOR
+   * =======================================================
+   *
+   * The project ID is the authoritative identity.
+   *
+   * The editor will then perform:
+   *
+   *   authenticated GET /api/projects/:id
+   *
+   * The backend verifies that the current authenticated
+   * user owns the project.
+   * =======================================================
+   */
+
+  const editProject = () => {
+    if (!project?.id) {
+      return;
+    }
+
+    window.location.href =
+      `/editor?projectId=${encodeURIComponent(
+        project.id
+      )}`;
+  };
+
+
   /*
    * =======================================================
    * SAVE URL
    * =======================================================
-   *
-   * NOTE:
-   *
-   * There is currently no backend URL endpoint exposed
-   * through Project/useProjects.
-   *
-   * Therefore this validates the URL and prepares the UI,
-   * but does not pretend that it has been persisted.
-   *
-   * We can wire this to:
-   *
-   * PATCH /api/projects/:id
-   *
-   * once that backend route exists.
-   * =======================================================
    */
 
   const saveUrl = async () => {
-  if (!project) {
-    return;
-  }
-
-  const value =
-    siteUrl
-      .trim()
-      .replace(/^\/+|\/+$/g, "")
-      .toLowerCase();
-
-  if (!value) {
-    setSaveMessage(
-      "Please enter a website URL."
-    );
-
-    return;
-  }
-
-  setSaving(true);
-  setSaveMessage(null);
-
-  try {
-    const response =
-      await fetch(
-        `/api/projects/${project.id}`,
-        {
-          method: "PATCH",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          credentials: "include",
-
-          body: JSON.stringify({
-            slug: value,
-          }),
-        }
-      );
-
-    const data =
-      await response.json();
-
-    if (!response.ok) {
-      throw new Error(
-        data?.error ||
-          "Unable to save website URL."
-      );
+    if (!project) {
+      return;
     }
 
-    setSiteUrl(
-      data.project.slug
-    );
+    const value =
+      siteUrl
+        .trim()
+        .replace(
+          /^\/+|\/+$/g,
+          ""
+        )
+        .toLowerCase();
 
-    setSaveMessage(
-      "Website URL saved."
-    );
-  } catch (error) {
-    console.error(
-      "Save URL failed:",
-      error
-    );
+    if (!value) {
+      setSaveMessage(
+        "Please enter a website URL."
+      );
 
-    setSaveMessage(
-      error instanceof Error
-        ? error.message
-        : "Unable to save the website URL."
-    );
-  } finally {
-    setSaving(false);
-  }
-};
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const response =
+        await fetch(
+          `/api/projects/${project.id}`,
+          {
+            method: "PATCH",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            credentials:
+              "include",
+
+            body:
+              JSON.stringify({
+                slug: value,
+              }),
+          }
+        );
+
+      const data =
+        await response
+          .json()
+          .catch(
+            () => null
+          );
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Unable to save website URL."
+        );
+      }
+
+      if (
+        !data?.project?.slug
+      ) {
+        throw new Error(
+          "The server did not return the saved website URL."
+        );
+      }
+
+      setSiteUrl(
+        data.project.slug
+      );
+
+      setSaveMessage(
+        "Website URL saved."
+      );
+    } catch (error) {
+      console.error(
+        "Save URL failed:",
+        error
+      );
+
+      setSaveMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the website URL."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
 
   /*
@@ -295,20 +321,22 @@ export default function ManageSite({
    */
 
   const goToSite = () => {
-  if (!project) {
-    return;
-  }
+    if (!project) {
+      return;
+    }
 
-  const value =
-    siteUrl.trim();
+    const value =
+      siteUrl.trim();
 
-  if (!value) {
-    return;
-  }
+    if (!value) {
+      return;
+    }
 
-  window.location.href =
-    `/site/${value}`;
-};
+    window.location.href =
+      `/site/${encodeURIComponent(
+        value
+      )}`;
+  };
 
 
   /*
@@ -346,6 +374,7 @@ export default function ManageSite({
       </group>
     );
   }
+
 
   /*
    * =======================================================
@@ -402,6 +431,7 @@ export default function ManageSite({
       </group>
     );
   }
+
 
   /*
    * =======================================================
@@ -475,6 +505,7 @@ export default function ManageSite({
     );
   }
 
+
   /*
    * =======================================================
    * SAFETY
@@ -484,6 +515,7 @@ export default function ManageSite({
   if (!project) {
     return null;
   }
+
 
   /*
    * =======================================================
@@ -500,12 +532,12 @@ export default function ManageSite({
         0,
       ]}
     >
+
       {/* ===================================================
           TITLE
           =================================================== */}
 
       <Title
-        
         position={[
           0,
           1.0,
@@ -514,6 +546,7 @@ export default function ManageSite({
       >
         Manage Your Websites
       </Title>
+
 
       {/* ===================================================
           PROJECT COUNTER
@@ -537,6 +570,7 @@ export default function ManageSite({
       >
         {`${index + 1} of ${projects.length}`}
       </Text>
+
 
       {/* ===================================================
           PROJECT NAME
@@ -562,6 +596,7 @@ export default function ManageSite({
         {project.name}
       </Text>
 
+
       {/* ===================================================
           TEMPLATE
           =================================================== */}
@@ -585,6 +620,7 @@ export default function ManageSite({
         {`Template: ${project.template}`}
       </Text>
 
+
       {/* ===================================================
           WEBSITE URL LABEL
           =================================================== */}
@@ -607,6 +643,7 @@ export default function ManageSite({
       >
         Website URL
       </Text>
+
 
       {/* ===================================================
           URL INPUT
@@ -633,6 +670,7 @@ export default function ManageSite({
         }}
       />
 
+
       {/* ===================================================
           SAVE MESSAGE
           =================================================== */}
@@ -640,9 +678,8 @@ export default function ManageSite({
       {saveMessage && (
         <Text
           color={
-            saveMessage.startsWith(
-              "URL ready"
-            )
+            saveMessage ===
+            "Website URL saved."
               ? "#7dd3fc"
               : "#ff6b6b"
           }
@@ -665,14 +702,15 @@ export default function ManageSite({
         </Text>
       )}
 
+
       {/* ===================================================
-          PROJECT ACTIONS
+          EDIT PROJECT
           =================================================== */}
 
       <Button
         position={[
           -0.60,
-          0.20,
+          -0.05,
           -1.55,
         ]}
         rotation={[
@@ -680,17 +718,47 @@ export default function ManageSite({
           Math.PI,
           0,
         ]}
-        onClick={saveUrl}
+        onClick={
+          editProject
+        }
+      >
+        Edit Website
+      </Button>
+
+
+      {/* ===================================================
+          SAVE URL
+          =================================================== */}
+
+      <Button
+        position={[
+          0.65,
+          -0.05,
+          -1.55,
+        ]}
+        rotation={[
+          0,
+          Math.PI,
+          0,
+        ]}
+        onClick={
+          saveUrl
+        }
       >
         {saving
           ? "Saving..."
           : "Save URL"}
       </Button>
 
+
+      {/* ===================================================
+          GO TO SITE
+          =================================================== */}
+
       <Button
         position={[
           -0.60,
-          0.10,
+          -0.35,
           -1.55,
         ]}
         rotation={[
@@ -698,19 +766,22 @@ export default function ManageSite({
           Math.PI,
           0,
         ]}
-        onClick={goToSite}
+        onClick={
+          goToSite
+        }
       >
         Go To Site
       </Button>
 
+
       {/* ===================================================
-          NAVIGATION
+          PREVIOUS
           =================================================== */}
 
       <Button
         position={[
           0.65,
-          0.20,
+          -0.35,
           -1.55,
         ]}
         rotation={[
@@ -725,10 +796,15 @@ export default function ManageSite({
         Previous
       </Button>
 
+
+      {/* ===================================================
+          NEXT
+          =================================================== */}
+
       <Button
         position={[
           0.65,
-          0.10,
+          -0.65,
           -1.55,
         ]}
         rotation={[
@@ -743,6 +819,7 @@ export default function ManageSite({
         Next
       </Button>
 
+
       {/* ===================================================
           PROJECT INFO
           =================================================== */}
@@ -753,7 +830,7 @@ export default function ManageSite({
         maxWidth={3}
         position={[
           0,
-          -0.95,
+          -1.0,
           -1.55,
         ]}
         rotation={[
@@ -766,6 +843,7 @@ export default function ManageSite({
       >
         {`Project ID: ${project.id}`}
       </Text>
+
 
       {/* ===================================================
           BACK
@@ -786,6 +864,7 @@ export default function ManageSite({
       >
         Back
       </Button>
+
     </group>
   );
 }

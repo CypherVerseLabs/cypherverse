@@ -1,1185 +1,1856 @@
 import React, {
-CSSProperties,
-ReactElement,
-useEffect,
-useMemo,
-useState,
+  CSSProperties,
+  ReactElement,
+  useEffect,
+  useMemo,
+  useState,
 } from "react";
 
 import {
-getIdeaCategories,
-getIdeasByCategory,
+  getIdeaCategories,
+  getIdeasByCategory,
 } from "../ideas";
 
-import { TransformMode } from "../context/transformMode";
+import {
+  TransformMode,
+} from "../context/transformMode";
 
-import { SceneObject } from "../scene/objectTypes";
+import {
+  SceneObject,
+} from "../scene/objectTypes";
 
 import HelpPanel from "./HelpPanel";
 
-type ActivePanel =
-| "add"
-| "move"
-| "rotate"
-| "scale"
-| "help"
-| null;
 
-type Vector3 = [number, number, number];
+type ActivePanel =
+  | "add"
+  | "move"
+  | "rotate"
+  | "scale"
+  | "help"
+  | null;
+
+
+type Vector3 =
+  [
+    number,
+    number,
+    number
+  ];
+
 
 type EditorContextualPanelProps = {
-panel: ActivePanel;
+  panel: ActivePanel;
 
-scene: {
-objects: SceneObject[];
+  scene: {
+    objects: SceneObject[];
+  };
+
+  selectedId?: string;
+
+  leftPanelCollapsed: boolean;
+
+  transformMode: TransformMode;
+
+  setTransformMode: (
+    mode: TransformMode
+  ) => void;
+
+  updateTransform: (
+    objectId: string,
+    transform: Partial<
+      SceneObject["transform"]
+    >
+  ) => void;
+
+  openIdeaFolders:
+    Record<
+      string,
+      boolean
+    >;
+
+  toggleIdeaFolder: (
+    category: string
+  ) => void;
+
+  addIdea: (
+    type: string
+  ) => void;
+
+  onClose: () => void;
 };
 
-selectedId?: string;
 
-leftPanelCollapsed: boolean;
+/* =========================================
+   ENVIRONMENT IDEAS
+========================================= */
 
-transformMode: TransformMode;
+/*
+ * These Ideas belong to Global Settings,
+ * not the normal Add Idea workflow.
+ *
+ * They remain valid SceneObject types and
+ * remain renderable in the scene.
+ */
+const GLOBAL_ENVIRONMENT_TYPES =
+  new Set<string>([
+    "ground",
+    "sky",
+    "cloudySky",
+    "rain",
+    "sun",
+    "fog",
+    "background",
+    "hdri",
+    "infinitePlane",
+    "lostFloor",
+  ]);
 
-setTransformMode: (mode: TransformMode) => void;
 
-updateTransform: (
-objectId: string,
-transform: Partial<SceneObject["transform"]>
-) => void;
-
-openIdeaFolders: Record<string, boolean>;
-
-toggleIdeaFolder: (category: string) => void;
-
-addIdea: (type: string) => void;
-
-onClose: () => void;
-};
+/* =========================================
+   MAIN PANEL
+========================================= */
 
 export default function EditorContextualPanel({
-panel,
-scene,
-selectedId,
-leftPanelCollapsed,
-transformMode,
-setTransformMode,
-updateTransform,
-openIdeaFolders,
-toggleIdeaFolder,
-addIdea,
-onClose,
+  panel,
+  scene,
+  selectedId,
+  leftPanelCollapsed,
+  transformMode,
+  setTransformMode,
+  updateTransform,
+  openIdeaFolders,
+  toggleIdeaFolder,
+  addIdea,
+  onClose,
 }: EditorContextualPanelProps) {
-/*
-
-Keep transform mode synchronized with the
-contextual toolbar without updating state
-during render.
-*/
-useEffect(() => {
-if (
-panel === "move" &&
-transformMode !== "translate"
-) {
-setTransformMode("translate");
-}
-if (
-  panel === "rotate" &&
-  transformMode !== "rotate"
-) {
-  setTransformMode("rotate");
-}
-
-if (
-  panel === "scale" &&
-  transformMode !== "scale"
-) {
-  setTransformMode("scale");
-}
-
-}, [
-panel,
-transformMode,
-setTransformMode,
-]);
-
-if (!panel) {
-return null;
-}
-
-if (panel === "help") {
-return (
-<HelpPanel onClose={onClose} />
-);
-}
-
-if (panel === "add") {
-return (
-<PanelShell
-width={400}
-height={260}
-title="Add Idea"
-onClose={onClose}
-variant="add"
-leftPanelCollapsed={
-leftPanelCollapsed
-}
->
-<AddIdeasPanel
-openIdeaFolders={
-openIdeaFolders
-}
-toggleIdeaFolder={
-toggleIdeaFolder
-}
-addIdea={addIdea}
-/>
-</PanelShell>
-);
-}
-
-const selectedObject =
-scene.objects.find(
-(object) =>
-object.id === selectedId
-);
-
-if (!selectedObject) {
-return (
-<PanelShell
-width={280}
-height={115}
-title={panelTitle(panel)}
-onClose={onClose}
-leftPanelCollapsed={
-leftPanelCollapsed
-}
->
-<div style={styles.empty}>
-Select an object first to edit
-its{" "}
-{panelTitle(
-panel
-).toLowerCase()}{" "}
-values.
-</div>
-</PanelShell>
-);
-}
-
-const values =
-panel === "move"
-? selectedObject.transform.position
-: panel === "rotate"
-? selectedObject.transform.rotation
-: selectedObject.transform.scale;
-
-return (
-<PanelShell
-width={280}
-height={125}
-title={panelTitle(panel)}
-onClose={onClose}
-leftPanelCollapsed={
-leftPanelCollapsed
-}
->
-<VectorEditor
-label={panelTitle(panel)}
-value={values}
-onChange={(next) => {
-if (panel === "move") {
-updateTransform(
-selectedObject.id,
-{
-position: next,
-}
-);
-} else if (
-panel === "rotate"
-) {
-updateTransform(
-selectedObject.id,
-{
-rotation: next,
-}
-);
-} else {
-updateTransform(
-selectedObject.id,
-{
-scale: next,
-}
-);
-}
-}}
-/>
-</PanelShell>
-);
-}
-
-function panelTitle(
-panel: Exclude<ActivePanel, null>
-): string {
-switch (panel) {
-case "move":
-return "Move";
-
-case "rotate":
-  return "Rotate";
-
-case "scale":
-  return "Scale";
-
-case "add":
-  return "Add Idea";
-
-case "help":
-  return "Help / Details";
-
-}
-}
-
-function PanelShell({
-title,
-children,
-onClose,
-width,
-height,
-variant = "default",
-leftPanelCollapsed,
-}: {
-title: string;
-
-children:
-| ReactElement
-| ReactElement[];
-
-onClose: () => void;
-
-width: number;
-
-height?: number;
-
-variant?: "default" | "add";
-
-leftPanelCollapsed: boolean;
-}) {
-/*
-
-Left panel:
-160px wide
 
 
-Contextual panel:
-starts immediately to its right
+  /* =======================================
+     TRANSFORM MODE SYNC
+  ======================================= */
+
+  useEffect(() => {
+    if (
+      panel === "move" &&
+      transformMode !==
+        "translate"
+    ) {
+      setTransformMode(
+        "translate"
+      );
+    }
 
 
-Toolbar:
-remains underneath both panels.
-*/
-const left =
-leftPanelCollapsed
-? 58
-: 180;
+    if (
+      panel === "rotate" &&
+      transformMode !==
+        "rotate"
+    ) {
+      setTransformMode(
+        "rotate"
+      );
+    }
 
-return (
-<div
-style={{
-...styles.shell,
-width,
-height,
-left,
-bottom: 70,
-}}
->
-<div style={styles.header}>
-<div style={styles.title}>
-{title}
-</div>
 
-    <button
-      type="button"
-      onClick={onClose}
-      style={styles.close}
-      title="Close"
-      aria-label="Close"
-    >
-      ×
-    </button>
-  </div>
+    if (
+      panel === "scale" &&
+      transformMode !==
+        "scale"
+    ) {
+      setTransformMode(
+        "scale"
+      );
+    }
+  }, [
+    panel,
+    transformMode,
+    setTransformMode,
+  ]);
 
-  <div style={styles.body}>
-    {children}
-  </div>
-</div>
 
-);
-}
+  /* =======================================
+     NO PANEL
+  ======================================= */
 
-function VectorEditor({
-label,
-value,
-onChange,
-}: {
-label: string;
+  if (!panel) {
+    return null;
+  }
 
-value: Vector3;
 
-onChange: (value: Vector3) => void;
-}) {
-return (
-<div>
-<div style={styles.subtle}>
-{label} — X / Y / Z
-</div>
+  /* =======================================
+     HELP
+  ======================================= */
 
-  <div style={styles.axisGrid}>
-    {(
-      ["X", "Y", "Z"] as const
-    ).map((axis, index) => (
-      <label
-        key={axis}
-        style={styles.axisLabel}
+  if (
+    panel === "help"
+  ) {
+    return (
+      <HelpPanel
+        onClose={
+          onClose
+        }
+      />
+    );
+  }
+
+
+  /* =======================================
+     ADD IDEA
+  ======================================= */
+
+  if (
+    panel === "add"
+  ) {
+    return (
+      <PanelShell
+        width={
+          400
+        }
+
+        height={
+          260
+        }
+
+        title="Add Idea"
+
+        onClose={
+          onClose
+        }
+
+        variant="add"
+
+        leftPanelCollapsed={
+          leftPanelCollapsed
+        }
       >
-        <span style={styles.axisName}>
-          {axis}
-        </span>
+        <AddIdeasPanel
+          openIdeaFolders={
+            openIdeaFolders
+          }
 
-        <input
-          type="number"
-          step="0.01"
-          value={value[index]}
-          onChange={(event) => {
-            const next = Number(
-              event.target.value
+          toggleIdeaFolder={
+            toggleIdeaFolder
+          }
+
+          addIdea={
+            addIdea
+          }
+        />
+      </PanelShell>
+    );
+  }
+
+
+  /* =======================================
+     SELECTED OBJECT
+  ======================================= */
+
+  const selectedObject =
+    scene.objects.find(
+      (object) =>
+        object.id ===
+        selectedId
+    );
+
+
+  /*
+   * No selected object means there should
+   * be no selected-object contextual editor.
+   */
+  if (!selectedObject) {
+    return null;
+  }
+
+
+  const values =
+    panel === "move"
+      ? selectedObject
+          .transform
+          .position
+
+      : panel === "rotate"
+        ? selectedObject
+            .transform
+            .rotation
+
+        : selectedObject
+            .transform
+            .scale;
+
+
+  /* =======================================
+     TRANSFORM PANEL
+  ======================================= */
+
+  return (
+    <PanelShell
+      width={
+        280
+      }
+
+      height={
+        125
+      }
+
+      title={
+        panelTitle(
+          panel
+        )
+      }
+
+      onClose={
+        onClose
+      }
+
+      leftPanelCollapsed={
+        leftPanelCollapsed
+      }
+    >
+      <VectorEditor
+        label={
+          panelTitle(
+            panel
+          )
+        }
+
+        value={
+          values
+        }
+
+        onChange={(
+          next
+        ) => {
+          if (
+            panel ===
+            "move"
+          ) {
+            updateTransform(
+              selectedObject.id,
+              {
+                position:
+                  next,
+              }
             );
 
-            if (
-              !Number.isFinite(next)
-            ) {
-              return;
+            return;
+          }
+
+
+          if (
+            panel ===
+            "rotate"
+          ) {
+            updateTransform(
+              selectedObject.id,
+              {
+                rotation:
+                  next,
+              }
+            );
+
+            return;
+          }
+
+
+          updateTransform(
+            selectedObject.id,
+            {
+              scale:
+                next,
             }
-
-            const updated =
-              [...value] as Vector3;
-
-            updated[index] = next;
-
-            onChange(updated);
-          }}
-          style={styles.input}
-        />
-      </label>
-    ))}
-  </div>
-</div>
-
-);
+          );
+        }}
+      />
+    </PanelShell>
+  );
 }
+
+
+/* =========================================
+   PANEL TITLE
+========================================= */
+
+function panelTitle(
+  panel:
+    Exclude<
+      ActivePanel,
+      null
+    >
+): string {
+  switch (
+    panel
+  ) {
+    case "move":
+      return "Move";
+
+    case "rotate":
+      return "Rotate";
+
+    case "scale":
+      return "Scale";
+
+    case "add":
+      return "Add Idea";
+
+    case "help":
+      return "Help / Details";
+  }
+}
+
+
+/* =========================================
+   PANEL SHELL
+========================================= */
+
+function PanelShell({
+  title,
+  children,
+  onClose,
+  width,
+  height,
+  variant = "default",
+  leftPanelCollapsed,
+}: {
+  title: string;
+
+  children:
+    | ReactElement
+    | ReactElement[];
+
+  onClose: () => void;
+
+  width: number;
+
+  height?: number;
+
+  variant?:
+    | "default"
+    | "add";
+
+  leftPanelCollapsed: boolean;
+}) {
+  /*
+   * Existing panel positioning is preserved.
+   */
+  const left =
+    leftPanelCollapsed
+      ? 58
+      : 180;
+
+
+  return (
+    <div
+      style={{
+        ...styles.shell,
+
+        width,
+
+        height,
+
+        left,
+
+        bottom:
+          70,
+      }}
+    >
+      <div
+        style={
+          styles.header
+        }
+      >
+        <div
+          style={
+            styles.title
+          }
+        >
+          {title}
+        </div>
+
+
+        <button
+          type="button"
+
+          onClick={
+            onClose
+          }
+
+          style={
+            styles.close
+          }
+
+          title="Close"
+
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+
+      <div
+        style={
+          styles.body
+        }
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================
+   VECTOR EDITOR
+========================================= */
+
+function VectorEditor({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+
+  value: Vector3;
+
+  onChange: (
+    value: Vector3
+  ) => void;
+}) {
+  return (
+    <div>
+      <div
+        style={
+          styles.subtle
+        }
+      >
+        {label} — X / Y / Z
+      </div>
+
+
+      <div
+        style={
+          styles.axisGrid
+        }
+      >
+        {(
+          [
+            "X",
+            "Y",
+            "Z",
+          ] as const
+        ).map(
+          (
+            axis,
+            index
+          ) => (
+            <label
+              key={
+                axis
+              }
+
+              style={
+                styles.axisLabel
+              }
+            >
+              <span
+                style={
+                  styles.axisName
+                }
+              >
+                {axis}
+              </span>
+
+
+              <input
+                type="number"
+
+                step="0.01"
+
+                value={
+                  value[
+                    index
+                  ]
+                }
+
+                onChange={(
+                  event
+                ) => {
+                  const next =
+                    Number(
+                      event
+                        .target
+                        .value
+                    );
+
+
+                  if (
+                    !Number.isFinite(
+                      next
+                    )
+                  ) {
+                    return;
+                  }
+
+
+                  const updated =
+                    [
+                      ...value,
+                    ] as Vector3;
+
+
+                  updated[
+                    index
+                  ] =
+                    next;
+
+
+                  onChange(
+                    updated
+                  );
+                }}
+
+                style={
+                  styles.input
+                }
+              />
+            </label>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================================
+   ADD IDEAS
+========================================= */
 
 function AddIdeasPanel({
-openIdeaFolders,
-toggleIdeaFolder,
-addIdea,
+  openIdeaFolders,
+  toggleIdeaFolder,
+  addIdea,
 }: {
-openIdeaFolders: Record<string, boolean>;
+  openIdeaFolders:
+    Record<
+      string,
+      boolean
+    >;
 
-toggleIdeaFolder: (
-category: string
-) => void;
+  toggleIdeaFolder: (
+    category: string
+  ) => void;
 
-addIdea: (type: string) => void;
+  addIdea: (
+    type: string
+  ) => void;
 }) {
-const categories = getIdeaCategories();
+  /*
+   * Start from the existing Idea Registry.
+   */
+  const categories =
+    getIdeaCategories();
 
-const [activeCategory, setActiveCategory] =
-useState("All");
 
-const [page, setPage] = useState(1);
+  const [
+    activeCategory,
+    setActiveCategory,
+  ] = useState(
+    "All"
+  );
 
-const allIdeas = useMemo(() => {
-return categories.flatMap(
-(category) =>
-getIdeasByCategory(category).map(
-(idea: any) => ({
-idea,
-category,
-})
-)
-);
-}, [categories]);
 
-const ideas =
-activeCategory === "All"
-? allIdeas.map(
-({ idea }) => idea
-)
-: getIdeasByCategory(
-activeCategory
-);
+  const [
+    page,
+    setPage,
+  ] = useState(
+    1
+  );
 
-/*
 
-Compact pagination.
-Three Ideas per page keeps the panel
-clean without making it taller.
-*/
-const pageSize = 3;
+  /*
+   * Filter Global Settings /
+   * environment Ideas out of this
+   * normal Idea picker.
+   */
+  const allIdeas =
+    useMemo(() => {
+      return categories.flatMap(
+        (
+          category
+        ) =>
+          getIdeasByCategory(
+            category
+          )
+            .map(
+              (
+                idea: any
+              ) => ({
+                idea,
+                category,
+              })
+            )
+            .filter(
+              ({
+                idea,
+              }) => {
+                const type =
+                  typeof idea ===
+                  "string"
+                    ? idea
+                    : idea.type ??
+                      idea.id;
 
-const totalPages = Math.max(
-1,
-Math.ceil(
-ideas.length / pageSize
-)
-);
+                return !GLOBAL_ENVIRONMENT_TYPES.has(
+                  String(
+                    type
+                  )
+                );
+              }
+            )
+      );
+    }, [
+      categories,
+    ]);
 
-const safePage = Math.min(
-page,
-totalPages
-);
 
-const visibleIdeas = ideas.slice(
-(safePage - 1) * pageSize,
-safePage * pageSize
-);
+  const ideas =
+    activeCategory ===
+    "All"
+      ? allIdeas.map(
+          ({
+            idea,
+          }) =>
+            idea
+        )
 
-const selectCategory = (
-category: string
-) => {
-setActiveCategory(category);
-setPage(1);
+      : getIdeasByCategory(
+          activeCategory
+        ).filter(
+          (
+            idea: any
+          ) => {
+            const type =
+              typeof idea ===
+              "string"
+                ? idea
+                : idea.type ??
+                  idea.id;
 
-if (
-  category !== "All" &&
-  !openIdeaFolders[category]
-) {
-  toggleIdeaFolder(category);
-}
+            return !GLOBAL_ENVIRONMENT_TYPES.has(
+              String(
+                type
+              )
+            );
+          }
+        );
 
-};
 
-return (
-<div style={styles.addLayout}>
-{/* CATEGORY COLUMN */}
-<div style={styles.categoryColumn}>
-<button
-type="button"
-onClick={() =>
-selectCategory("All")
-}
-style={{
-...styles.categoryItem,
-...(activeCategory === "All"
-? styles.categoryActive
-: {}),
-}}
->
-All
-</button>
+  /* =======================================
+     PAGINATION
+  ======================================= */
 
-    {categories.map(
-      (category) => (
+  const pageSize =
+    3;
+
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        ideas.length /
+          pageSize
+      )
+    );
+
+
+  const safePage =
+    Math.min(
+      page,
+      totalPages
+    );
+
+
+  const visibleIdeas =
+    ideas.slice(
+      (safePage -
+        1) *
+        pageSize,
+
+      safePage *
+        pageSize
+    );
+
+
+  /* =======================================
+     CATEGORY
+  ======================================= */
+
+  const selectCategory =
+    (
+      category: string
+    ) => {
+      setActiveCategory(
+        category
+      );
+
+      setPage(
+        1
+      );
+
+
+      if (
+        category !==
+          "All" &&
+        !openIdeaFolders[
+          category
+        ]
+      ) {
+        toggleIdeaFolder(
+          category
+        );
+      }
+    };
+
+
+  return (
+    <div
+      style={
+        styles.addLayout
+      }
+    >
+      {/* =================================
+          CATEGORY COLUMN
+      ================================= */}
+
+      <div
+        style={
+          styles.categoryColumn
+        }
+      >
         <button
-          key={category}
           type="button"
+
           onClick={() =>
             selectCategory(
-              category
+              "All"
             )
           }
+
           style={{
             ...styles.categoryItem,
+
             ...(activeCategory ===
-            category
-              ? styles.categorySelected
+            "All"
+              ? styles.categoryActive
               : {}),
           }}
         >
-          {category}
+          All
         </button>
-      )
-    )}
-  </div>
 
-  {/* IDEA AREA */}
-  <div style={styles.ideaArea}>
-    <div style={styles.ideaAreaHeader}>
-      <div style={styles.ideaAreaTitle}>
-        {activeCategory === "All"
-          ? "All Ideas"
-          : activeCategory}
-      </div>
 
-      <button
-        type="button"
-        onClick={() =>
-          window.alert(
-            "Idea upload is available through the project asset workflow."
-          )
-        }
-        style={styles.upload}
-      >
-        + Upload
-      </button>
-    </div>
+        {categories.map(
+          (
+            category
+          ) => {
+            /*
+             * Do not expose an empty
+             * environment category if
+             * everything inside it is
+             * Global Settings.
+             */
+            const categoryIdeas =
+              getIdeasByCategory(
+                category
+              ).filter(
+                (
+                  idea: any
+                ) => {
+                  const type =
+                    typeof idea ===
+                    "string"
+                      ? idea
+                      : idea.type ??
+                        idea.id;
 
-    <div style={styles.ideaList}>
-      {visibleIdeas.map(
-        (idea: any, index) => {
-          const ideaType =
-            typeof idea ===
-            "string"
-              ? idea
-              : idea.type ??
-                idea.id;
-
-          const ideaLabel =
-            typeof idea ===
-            "string"
-              ? idea
-              : idea.name ??
-                idea.label ??
-                idea.type;
-
-          const description =
-            typeof idea ===
-            "string"
-              ? `Add ${idea} to the world.`
-              : idea.description ??
-                `Add ${ideaLabel} to the world.`;
-
-          return (
-            <div
-              key={`${ideaType}-${index}`}
-              style={styles.ideaCard}
-            >
-              <div
-                style={
-                  styles.ideaIcon
-                }
-              >
-                +
-              </div>
-
-              <div
-                style={
-                  styles.ideaInfo
-                }
-              >
-                <div
-                  style={
-                    styles.ideaName
-                  }
-                >
-                  {String(
-                    ideaLabel
-                  )}
-                </div>
-
-                <div
-                  style={
-                    styles.ideaDescription
-                  }
-                >
-                  {String(
-                    description
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  addIdea(
+                  return !GLOBAL_ENVIRONMENT_TYPES.has(
                     String(
-                      ideaType
+                      type
                     )
+                  );
+                }
+              );
+
+
+            if (
+              categoryIdeas.length ===
+              0
+            ) {
+              return null;
+            }
+
+
+            return (
+              <button
+                key={
+                  category
+                }
+
+                type="button"
+
+                onClick={() =>
+                  selectCategory(
+                    category
                   )
                 }
-                style={
-                  styles.addButton
-                }
+
+                style={{
+                  ...styles.categoryItem,
+
+                  ...(activeCategory ===
+                  category
+                    ? styles.categorySelected
+                    : {}),
+                }}
               >
-                Add
+                {
+                  category
+                }
               </button>
-            </div>
-          );
-        }
-      )}
+            );
+          }
+        )}
+      </div>
 
-      {visibleIdeas.length ===
-        0 && (
-        <div style={styles.noIdeas}>
-          No Ideas in this
-          category yet.
+
+      {/* =================================
+          IDEA AREA
+      ================================= */}
+
+      <div
+        style={
+          styles.ideaArea
+        }
+      >
+        <div
+          style={
+            styles.ideaAreaHeader
+          }
+        >
+          <div
+            style={
+              styles.ideaAreaTitle
+            }
+          >
+            {activeCategory ===
+            "All"
+              ? "All Ideas"
+              : activeCategory}
+          </div>
+
+
+          <button
+            type="button"
+
+            onClick={() =>
+              window.alert(
+                "Idea upload is available through the project asset workflow."
+              )
+            }
+
+            style={
+              styles.upload
+            }
+          >
+            + Upload
+          </button>
         </div>
-      )}
+
+
+        <div
+          style={
+            styles.ideaList
+          }
+        >
+          {visibleIdeas.map(
+            (
+              idea: any,
+              index
+            ) => {
+              const ideaType =
+                typeof idea ===
+                "string"
+                  ? idea
+                  : idea.type ??
+                    idea.id;
+
+
+              const ideaLabel =
+                typeof idea ===
+                "string"
+                  ? idea
+                  : idea.name ??
+                    idea.label ??
+                    idea.type;
+
+
+              const description =
+                typeof idea ===
+                "string"
+                  ? `Add ${idea} to the world.`
+
+                  : idea.description ??
+                    `Add ${ideaLabel} to the world.`;
+
+
+              return (
+                <div
+                  key={`${ideaType}-${index}`}
+
+                  style={
+                    styles.ideaCard
+                  }
+                >
+                  <div
+                    style={
+                      styles.ideaIcon
+                    }
+                  >
+                    +
+                  </div>
+
+
+                  <div
+                    style={
+                      styles.ideaInfo
+                    }
+                  >
+                    <div
+                      style={
+                        styles.ideaName
+                      }
+                    >
+                      {
+                        String(
+                          ideaLabel
+                        )
+                      }
+                    </div>
+
+
+                    <div
+                      style={
+                        styles.ideaDescription
+                      }
+                    >
+                      {
+                        String(
+                          description
+                        )
+                      }
+                    </div>
+                  </div>
+
+
+                  <button
+                    type="button"
+
+                    onClick={() =>
+                      addIdea(
+                        String(
+                          ideaType
+                        )
+                      )
+                    }
+
+                    style={
+                      styles.addButton
+                    }
+                  >
+                    Add
+                  </button>
+                </div>
+              );
+            }
+          )}
+
+
+          {visibleIdeas.length ===
+            0 && (
+            <div
+              style={
+                styles.noIdeas
+              }
+            >
+              No Ideas in this
+              category yet.
+            </div>
+          )}
+        </div>
+
+
+        {/* ===============================
+            PAGINATION
+        =============================== */}
+
+        <div
+          style={
+            styles.pagination
+          }
+        >
+          <button
+            type="button"
+
+            disabled={
+              safePage <=
+              1
+            }
+
+            onClick={() =>
+              setPage(
+                Math.max(
+                  1,
+                  safePage -
+                    1
+                )
+              )
+            }
+
+            style={{
+              ...styles.pageButton,
+
+              opacity:
+                safePage <=
+                1
+                  ? 0.4
+                  : 1,
+            }}
+          >
+            ‹
+          </button>
+
+
+          <span>
+            {
+              safePage
+            }{" "}
+            /{" "}
+            {
+              totalPages
+            }
+          </span>
+
+
+          <button
+            type="button"
+
+            disabled={
+              safePage >=
+              totalPages
+            }
+
+            onClick={() =>
+              setPage(
+                Math.min(
+                  totalPages,
+                  safePage +
+                    1
+                )
+              )
+            }
+
+            style={{
+              ...styles.pageButton,
+
+              opacity:
+                safePage >=
+                totalPages
+                  ? 0.4
+                  : 1,
+            }}
+          >
+            ›
+          </button>
+        </div>
+      </div>
     </div>
-
-    <div style={styles.pagination}>
-      <button
-        type="button"
-        disabled={safePage <= 1}
-        onClick={() =>
-          setPage(
-            Math.max(
-              1,
-              safePage - 1
-            )
-          )
-        }
-        style={{
-          ...styles.pageButton,
-          opacity:
-            safePage <= 1
-              ? 0.4
-              : 1,
-        }}
-      >
-        ‹
-      </button>
-
-      <span>
-        {safePage} / {totalPages}
-      </span>
-
-      <button
-        type="button"
-        disabled={
-          safePage >= totalPages
-        }
-        onClick={() =>
-          setPage(
-            Math.min(
-              totalPages,
-              safePage + 1
-            )
-          )
-        }
-        style={{
-          ...styles.pageButton,
-          opacity:
-            safePage >=
-            totalPages
-              ? 0.4
-              : 1,
-        }}
-      >
-        ›
-      </button>
-    </div>
-  </div>
-</div>
-
-);
+  );
 }
 
-const styles: Record<string, CSSProperties> = {
-shell: {
-position: "absolute",
 
-boxSizing: "border-box",
+/* =========================================
+   STYLES
+========================================= */
 
-overflow: "hidden",
+const styles:
+  Record<
+    string,
+    CSSProperties
+  > = {
+  shell: {
+    position:
+      "absolute",
 
-borderRadius: 11,
+    boxSizing:
+      "border-box",
 
-background:
-  "rgba(242, 243, 245, 0.98)",
+    overflow:
+      "hidden",
 
-border:
-  "1px solid rgba(30, 32, 36, 0.12)",
+    borderRadius:
+      11,
 
-boxShadow:
-  "0 10px 28px rgba(0,0,0,0.14)",
+    background:
+      "rgba(242, 243, 245, 0.98)",
 
-pointerEvents: "auto",
+    border:
+      "1px solid rgba(30, 32, 36, 0.12)",
 
-zIndex: 35,
+    boxShadow:
+      "0 10px 28px rgba(0,0,0,0.14)",
 
-color: "#292c32",
+    pointerEvents:
+      "auto",
 
-},
+    zIndex:
+      35,
 
-header: {
-height: 34,
+    color:
+      "#292c32",
+  },
 
-display: "flex",
-alignItems: "center",
-justifyContent:
-  "space-between",
 
-padding:
-  "0 7px 0 10px",
+  header: {
+    height:
+      34,
 
-boxSizing:
-  "border-box",
+    display:
+      "flex",
 
-background:
-  "#e9eaec",
+    alignItems:
+      "center",
 
-borderBottom:
-  "1px solid rgba(30,32,36,0.09)",
+    justifyContent:
+      "space-between",
 
-},
+    padding:
+      "0 7px 0 10px",
 
-title: {
-fontSize: 10,
-fontWeight: 800,
+    boxSizing:
+      "border-box",
 
-color: "#292c32",
+    background:
+      "#e9eaec",
 
-},
+    borderBottom:
+      "1px solid rgba(30,32,36,0.09)",
+  },
 
-close: {
-width: 23,
-height: 23,
 
-border: 0,
-borderRadius: 6,
+  title: {
+    fontSize:
+      10,
 
-background:
-  "#dedfe2",
+    fontWeight:
+      800,
 
-color: "#454a51",
+    color:
+      "#292c32",
+  },
 
-cursor: "pointer",
 
-fontSize: 15,
-lineHeight: 1,
+  close: {
+    width:
+      23,
 
-},
+    height:
+      23,
 
-body: {
-height: "calc(100% - 34px)",
+    border:
+      0,
 
-padding: 8,
+    borderRadius:
+      6,
 
-overflowY: "auto",
+    background:
+      "#dedfe2",
 
-boxSizing: "border-box",
+    color:
+      "#454a51",
 
-},
+    cursor:
+      "pointer",
 
-subtle: {
-fontSize: 8,
+    fontSize:
+      15,
 
-color: "#656a72",
+    lineHeight:
+      1,
+  },
 
-marginBottom: 7,
 
-},
+  body: {
+    height:
+      "calc(100% - 34px)",
 
-axisGrid: {
-display: "grid",
+    padding:
+      8,
 
-gridTemplateColumns:
-  "repeat(3, 1fr)",
+    overflowY:
+      "auto",
 
-gap: 6,
+    boxSizing:
+      "border-box",
+  },
 
-},
 
-axisLabel: {
-display: "flex",
+  subtle: {
+    fontSize:
+      8,
 
-flexDirection: "column",
+    color:
+      "#656a72",
 
-gap: 3,
+    marginBottom:
+      7,
+  },
 
-fontSize: 8,
 
-color: "#454a51",
+  axisGrid: {
+    display:
+      "grid",
 
-fontWeight: 700,
+    gridTemplateColumns:
+      "repeat(3, 1fr)",
 
-},
+    gap:
+      6,
+  },
 
-axisName: {
-color: "#454a51",
-},
 
-input: {
-boxSizing: "border-box",
+  axisLabel: {
+    display:
+      "flex",
 
-width: "100%",
+    flexDirection:
+      "column",
 
-height: 29,
+    gap:
+      3,
 
-padding:
-  "5px 6px",
+    fontSize:
+      8,
 
-borderRadius: 6,
+    color:
+      "#454a51",
 
-border:
-  "1px solid rgba(30,32,36,0.16)",
+    fontWeight:
+      700,
+  },
 
-background:
-  "#ffffff",
 
-color: "#1f2328",
+  axisName: {
+    color:
+      "#454a51",
+  },
 
-WebkitTextFillColor:
-  "#1f2328",
 
-outline: "none",
+  input: {
+    boxSizing:
+      "border-box",
 
-fontSize: 10,
+    width:
+      "100%",
 
-fontWeight: 700,
+    height:
+      29,
 
-},
+    padding:
+      "5px 6px",
 
-empty: {
-padding: 10,
+    borderRadius:
+      6,
 
-borderRadius: 7,
+    border:
+      "1px solid rgba(30,32,36,0.16)",
 
-background:
-  "#e8e9eb",
+    background:
+      "#ffffff",
 
-color: "#555a62",
+    color:
+      "#1f2328",
 
-fontSize: 9,
+    WebkitTextFillColor:
+      "#1f2328",
 
-lineHeight: 1.45,
+    outline:
+      "none",
 
-textAlign: "center",
+    fontSize:
+      10,
 
-},
+    fontWeight:
+      700,
+  },
 
-addLayout: {
-display: "grid",
 
-gridTemplateColumns:
-  "92px minmax(0, 1fr)",
+  empty: {
+    padding:
+      10,
 
-gap: 8,
+    borderRadius:
+      7,
 
-width: "100%",
+    background:
+      "#e8e9eb",
 
-height: "100%",
+    color:
+      "#555a62",
 
-minHeight: 0,
+    fontSize:
+      9,
 
-},
+    lineHeight:
+      1.45,
 
-categoryColumn: {
-display: "flex",
+    textAlign:
+      "center",
+  },
 
-flexDirection: "column",
 
-gap: 3,
+  addLayout: {
+    display:
+      "grid",
 
-padding: 4,
+    gridTemplateColumns:
+      "92px minmax(0, 1fr)",
 
-borderRadius: 8,
+    gap:
+      8,
 
-background:
-  "#e7e8ea",
+    width:
+      "100%",
 
-overflowY: "auto",
+    height:
+      "100%",
 
-minHeight: 0,
+    minHeight:
+      0,
+  },
 
-},
 
-categoryItem: {
-width: "100%",
+  categoryColumn: {
+    display:
+      "flex",
 
-minHeight: 25,
+    flexDirection:
+      "column",
 
-flexShrink: 0,
+    gap:
+      3,
 
-padding:
-  "0 7px",
+    padding:
+      4,
 
-border: 0,
+    borderRadius:
+      8,
 
-borderRadius: 6,
+    background:
+      "#e7e8ea",
 
-background:
-  "transparent",
+    overflowY:
+      "auto",
 
-color: "#4e535a",
+    minHeight:
+      0,
+  },
 
-cursor: "pointer",
 
-textAlign: "left",
+  categoryItem: {
+    width:
+      "100%",
 
-fontSize: 8,
+    minHeight:
+      25,
 
-fontWeight: 700,
+    flexShrink:
+      0,
 
-},
+    padding:
+      "0 7px",
 
-categoryActive: {
-background:
-"#5d83ee",
+    border:
+      0,
 
-color:
-  "#ffffff",
+    borderRadius:
+      6,
 
-},
+    background:
+      "transparent",
 
-categorySelected: {
-background:
-"#d7dce8",
+    color:
+      "#4e535a",
 
-color:
-  "#354875",
+    cursor:
+      "pointer",
 
-},
+    textAlign:
+      "left",
 
-ideaArea: {
-minWidth: 0,
+    fontSize:
+      8,
 
-minHeight: 0,
+    fontWeight:
+      700,
+  },
 
-display: "flex",
 
-flexDirection: "column",
+  categoryActive: {
+    background:
+      "#5d83ee",
 
-},
+    color:
+      "#ffffff",
+  },
 
-ideaAreaHeader: {
-display: "flex",
 
-alignItems: "center",
+  categorySelected: {
+    background:
+      "#d7dce8",
 
-justifyContent:
-  "space-between",
+    color:
+      "#354875",
+  },
 
-gap: 6,
 
-marginBottom: 5,
+  ideaArea: {
+    minWidth:
+      0,
 
-},
+    minHeight:
+      0,
 
-ideaAreaTitle: {
-fontSize: 9,
+    display:
+      "flex",
 
-fontWeight: 800,
+    flexDirection:
+      "column",
+  },
 
-color: "#4f545b",
 
-},
+  ideaAreaHeader: {
+    display:
+      "flex",
 
-upload: {
-flexShrink: 0,
+    alignItems:
+      "center",
 
-padding:
-  "4px 7px",
+    justifyContent:
+      "space-between",
 
-border: 0,
+    gap:
+      6,
 
-borderRadius: 5,
+    marginBottom:
+      5,
+  },
 
-background:
-  "#dedfe2",
 
-color: "#454a51",
+  ideaAreaTitle: {
+    fontSize:
+      9,
 
-fontSize: 8,
+    fontWeight:
+      800,
 
-fontWeight: 700,
+    color:
+      "#4f545b",
+  },
 
-cursor: "pointer",
 
-},
+  upload: {
+    flexShrink:
+      0,
 
-ideaList: {
-display: "flex",
+    padding:
+      "4px 7px",
 
-flexDirection: "column",
+    border:
+      0,
 
-gap: 4,
+    borderRadius:
+      5,
 
-flex: 1,
+    background:
+      "#dedfe2",
 
-minHeight: 0,
+    color:
+      "#454a51",
 
-overflowY: "auto",
+    fontSize:
+      8,
 
-paddingRight: 2,
+    fontWeight:
+      700,
 
-},
+    cursor:
+      "pointer",
+  },
 
-ideaCard: {
-minHeight: 48,
 
-flexShrink: 0,
+  ideaList: {
+    display:
+      "flex",
 
-display: "flex",
+    flexDirection:
+      "column",
 
-alignItems: "center",
+    gap:
+      4,
 
-gap: 6,
+    flex:
+      1,
 
-padding:
-  "5px 6px",
+    minHeight:
+      0,
 
-border:
-  "1px solid rgba(30,32,36,0.08)",
+    overflowY:
+      "auto",
 
-borderRadius: 7,
+    paddingRight:
+      2,
+  },
 
-background:
-  "#f8f8f9",
 
-},
+  ideaCard: {
+    minHeight:
+      48,
 
-ideaIcon: {
-width: 23,
-height: 23,
+    flexShrink:
+      0,
 
-flexShrink: 0,
+    display:
+      "flex",
 
-display: "flex",
+    alignItems:
+      "center",
 
-alignItems: "center",
+    gap:
+      6,
 
-justifyContent: "center",
+    padding:
+      "5px 6px",
 
-borderRadius: 6,
+    border:
+      "1px solid rgba(30,32,36,0.08)",
 
-background:
-  "#dedfe2",
+    borderRadius:
+      7,
 
-color:
-  "#60656c",
+    background:
+      "#f8f8f9",
+  },
 
-fontWeight: 900,
 
-fontSize: 12,
+  ideaIcon: {
+    width:
+      23,
 
-},
+    height:
+      23,
 
-ideaInfo: {
-flex: 1,
+    flexShrink:
+      0,
 
-minWidth: 0,
+    display:
+      "flex",
 
-},
+    alignItems:
+      "center",
 
-ideaName: {
-overflow: "hidden",
+    justifyContent:
+      "center",
 
-textOverflow: "ellipsis",
+    borderRadius:
+      6,
 
-whiteSpace: "nowrap",
+    background:
+      "#dedfe2",
 
-fontSize: 9,
+    color:
+      "#60656c",
 
-fontWeight: 800,
+    fontWeight:
+      900,
 
-color:
-  "#30343a",
+    fontSize:
+      12,
+  },
 
-marginBottom: 1,
 
-},
+  ideaInfo: {
+    flex:
+      1,
 
-ideaDescription: {
-overflow: "hidden",
+    minWidth:
+      0,
+  },
 
-textOverflow: "ellipsis",
 
-whiteSpace: "nowrap",
+  ideaName: {
+    overflow:
+      "hidden",
 
-fontSize: 7.5,
+    textOverflow:
+      "ellipsis",
 
-lineHeight: 1.3,
+    whiteSpace:
+      "nowrap",
 
-color:
-  "#6c7178",
+    fontSize:
+      9,
 
-},
+    fontWeight:
+      800,
 
-addButton: {
-flexShrink: 0,
+    color:
+      "#30343a",
 
-padding:
-  "5px 8px",
+    marginBottom:
+      1,
+  },
 
-border: 0,
 
-borderRadius: 5,
+  ideaDescription: {
+    overflow:
+      "hidden",
 
-background:
-  "#5d83ee",
+    textOverflow:
+      "ellipsis",
 
-color:
-  "#ffffff",
+    whiteSpace:
+      "nowrap",
 
-cursor: "pointer",
+    fontSize:
+      7.5,
 
-fontSize: 8,
+    lineHeight:
+      1.3,
 
-fontWeight: 800,
+    color:
+      "#6c7178",
+  },
 
-},
 
-noIdeas: {
-padding: 12,
+  addButton: {
+    flexShrink:
+      0,
 
-borderRadius: 7,
+    padding:
+      "5px 8px",
 
-background:
-  "#e8e9eb",
+    border:
+      0,
 
-color:
-  "#686d74",
+    borderRadius:
+      5,
 
-textAlign: "center",
+    background:
+      "#5d83ee",
 
-fontSize: 8,
+    color:
+      "#ffffff",
 
-},
+    cursor:
+      "pointer",
 
-pagination: {
-display: "flex",
+    fontSize:
+      8,
 
-alignItems: "center",
+    fontWeight:
+      800,
+  },
 
-justifyContent:
-  "center",
 
-gap: 7,
+  noIdeas: {
+    padding:
+      12,
 
-marginTop: 5,
+    borderRadius:
+      7,
 
-paddingTop: 5,
+    background:
+      "#e8e9eb",
 
-borderTop:
-  "1px solid rgba(30,32,36,0.08)",
+    color:
+      "#686d74",
 
-fontSize: 8,
+    textAlign:
+      "center",
 
-fontWeight: 800,
+    fontSize:
+      8,
+  },
 
-color:
-  "#555a62",
 
-},
+  pagination: {
+    display:
+      "flex",
 
-pageButton: {
-width: 21,
-height: 21,
+    alignItems:
+      "center",
 
-border: 0,
+    justifyContent:
+      "center",
 
-borderRadius: 5,
+    gap:
+      7,
 
-background:
-  "#dedfe2",
+    marginTop:
+      5,
 
-color:
-  "#454a51",
+    paddingTop:
+      5,
 
-cursor: "pointer",
+    borderTop:
+      "1px solid rgba(30,32,36,0.08)",
 
-fontSize: 13,
+    fontSize:
+      8,
 
-},
+    fontWeight:
+      800,
+
+    color:
+      "#555a62",
+  },
+
+
+  pageButton: {
+    width:
+      21,
+
+    height:
+      21,
+
+    border:
+      0,
+
+    borderRadius:
+      5,
+
+    background:
+      "#dedfe2",
+
+    color:
+      "#454a51",
+
+    cursor:
+      "pointer",
+
+    fontSize:
+      13,
+  },
 };
