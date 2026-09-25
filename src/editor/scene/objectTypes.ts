@@ -17,6 +17,46 @@ export type Transform = {
 
 
 /* =========================================
+   MODIFIERS
+========================================= */
+
+export type OrbitingModifier = {
+  type: "orbiting";
+
+  props: {
+    radius: number;
+
+    ySpeed: number;
+  };
+};
+
+
+/* =========================================
+   EFFECTS
+========================================= */
+
+export type BloomEffect = {
+  type: "bloom";
+
+  props: {
+    strength: number;
+
+    radius: number;
+
+    threshold: number;
+  };
+};
+
+
+export type SceneObjectModifier =
+  | OrbitingModifier;
+
+
+export type SceneObjectEffect =
+  | BloomEffect;
+
+
+/* =========================================
    SCENE OBJECT BASE
 ========================================= */
 
@@ -24,6 +64,18 @@ export type SceneObjectBase = {
   id: string;
 
   transform: Transform;
+
+  /*
+   * Modifiers are behaviors applied to
+   * this Scene Object.
+   */
+  modifiers?: SceneObjectModifier[];
+
+  /*
+   * Effects are visual effects applied to
+   * this Scene Object.
+   */
+  effects?: SceneObjectEffect[];
 
   /*
    * Hierarchy / editor metadata
@@ -93,6 +145,66 @@ export type VideoObject =
       muted: boolean;
 
       volume: number;
+    };
+  };
+
+
+/* =========================================
+   VIDEO PLAYER
+========================================= */
+
+export type VideoPlayerObject =
+  SceneObjectBase & {
+    type: "videoPlayer";
+
+    props: {
+      videoSrc: string;
+
+      videoDistance: number;
+
+      framed: boolean;
+
+      volume: number;
+
+      restartOnEnter: boolean;
+
+      audioDistance: number;
+
+      frameColor: string;
+
+      previewColor: string;
+
+      previewText: string;
+
+      previewTextColor: string;
+
+      previewTextFont: string;
+
+      previewTextSize: number;
+    };
+  };
+
+
+/* =========================================
+   YOUTUBE PLAYER
+========================================= */
+
+export type YouTubePlayerObject =
+  SceneObjectBase & {
+    type: "youtubePlayer";
+
+    props: {
+      videoId: string;
+
+      width: number;
+
+      height: number;
+
+      videoDistance: number;
+
+      controls: boolean;
+
+      muted: boolean;
     };
   };
 
@@ -221,6 +333,40 @@ export type RainObject =
 
 
 /* =========================================
+   TOXIC GASS
+========================================= */
+
+export type ToxicGassObject =
+  SceneObjectBase & {
+    type: "toxicGass";
+
+    props: {
+      count: number;
+
+      color: string;
+
+      size: number;
+    };
+  };
+
+
+/* =========================================
+   TRANSPARENT FLOOR
+========================================= */
+
+export type TransparentFloorObject =
+  SceneObjectBase & {
+    type: "transparentFloor";
+
+    props: {
+      opacity: number;
+
+      color: string;
+    };
+  };
+
+
+/* =========================================
    TITLE
 ========================================= */
 
@@ -271,6 +417,56 @@ export type SpeakerObject =
 
 
 /* =========================================
+   SPEAKER RADIO
+========================================= */
+
+export type SpeakerRadioObject =
+  SceneObjectBase & {
+    type: "speakerRadio";
+
+    props: {
+      distance: number;
+
+      volume: number;
+
+      shuffle: boolean;
+    };
+  };
+
+
+/* =========================================
+   PROBE
+========================================= */
+
+export type ProbeObject =
+  SceneObjectBase & {
+    type: "probe";
+
+    props: Record<string, never>;
+  };
+
+
+/* =========================================
+   CYRUS
+========================================= */
+
+export type CyrusObject =
+  SceneObjectBase & {
+    type: "cyrus";
+
+    props: {
+      dialogue: string;
+
+      response: string;
+
+      link: string;
+
+      anim: string;
+    };
+  };
+
+
+/* =========================================
    GROUND
 ========================================= */
 
@@ -313,6 +509,8 @@ export type SceneObject =
   | ImageObject
   | ModelObject
   | VideoObject
+  | VideoPlayerObject
+  | YouTubePlayerObject
   | AudioObject
   | HDRIObject
   | BackgroundObject
@@ -320,9 +518,14 @@ export type SceneObject =
   | InfinitePlaneObject
   | CloudySkyObject
   | RainObject
+  | ToxicGassObject
+  | TransparentFloorObject
   | TitleObject
   | LinkObject
   | SpeakerObject
+  | SpeakerRadioObject
+  | ProbeObject
+  | CyrusObject
   | GroundObject
   | LostFloorObject;
 
@@ -382,6 +585,18 @@ export function cloneSceneObject(
     props: {
       ...object.props,
     },
+
+    modifiers: object.modifiers
+      ? structuredClone(
+          object.modifiers
+        )
+      : undefined,
+
+    effects: object.effects
+      ? structuredClone(
+          object.effects
+        )
+      : undefined,
   };
 
   return cloned as SceneObject;

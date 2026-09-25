@@ -42,6 +42,10 @@ type SceneObjectUpdate = {
 
   props?: Record<string, unknown>;
 
+  modifiers?: SceneObject["modifiers"];
+
+  effects?: SceneObject["effects"];
+
   parentId?: string | undefined;
 
   name?: string | undefined;
@@ -2005,116 +2009,161 @@ export function EditorProvider({
     );
 
   /* =======================================
-     UPDATE OBJECT
-  ======================================= */
+   UPDATE OBJECT
+======================================= */
 
-  const updateObject =
-    useCallback(
-      (
-        id: string,
-        changes: SceneObjectUpdate
-      ) => {
-        commitScene(
-          (current) => {
-            const object =
-              current.objects.find(
-                (item) =>
-                  item.id === id
-              );
+const updateObject =
+  useCallback(
+    (
+      id: string,
+      changes: SceneObjectUpdate
+    ) => {
+      commitScene(
+        (current) => {
+          const object =
+            current.objects.find(
+              (item) =>
+                item.id === id
+            );
 
-            if (!object) {
-              return current;
-            }
-
-            return {
-              ...current,
-
-              objects:
-                current.objects.map(
-                  (item) => {
-                    if (
-                      item.id !== id
-                    ) {
-                      return item;
-                    }
-
-                    const nextObject =
-                      structuredClone(
-                        item
-                      ) as SceneObject;
-
-                    if (
-                      changes.transform
-                    ) {
-                      nextObject.transform =
-                        {
-                          ...cloneTransform(
-                            item.transform
-                          ),
-
-                          ...changes.transform,
-                        };
-                    }
-
-                    if (
-                      changes.props
-                    ) {
-                      nextObject.props =
-                        {
-                          ...item.props,
-                          ...changes.props,
-                        } as typeof nextObject.props;
-                    }
-
-                    if (
-                      Object.prototype.hasOwnProperty.call(
-                        changes,
-                        "name"
-                      )
-                    ) {
-                      nextObject.name =
-                        changes.name;
-                    }
-
-                    if (
-                      Object.prototype.hasOwnProperty.call(
-                        changes,
-                        "visible"
-                      )
-                    ) {
-                      nextObject.visible =
-                        changes.visible;
-                    }
-
-                    if (
-                      Object.prototype.hasOwnProperty.call(
-                        changes,
-                        "locked"
-                      )
-                    ) {
-                      nextObject.locked =
-                        changes.locked;
-                    }
-
-                    if (
-                      Object.prototype.hasOwnProperty.call(
-                        changes,
-                        "parentId"
-                      )
-                    ) {
-                      nextObject.parentId =
-                        changes.parentId;
-                    }
-
-                    return nextObject;
-                  }
-                ),
-            };
+          if (!object) {
+            return current;
           }
-        );
-      },
-      [commitScene]
-    );
+
+          return {
+            ...current,
+
+            objects:
+              current.objects.map(
+                (item) => {
+                  if (
+                    item.id !== id
+                  ) {
+                    return item;
+                  }
+
+                  const nextObject =
+                    structuredClone(
+                      item
+                    ) as SceneObject;
+
+                  /* TRANSFORM */
+
+                  if (
+                    changes.transform
+                  ) {
+                    nextObject.transform =
+                      {
+                        ...cloneTransform(
+                          item.transform
+                        ),
+
+                        ...changes.transform,
+                      };
+                  }
+
+                  /* PROPS */
+
+                  if (
+                    changes.props
+                  ) {
+                    nextObject.props =
+                      {
+                        ...item.props,
+                        ...changes.props,
+                      } as typeof nextObject.props;
+                  }
+
+                  /* MODIFIERS */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "modifiers"
+                    )
+                  ) {
+                    nextObject.modifiers =
+                      changes.modifiers
+                        ? structuredClone(
+                            changes.modifiers
+                          )
+                        : undefined;
+                  }
+
+                  /* EFFECTS */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "effects"
+                    )
+                  ) {
+                    nextObject.effects =
+                      changes.effects
+                        ? structuredClone(
+                            changes.effects
+                          )
+                        : undefined;
+                  }
+
+                  /* NAME */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "name"
+                    )
+                  ) {
+                    nextObject.name =
+                      changes.name;
+                  }
+
+                  /* VISIBILITY */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "visible"
+                    )
+                  ) {
+                    nextObject.visible =
+                      changes.visible;
+                  }
+
+                  /* LOCK */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "locked"
+                    )
+                  ) {
+                    nextObject.locked =
+                      changes.locked;
+                  }
+
+                  /* PARENT */
+
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      changes,
+                      "parentId"
+                    )
+                  ) {
+                    nextObject.parentId =
+                      changes.parentId;
+                  }
+
+                  return nextObject;
+                }
+              ),
+          };
+        }
+      );
+    },
+    [commitScene]
+  );
+
 
   /* =======================================
      UPDATE TRANSFORM

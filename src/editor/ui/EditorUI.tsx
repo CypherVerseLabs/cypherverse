@@ -811,52 +811,31 @@ export default function EditorUI({
         ================================= */}
 
         <EditorContextualPanel
-          panel={
-            activePanel
-          }
+          panel={activePanel}
 
-          scene={
-            scene
-          }
+          scene={scene}
 
-          selectedId={
-            selectedId
-          }
+          selectedId={selectedId}
 
-          leftPanelCollapsed={
-            leftPanelCollapsed
-          }
+          leftPanelCollapsed={leftPanelCollapsed}
 
-          transformMode={
-            transformMode
-          }
+          transformMode={transformMode}
 
-          setTransformMode={
-            setTransformMode
-          }
+          setTransformMode={setTransformMode}
 
-          updateTransform={
-            updateTransform
-          }
+          updateTransform={updateTransform}
 
-          openIdeaFolders={
-            openIdeaFolders
-          }
+          openIdeaFolders={openIdeaFolders}
 
-          toggleIdeaFolder={
-            toggleIdeaFolder
-          }
+          toggleIdeaFolder={toggleIdeaFolder}
 
-          addIdea={
-            addIdea
-          }
+          addIdea={addIdea}
 
-          onClose={() =>
-            setActivePanel(
-              null
-            )
-          }
-        />
+          onClose={() => setActivePanel(
+            null
+          )} updateObject={function (objectId: string, changes: { modifiers?: SceneObject["modifiers"]; effects?: SceneObject["effects"]; }): void {
+            throw new Error("Function not implemented.");
+          } }        />
 
 
         {/* =================================

@@ -1,115 +1,70 @@
 import React, {
-  CSSProperties,
-  ReactElement,
-  useEffect,
-  useMemo,
-  useState,
+CSSProperties,
+ReactElement,
+useEffect,
+useMemo,
+useState,
 } from "react";
 
 import {
-  getIdeaCategories,
-  getIdeasByCategory,
+getIdeaCategories,
+getIdeasByCategory,
 } from "../ideas";
 
-import {
-  TransformMode,
-} from "../context/transformMode";
+import { TransformMode } from "../context/transformMode";
 
-import {
-  SceneObject,
-} from "../scene/objectTypes";
+import { SceneObject } from "../scene/objectTypes";
 
 import HelpPanel from "./HelpPanel";
 
-
 type ActivePanel =
-  | "add"
-  | "move"
-  | "rotate"
-  | "scale"
-  | "help"
-  | null;
+| "add"
+| "move"
+| "rotate"
+| "scale"
+| "help"
+| null;
 
-
-type Vector3 =
-  [
-    number,
-    number,
-    number
-  ];
-
+type Vector3 = [number, number, number];
 
 type EditorContextualPanelProps = {
-  panel: ActivePanel;
+panel: ActivePanel;
 
-  scene: {
-    objects: SceneObject[];
-  };
-
-  selectedId?: string;
-
-  leftPanelCollapsed: boolean;
-
-  transformMode: TransformMode;
-
-  setTransformMode: (
-    mode: TransformMode
-  ) => void;
-
-  updateTransform: (
-    objectId: string,
-    transform: Partial<
-      SceneObject["transform"]
-    >
-  ) => void;
-
-  openIdeaFolders:
-    Record<
-      string,
-      boolean
-    >;
-
-  toggleIdeaFolder: (
-    category: string
-  ) => void;
-
-  addIdea: (
-    type: string
-  ) => void;
-
-  onClose: () => void;
+scene: {
+objects: SceneObject[];
 };
 
+selectedId?: string;
 
-/* =========================================
-   ENVIRONMENT IDEAS
-========================================= */
+leftPanelCollapsed: boolean;
 
-/*
- * These Ideas belong to Global Settings,
- * not the normal Add Idea workflow.
- *
- * They remain valid SceneObject types and
- * remain renderable in the scene.
- */
-const GLOBAL_ENVIRONMENT_TYPES =
-  new Set<string>([
-    "ground",
-    "sky",
-    "cloudySky",
-    "rain",
-    "sun",
-    "fog",
-    "background",
-    "hdri",
-    "infinitePlane",
-    "lostFloor",
-  ]);
+transformMode: TransformMode;
+
+setTransformMode: (mode: TransformMode) => void;
+
+updateTransform: (
+objectId: string,
+transform: Partial<SceneObject["transform"]>
+) => void;
+
+updateObject: (
+  objectId: string,
+  changes: {
+    modifiers?: SceneObject["modifiers"];
+    effects?: SceneObject["effects"];
+  }
+) => void;
 
 
-/* =========================================
-   MAIN PANEL
-========================================= */
+
+openIdeaFolders: Record<string, boolean>;
+
+toggleIdeaFolder: (category: string) => void;
+
+addIdea: (type: string) => void;
+
+onClose: () => void;
+};
 
 export default function EditorContextualPanel({
   panel,
@@ -119,1738 +74,1124 @@ export default function EditorContextualPanel({
   transformMode,
   setTransformMode,
   updateTransform,
+  updateObject,
   openIdeaFolders,
   toggleIdeaFolder,
   addIdea,
   onClose,
 }: EditorContextualPanelProps) {
 
+/*
 
-  /* =======================================
-     TRANSFORM MODE SYNC
-  ======================================= */
-
-  useEffect(() => {
-    if (
-      panel === "move" &&
-      transformMode !==
-        "translate"
-    ) {
-      setTransformMode(
-        "translate"
-      );
-    }
-
-
-    if (
-      panel === "rotate" &&
-      transformMode !==
-        "rotate"
-    ) {
-      setTransformMode(
-        "rotate"
-      );
-    }
-
-
-    if (
-      panel === "scale" &&
-      transformMode !==
-        "scale"
-    ) {
-      setTransformMode(
-        "scale"
-      );
-    }
-  }, [
-    panel,
-    transformMode,
-    setTransformMode,
-  ]);
-
-
-  /* =======================================
-     NO PANEL
-  ======================================= */
-
-  if (!panel) {
-    return null;
-  }
-
-
-  /* =======================================
-     HELP
-  ======================================= */
-
-  if (
-    panel === "help"
-  ) {
-    return (
-      <HelpPanel
-        onClose={
-          onClose
-        }
-      />
-    );
-  }
-
-
-  /* =======================================
-     ADD IDEA
-  ======================================= */
-
-  if (
-    panel === "add"
-  ) {
-    return (
-      <PanelShell
-        width={
-          400
-        }
-
-        height={
-          260
-        }
-
-        title="Add Idea"
-
-        onClose={
-          onClose
-        }
-
-        variant="add"
-
-        leftPanelCollapsed={
-          leftPanelCollapsed
-        }
-      >
-        <AddIdeasPanel
-          openIdeaFolders={
-            openIdeaFolders
-          }
-
-          toggleIdeaFolder={
-            toggleIdeaFolder
-          }
-
-          addIdea={
-            addIdea
-          }
-        />
-      </PanelShell>
-    );
-  }
-
-
-  /* =======================================
-     SELECTED OBJECT
-  ======================================= */
-
-  const selectedObject =
-    scene.objects.find(
-      (object) =>
-        object.id ===
-        selectedId
-    );
-
-
-  /*
-   * No selected object means there should
-   * be no selected-object contextual editor.
-   */
-  if (!selectedObject) {
-    return null;
-  }
-
-
-  const values =
-    panel === "move"
-      ? selectedObject
-          .transform
-          .position
-
-      : panel === "rotate"
-        ? selectedObject
-            .transform
-            .rotation
-
-        : selectedObject
-            .transform
-            .scale;
-
-
-  /* =======================================
-     TRANSFORM PANEL
-  ======================================= */
-
-  return (
-    <PanelShell
-      width={
-        280
-      }
-
-      height={
-        125
-      }
-
-      title={
-        panelTitle(
-          panel
-        )
-      }
-
-      onClose={
-        onClose
-      }
-
-      leftPanelCollapsed={
-        leftPanelCollapsed
-      }
-    >
-      <VectorEditor
-        label={
-          panelTitle(
-            panel
-          )
-        }
-
-        value={
-          values
-        }
-
-        onChange={(
-          next
-        ) => {
-          if (
-            panel ===
-            "move"
-          ) {
-            updateTransform(
-              selectedObject.id,
-              {
-                position:
-                  next,
-              }
-            );
-
-            return;
-          }
-
-
-          if (
-            panel ===
-            "rotate"
-          ) {
-            updateTransform(
-              selectedObject.id,
-              {
-                rotation:
-                  next,
-              }
-            );
-
-            return;
-          }
-
-
-          updateTransform(
-            selectedObject.id,
-            {
-              scale:
-                next,
-            }
-          );
-        }}
-      />
-    </PanelShell>
-  );
+Keep transform mode synchronized with the
+contextual toolbar without updating state
+during render.
+*/
+useEffect(() => {
+if (
+panel === "move" &&
+transformMode !== "translate"
+) {
+setTransformMode("translate");
+}
+if (
+  panel === "rotate" &&
+  transformMode !== "rotate"
+) {
+  setTransformMode("rotate");
 }
 
+if (
+  panel === "scale" &&
+  transformMode !== "scale"
+) {
+  setTransformMode("scale");
+}
 
-/* =========================================
-   PANEL TITLE
-========================================= */
+}, [
+panel,
+transformMode,
+setTransformMode,
+]);
+
+if (!panel) {
+return null;
+}
+
+if (panel === "help") {
+return (
+<HelpPanel onClose={onClose} />
+);
+}
+
+if (panel === "add") {
+return (
+<PanelShell
+width={400}
+height={260}
+title="Add Idea"
+onClose={onClose}
+variant="add"
+leftPanelCollapsed={
+leftPanelCollapsed
+}
+>
+<AddIdeasPanel
+openIdeaFolders={
+openIdeaFolders
+}
+toggleIdeaFolder={
+toggleIdeaFolder
+}
+addIdea={addIdea}
+/>
+</PanelShell>
+);
+}
+
+const selectedObject =
+scene.objects.find(
+(object) =>
+object.id === selectedId
+);
+
+if (!selectedObject) {
+return (
+<PanelShell
+width={280}
+height={115}
+title={panelTitle(panel)}
+onClose={onClose}
+leftPanelCollapsed={
+leftPanelCollapsed
+}
+>
+<div style={styles.empty}>
+Select an object first to edit
+its{" "}
+{panelTitle(
+panel
+).toLowerCase()}{" "}
+values.
+</div>
+</PanelShell>
+);
+}
+
+const values =
+panel === "move"
+? selectedObject.transform.position
+: panel === "rotate"
+? selectedObject.transform.rotation
+: selectedObject.transform.scale;
+
+return (
+<PanelShell
+width={280}
+height={125}
+title={panelTitle(panel)}
+onClose={onClose}
+leftPanelCollapsed={
+leftPanelCollapsed
+}
+>
+<VectorEditor
+label={panelTitle(panel)}
+value={values}
+onChange={(next) => {
+if (panel === "move") {
+updateTransform(
+selectedObject.id,
+{
+position: next,
+}
+);
+} else if (
+panel === "rotate"
+) {
+updateTransform(
+selectedObject.id,
+{
+rotation: next,
+}
+);
+} else {
+updateTransform(
+selectedObject.id,
+{
+scale: next,
+}
+);
+}
+}}
+/>
+</PanelShell>
+);
+}
 
 function panelTitle(
-  panel:
-    Exclude<
-      ActivePanel,
-      null
-    >
+panel: Exclude<ActivePanel, null>
 ): string {
-  switch (
-    panel
-  ) {
-    case "move":
-      return "Move";
+switch (panel) {
+case "move":
+return "Move";
 
-    case "rotate":
-      return "Rotate";
+case "rotate":
+  return "Rotate";
 
-    case "scale":
-      return "Scale";
+case "scale":
+  return "Scale";
 
-    case "add":
-      return "Add Idea";
+case "add":
+  return "Add Idea";
 
-    case "help":
-      return "Help / Details";
-  }
+case "help":
+  return "Help / Details";
+
 }
-
-
-/* =========================================
-   PANEL SHELL
-========================================= */
+}
 
 function PanelShell({
-  title,
-  children,
-  onClose,
-  width,
-  height,
-  variant = "default",
-  leftPanelCollapsed,
+title,
+children,
+onClose,
+width,
+height,
+variant = "default",
+leftPanelCollapsed,
 }: {
-  title: string;
+title: string;
 
-  children:
-    | ReactElement
-    | ReactElement[];
+children:
+| ReactElement
+| ReactElement[];
 
-  onClose: () => void;
+onClose: () => void;
 
-  width: number;
+width: number;
 
-  height?: number;
+height?: number;
 
-  variant?:
-    | "default"
-    | "add";
+variant?: "default" | "add";
 
-  leftPanelCollapsed: boolean;
+leftPanelCollapsed: boolean;
 }) {
-  /*
-   * Existing panel positioning is preserved.
-   */
-  const left =
-    leftPanelCollapsed
-      ? 58
-      : 180;
+/*
+
+Left panel:
+160px wide
 
 
-  return (
-    <div
-      style={{
-        ...styles.shell,
+Contextual panel:
+starts immediately to its right
 
-        width,
 
-        height,
+Toolbar:
+remains underneath both panels.
+*/
+const left =
+leftPanelCollapsed
+? 58
+: 180;
 
-        left,
+return (
+<div
+style={{
+...styles.shell,
+width,
+height,
+left,
+bottom: 70,
+}}
+>
+<div style={styles.header}>
+<div style={styles.title}>
+{title}
+</div>
 
-        bottom:
-          70,
-      }}
+    <button
+      type="button"
+      onClick={onClose}
+      style={styles.close}
+      title="Close"
+      aria-label="Close"
     >
-      <div
-        style={
-          styles.header
-        }
-      >
-        <div
-          style={
-            styles.title
-          }
-        >
-          {title}
-        </div>
+      ×
+    </button>
+  </div>
 
+  <div style={styles.body}>
+    {children}
+  </div>
+</div>
 
-        <button
-          type="button"
-
-          onClick={
-            onClose
-          }
-
-          style={
-            styles.close
-          }
-
-          title="Close"
-
-          aria-label="Close"
-        >
-          ×
-        </button>
-      </div>
-
-
-      <div
-        style={
-          styles.body
-        }
-      >
-        {children}
-      </div>
-    </div>
-  );
+);
 }
-
-
-/* =========================================
-   VECTOR EDITOR
-========================================= */
 
 function VectorEditor({
-  label,
-  value,
-  onChange,
+label,
+value,
+onChange,
 }: {
-  label: string;
+label: string;
 
-  value: Vector3;
+value: Vector3;
 
-  onChange: (
-    value: Vector3
-  ) => void;
+onChange: (value: Vector3) => void;
 }) {
-  return (
-    <div>
-      <div
-        style={
-          styles.subtle
-        }
+return (
+<div>
+<div style={styles.subtle}>
+{label} — X / Y / Z
+</div>
+
+  <div style={styles.axisGrid}>
+    {(
+      ["X", "Y", "Z"] as const
+    ).map((axis, index) => (
+      <label
+        key={axis}
+        style={styles.axisLabel}
       >
-        {label} — X / Y / Z
-      </div>
+        <span style={styles.axisName}>
+          {axis}
+        </span>
 
+        <input
+          type="number"
+          step="0.01"
+          value={value[index]}
+          onChange={(event) => {
+            const next = Number(
+              event.target.value
+            );
 
-      <div
-        style={
-          styles.axisGrid
-        }
-      >
-        {(
-          [
-            "X",
-            "Y",
-            "Z",
-          ] as const
-        ).map(
-          (
-            axis,
-            index
-          ) => (
-            <label
-              key={
-                axis
-              }
+            if (
+              !Number.isFinite(next)
+            ) {
+              return;
+            }
 
-              style={
-                styles.axisLabel
-              }
-            >
-              <span
-                style={
-                  styles.axisName
-                }
-              >
-                {axis}
-              </span>
+            const updated =
+              [...value] as Vector3;
 
+            updated[index] = next;
 
-              <input
-                type="number"
+            onChange(updated);
+          }}
+          style={styles.input}
+        />
+      </label>
+    ))}
+  </div>
+</div>
 
-                step="0.01"
-
-                value={
-                  value[
-                    index
-                  ]
-                }
-
-                onChange={(
-                  event
-                ) => {
-                  const next =
-                    Number(
-                      event
-                        .target
-                        .value
-                    );
-
-
-                  if (
-                    !Number.isFinite(
-                      next
-                    )
-                  ) {
-                    return;
-                  }
-
-
-                  const updated =
-                    [
-                      ...value,
-                    ] as Vector3;
-
-
-                  updated[
-                    index
-                  ] =
-                    next;
-
-
-                  onChange(
-                    updated
-                  );
-                }}
-
-                style={
-                  styles.input
-                }
-              />
-            </label>
-          )
-        )}
-      </div>
-    </div>
-  );
+);
 }
 
-
-/* =========================================
-   ADD IDEAS
-========================================= */
-
 function AddIdeasPanel({
-  openIdeaFolders,
-  toggleIdeaFolder,
-  addIdea,
+openIdeaFolders,
+toggleIdeaFolder,
+addIdea,
 }: {
-  openIdeaFolders:
-    Record<
-      string,
-      boolean
-    >;
+openIdeaFolders: Record<string, boolean>;
 
-  toggleIdeaFolder: (
-    category: string
-  ) => void;
+toggleIdeaFolder: (
+category: string
+) => void;
 
-  addIdea: (
-    type: string
-  ) => void;
+addIdea: (type: string) => void;
 }) {
-  /*
-   * Start from the existing Idea Registry.
-   */
-  const categories =
-    getIdeaCategories();
+const categories = getIdeaCategories();
 
+const [activeCategory, setActiveCategory] =
+useState("All");
 
-  const [
-    activeCategory,
-    setActiveCategory,
-  ] = useState(
-    "All"
-  );
+const [page, setPage] = useState(1);
 
+const allIdeas = useMemo(() => {
+return categories.flatMap(
+(category) =>
+getIdeasByCategory(category).map(
+(idea: any) => ({
+idea,
+category,
+})
+)
+);
+}, [categories]);
 
-  const [
-    page,
-    setPage,
-  ] = useState(
-    1
-  );
+const ideas =
+activeCategory === "All"
+? allIdeas.map(
+({ idea }) => idea
+)
+: getIdeasByCategory(
+activeCategory
+);
 
+/*
 
-  /*
-   * Filter Global Settings /
-   * environment Ideas out of this
-   * normal Idea picker.
-   */
-  const allIdeas =
-    useMemo(() => {
-      return categories.flatMap(
-        (
-          category
-        ) =>
-          getIdeasByCategory(
-            category
-          )
-            .map(
-              (
-                idea: any
-              ) => ({
-                idea,
-                category,
-              })
-            )
-            .filter(
-              ({
-                idea,
-              }) => {
-                const type =
-                  typeof idea ===
-                  "string"
-                    ? idea
-                    : idea.type ??
-                      idea.id;
+Compact pagination.
+Three Ideas per page keeps the panel
+clean without making it taller.
+*/
+const pageSize = 3;
 
-                return !GLOBAL_ENVIRONMENT_TYPES.has(
-                  String(
-                    type
-                  )
-                );
-              }
-            )
-      );
-    }, [
-      categories,
-    ]);
+const totalPages = Math.max(
+1,
+Math.ceil(
+ideas.length / pageSize
+)
+);
 
+const safePage = Math.min(
+page,
+totalPages
+);
 
-  const ideas =
-    activeCategory ===
-    "All"
-      ? allIdeas.map(
-          ({
-            idea,
-          }) =>
-            idea
-        )
+const visibleIdeas = ideas.slice(
+(safePage - 1) * pageSize,
+safePage * pageSize
+);
 
-      : getIdeasByCategory(
-          activeCategory
-        ).filter(
-          (
-            idea: any
-          ) => {
-            const type =
-              typeof idea ===
-              "string"
-                ? idea
-                : idea.type ??
-                  idea.id;
+const selectCategory = (
+category: string
+) => {
+setActiveCategory(category);
+setPage(1);
 
-            return !GLOBAL_ENVIRONMENT_TYPES.has(
-              String(
-                type
-              )
-            );
-          }
-        );
+if (
+  category !== "All" &&
+  !openIdeaFolders[category]
+) {
+  toggleIdeaFolder(category);
+}
 
+};
 
-  /* =======================================
-     PAGINATION
-  ======================================= */
+return (
+<div style={styles.addLayout}>
+{/* CATEGORY COLUMN */}
+<div style={styles.categoryColumn}>
+<button
+type="button"
+onClick={() =>
+selectCategory("All")
+}
+style={{
+...styles.categoryItem,
+...(activeCategory === "All"
+? styles.categoryActive
+: {}),
+}}
+>
+All
+</button>
 
-  const pageSize =
-    3;
-
-
-  const totalPages =
-    Math.max(
-      1,
-      Math.ceil(
-        ideas.length /
-          pageSize
-      )
-    );
-
-
-  const safePage =
-    Math.min(
-      page,
-      totalPages
-    );
-
-
-  const visibleIdeas =
-    ideas.slice(
-      (safePage -
-        1) *
-        pageSize,
-
-      safePage *
-        pageSize
-    );
-
-
-  /* =======================================
-     CATEGORY
-  ======================================= */
-
-  const selectCategory =
-    (
-      category: string
-    ) => {
-      setActiveCategory(
-        category
-      );
-
-      setPage(
-        1
-      );
-
-
-      if (
-        category !==
-          "All" &&
-        !openIdeaFolders[
-          category
-        ]
-      ) {
-        toggleIdeaFolder(
-          category
-        );
-      }
-    };
-
-
-  return (
-    <div
-      style={
-        styles.addLayout
-      }
-    >
-      {/* =================================
-          CATEGORY COLUMN
-      ================================= */}
-
-      <div
-        style={
-          styles.categoryColumn
-        }
-      >
+    {categories.map(
+      (category) => (
         <button
+          key={category}
           type="button"
-
           onClick={() =>
             selectCategory(
-              "All"
+              category
             )
           }
-
           style={{
             ...styles.categoryItem,
-
             ...(activeCategory ===
-            "All"
-              ? styles.categoryActive
+            category
+              ? styles.categorySelected
               : {}),
           }}
         >
-          All
+          {category}
         </button>
+      )
+    )}
+  </div>
 
-
-        {categories.map(
-          (
-            category
-          ) => {
-            /*
-             * Do not expose an empty
-             * environment category if
-             * everything inside it is
-             * Global Settings.
-             */
-            const categoryIdeas =
-              getIdeasByCategory(
-                category
-              ).filter(
-                (
-                  idea: any
-                ) => {
-                  const type =
-                    typeof idea ===
-                    "string"
-                      ? idea
-                      : idea.type ??
-                        idea.id;
-
-                  return !GLOBAL_ENVIRONMENT_TYPES.has(
-                    String(
-                      type
-                    )
-                  );
-                }
-              );
-
-
-            if (
-              categoryIdeas.length ===
-              0
-            ) {
-              return null;
-            }
-
-
-            return (
-              <button
-                key={
-                  category
-                }
-
-                type="button"
-
-                onClick={() =>
-                  selectCategory(
-                    category
-                  )
-                }
-
-                style={{
-                  ...styles.categoryItem,
-
-                  ...(activeCategory ===
-                  category
-                    ? styles.categorySelected
-                    : {}),
-                }}
-              >
-                {
-                  category
-                }
-              </button>
-            );
-          }
-        )}
+  {/* IDEA AREA */}
+  <div style={styles.ideaArea}>
+    <div style={styles.ideaAreaHeader}>
+      <div style={styles.ideaAreaTitle}>
+        {activeCategory === "All"
+          ? "All Ideas"
+          : activeCategory}
       </div>
 
-
-      {/* =================================
-          IDEA AREA
-      ================================= */}
-
-      <div
-        style={
-          styles.ideaArea
+      <button
+        type="button"
+        onClick={() =>
+          window.alert(
+            "Idea upload is available through the project asset workflow."
+          )
         }
+        style={styles.upload}
       >
-        <div
-          style={
-            styles.ideaAreaHeader
-          }
-        >
-          <div
-            style={
-              styles.ideaAreaTitle
-            }
-          >
-            {activeCategory ===
-            "All"
-              ? "All Ideas"
-              : activeCategory}
-          </div>
+        + Upload
+      </button>
+    </div>
 
+    <div style={styles.ideaList}>
+      {visibleIdeas.map(
+        (idea: any, index) => {
+          const ideaType =
+            typeof idea ===
+            "string"
+              ? idea
+              : idea.type ??
+                idea.id;
 
-          <button
-            type="button"
+          const ideaLabel =
+            typeof idea ===
+            "string"
+              ? idea
+              : idea.name ??
+                idea.label ??
+                idea.type;
 
-            onClick={() =>
-              window.alert(
-                "Idea upload is available through the project asset workflow."
-              )
-            }
+          const description =
+            typeof idea ===
+            "string"
+              ? `Add ${idea} to the world.`
+              : idea.description ??
+                `Add ${ideaLabel} to the world.`;
 
-            style={
-              styles.upload
-            }
-          >
-            + Upload
-          </button>
-        </div>
+          return (
+            <div
+              key={`${ideaType}-${index}`}
+              style={styles.ideaCard}
+            >
+              <div
+                style={
+                  styles.ideaIcon
+                }
+              >
+                +
+              </div>
 
-
-        <div
-          style={
-            styles.ideaList
-          }
-        >
-          {visibleIdeas.map(
-            (
-              idea: any,
-              index
-            ) => {
-              const ideaType =
-                typeof idea ===
-                "string"
-                  ? idea
-                  : idea.type ??
-                    idea.id;
-
-
-              const ideaLabel =
-                typeof idea ===
-                "string"
-                  ? idea
-                  : idea.name ??
-                    idea.label ??
-                    idea.type;
-
-
-              const description =
-                typeof idea ===
-                "string"
-                  ? `Add ${idea} to the world.`
-
-                  : idea.description ??
-                    `Add ${ideaLabel} to the world.`;
-
-
-              return (
+              <div
+                style={
+                  styles.ideaInfo
+                }
+              >
                 <div
-                  key={`${ideaType}-${index}`}
-
                   style={
-                    styles.ideaCard
+                    styles.ideaName
                   }
                 >
-                  <div
-                    style={
-                      styles.ideaIcon
-                    }
-                  >
-                    +
-                  </div>
-
-
-                  <div
-                    style={
-                      styles.ideaInfo
-                    }
-                  >
-                    <div
-                      style={
-                        styles.ideaName
-                      }
-                    >
-                      {
-                        String(
-                          ideaLabel
-                        )
-                      }
-                    </div>
-
-
-                    <div
-                      style={
-                        styles.ideaDescription
-                      }
-                    >
-                      {
-                        String(
-                          description
-                        )
-                      }
-                    </div>
-                  </div>
-
-
-                  <button
-                    type="button"
-
-                    onClick={() =>
-                      addIdea(
-                        String(
-                          ideaType
-                        )
-                      )
-                    }
-
-                    style={
-                      styles.addButton
-                    }
-                  >
-                    Add
-                  </button>
+                  {String(
+                    ideaLabel
+                  )}
                 </div>
-              );
-            }
-          )}
 
+                <div
+                  style={
+                    styles.ideaDescription
+                  }
+                >
+                  {String(
+                    description
+                  )}
+                </div>
+              </div>
 
-          {visibleIdeas.length ===
-            0 && (
-            <div
-              style={
-                styles.noIdeas
-              }
-            >
-              No Ideas in this
-              category yet.
+              <button
+                type="button"
+                onClick={() =>
+                  addIdea(
+                    String(
+                      ideaType
+                    )
+                  )
+                }
+                style={
+                  styles.addButton
+                }
+              >
+                Add
+              </button>
             </div>
-          )}
+          );
+        }
+      )}
+
+      {visibleIdeas.length ===
+        0 && (
+        <div style={styles.noIdeas}>
+          No Ideas in this
+          category yet.
         </div>
-
-
-        {/* ===============================
-            PAGINATION
-        =============================== */}
-
-        <div
-          style={
-            styles.pagination
-          }
-        >
-          <button
-            type="button"
-
-            disabled={
-              safePage <=
-              1
-            }
-
-            onClick={() =>
-              setPage(
-                Math.max(
-                  1,
-                  safePage -
-                    1
-                )
-              )
-            }
-
-            style={{
-              ...styles.pageButton,
-
-              opacity:
-                safePage <=
-                1
-                  ? 0.4
-                  : 1,
-            }}
-          >
-            ‹
-          </button>
-
-
-          <span>
-            {
-              safePage
-            }{" "}
-            /{" "}
-            {
-              totalPages
-            }
-          </span>
-
-
-          <button
-            type="button"
-
-            disabled={
-              safePage >=
-              totalPages
-            }
-
-            onClick={() =>
-              setPage(
-                Math.min(
-                  totalPages,
-                  safePage +
-                    1
-                )
-              )
-            }
-
-            style={{
-              ...styles.pageButton,
-
-              opacity:
-                safePage >=
-                totalPages
-                  ? 0.4
-                  : 1,
-            }}
-          >
-            ›
-          </button>
-        </div>
-      </div>
+      )}
     </div>
-  );
+
+    <div style={styles.pagination}>
+      <button
+        type="button"
+        disabled={safePage <= 1}
+        onClick={() =>
+          setPage(
+            Math.max(
+              1,
+              safePage - 1
+            )
+          )
+        }
+        style={{
+          ...styles.pageButton,
+          opacity:
+            safePage <= 1
+              ? 0.4
+              : 1,
+        }}
+      >
+        ‹
+      </button>
+
+      <span>
+        {safePage} / {totalPages}
+      </span>
+
+      <button
+        type="button"
+        disabled={
+          safePage >= totalPages
+        }
+        onClick={() =>
+          setPage(
+            Math.min(
+              totalPages,
+              safePage + 1
+            )
+          )
+        }
+        style={{
+          ...styles.pageButton,
+          opacity:
+            safePage >=
+            totalPages
+              ? 0.4
+              : 1,
+        }}
+      >
+        ›
+      </button>
+    </div>
+  </div>
+</div>
+
+);
 }
 
+const styles: Record<string, CSSProperties> = {
+shell: {
+position: "absolute",
 
-/* =========================================
-   STYLES
-========================================= */
+boxSizing: "border-box",
 
-const styles:
-  Record<
-    string,
-    CSSProperties
-  > = {
-  shell: {
-    position:
-      "absolute",
+overflow: "hidden",
 
-    boxSizing:
-      "border-box",
+borderRadius: 11,
 
-    overflow:
-      "hidden",
+background:
+  "rgba(242, 243, 245, 0.98)",
 
-    borderRadius:
-      11,
+border:
+  "1px solid rgba(30, 32, 36, 0.12)",
 
-    background:
-      "rgba(242, 243, 245, 0.98)",
+boxShadow:
+  "0 10px 28px rgba(0,0,0,0.14)",
 
-    border:
-      "1px solid rgba(30, 32, 36, 0.12)",
+pointerEvents: "auto",
 
-    boxShadow:
-      "0 10px 28px rgba(0,0,0,0.14)",
+zIndex: 35,
 
-    pointerEvents:
-      "auto",
+color: "#292c32",
 
-    zIndex:
-      35,
+},
 
-    color:
-      "#292c32",
-  },
+header: {
+height: 34,
 
+display: "flex",
+alignItems: "center",
+justifyContent:
+  "space-between",
 
-  header: {
-    height:
-      34,
+padding:
+  "0 7px 0 10px",
 
-    display:
-      "flex",
+boxSizing:
+  "border-box",
 
-    alignItems:
-      "center",
+background:
+  "#e9eaec",
 
-    justifyContent:
-      "space-between",
+borderBottom:
+  "1px solid rgba(30,32,36,0.09)",
 
-    padding:
-      "0 7px 0 10px",
+},
 
-    boxSizing:
-      "border-box",
+title: {
+fontSize: 10,
+fontWeight: 800,
 
-    background:
-      "#e9eaec",
+color: "#292c32",
 
-    borderBottom:
-      "1px solid rgba(30,32,36,0.09)",
-  },
+},
 
+close: {
+width: 23,
+height: 23,
 
-  title: {
-    fontSize:
-      10,
+border: 0,
+borderRadius: 6,
 
-    fontWeight:
-      800,
+background:
+  "#dedfe2",
 
-    color:
-      "#292c32",
-  },
+color: "#454a51",
 
+cursor: "pointer",
 
-  close: {
-    width:
-      23,
+fontSize: 15,
+lineHeight: 1,
 
-    height:
-      23,
+},
 
-    border:
-      0,
+body: {
+height: "calc(100% - 34px)",
 
-    borderRadius:
-      6,
+padding: 8,
 
-    background:
-      "#dedfe2",
+overflowY: "auto",
 
-    color:
-      "#454a51",
+boxSizing: "border-box",
 
-    cursor:
-      "pointer",
+},
 
-    fontSize:
-      15,
+subtle: {
+fontSize: 8,
 
-    lineHeight:
-      1,
-  },
+color: "#656a72",
 
+marginBottom: 7,
 
-  body: {
-    height:
-      "calc(100% - 34px)",
+},
 
-    padding:
-      8,
+axisGrid: {
+display: "grid",
 
-    overflowY:
-      "auto",
+gridTemplateColumns:
+  "repeat(3, 1fr)",
 
-    boxSizing:
-      "border-box",
-  },
+gap: 6,
 
+},
 
-  subtle: {
-    fontSize:
-      8,
+axisLabel: {
+display: "flex",
 
-    color:
-      "#656a72",
+flexDirection: "column",
 
-    marginBottom:
-      7,
-  },
+gap: 3,
 
+fontSize: 8,
 
-  axisGrid: {
-    display:
-      "grid",
+color: "#454a51",
 
-    gridTemplateColumns:
-      "repeat(3, 1fr)",
+fontWeight: 700,
 
-    gap:
-      6,
-  },
+},
 
+axisName: {
+color: "#454a51",
+},
 
-  axisLabel: {
-    display:
-      "flex",
+input: {
+boxSizing: "border-box",
 
-    flexDirection:
-      "column",
+width: "100%",
 
-    gap:
-      3,
+height: 29,
 
-    fontSize:
-      8,
+padding:
+  "5px 6px",
 
-    color:
-      "#454a51",
+borderRadius: 6,
 
-    fontWeight:
-      700,
-  },
+border:
+  "1px solid rgba(30,32,36,0.16)",
 
+background:
+  "#ffffff",
 
-  axisName: {
-    color:
-      "#454a51",
-  },
+color: "#1f2328",
 
+WebkitTextFillColor:
+  "#1f2328",
 
-  input: {
-    boxSizing:
-      "border-box",
+outline: "none",
 
-    width:
-      "100%",
+fontSize: 10,
 
-    height:
-      29,
+fontWeight: 700,
 
-    padding:
-      "5px 6px",
+},
 
-    borderRadius:
-      6,
+empty: {
+padding: 10,
 
-    border:
-      "1px solid rgba(30,32,36,0.16)",
+borderRadius: 7,
 
-    background:
-      "#ffffff",
+background:
+  "#e8e9eb",
 
-    color:
-      "#1f2328",
+color: "#555a62",
 
-    WebkitTextFillColor:
-      "#1f2328",
+fontSize: 9,
 
-    outline:
-      "none",
+lineHeight: 1.45,
 
-    fontSize:
-      10,
+textAlign: "center",
 
-    fontWeight:
-      700,
-  },
+},
 
+addLayout: {
+display: "grid",
 
-  empty: {
-    padding:
-      10,
+gridTemplateColumns:
+  "92px minmax(0, 1fr)",
 
-    borderRadius:
-      7,
+gap: 8,
 
-    background:
-      "#e8e9eb",
+width: "100%",
 
-    color:
-      "#555a62",
+height: "100%",
 
-    fontSize:
-      9,
+minHeight: 0,
 
-    lineHeight:
-      1.45,
+},
 
-    textAlign:
-      "center",
-  },
+categoryColumn: {
+display: "flex",
 
+flexDirection: "column",
 
-  addLayout: {
-    display:
-      "grid",
+gap: 3,
 
-    gridTemplateColumns:
-      "92px minmax(0, 1fr)",
+padding: 4,
 
-    gap:
-      8,
+borderRadius: 8,
 
-    width:
-      "100%",
+background:
+  "#e7e8ea",
 
-    height:
-      "100%",
+overflowY: "auto",
 
-    minHeight:
-      0,
-  },
+minHeight: 0,
 
+},
 
-  categoryColumn: {
-    display:
-      "flex",
+categoryItem: {
+width: "100%",
 
-    flexDirection:
-      "column",
+minHeight: 25,
 
-    gap:
-      3,
+flexShrink: 0,
 
-    padding:
-      4,
+padding:
+  "0 7px",
 
-    borderRadius:
-      8,
+border: 0,
 
-    background:
-      "#e7e8ea",
+borderRadius: 6,
 
-    overflowY:
-      "auto",
+background:
+  "transparent",
 
-    minHeight:
-      0,
-  },
+color: "#4e535a",
 
+cursor: "pointer",
 
-  categoryItem: {
-    width:
-      "100%",
+textAlign: "left",
 
-    minHeight:
-      25,
+fontSize: 8,
 
-    flexShrink:
-      0,
+fontWeight: 700,
 
-    padding:
-      "0 7px",
+},
 
-    border:
-      0,
+categoryActive: {
+background:
+"#5d83ee",
 
-    borderRadius:
-      6,
+color:
+  "#ffffff",
 
-    background:
-      "transparent",
+},
 
-    color:
-      "#4e535a",
+categorySelected: {
+background:
+"#d7dce8",
 
-    cursor:
-      "pointer",
+color:
+  "#354875",
 
-    textAlign:
-      "left",
+},
 
-    fontSize:
-      8,
+ideaArea: {
+minWidth: 0,
 
-    fontWeight:
-      700,
-  },
+minHeight: 0,
 
+display: "flex",
 
-  categoryActive: {
-    background:
-      "#5d83ee",
+flexDirection: "column",
 
-    color:
-      "#ffffff",
-  },
+},
 
+ideaAreaHeader: {
+display: "flex",
 
-  categorySelected: {
-    background:
-      "#d7dce8",
+alignItems: "center",
 
-    color:
-      "#354875",
-  },
+justifyContent:
+  "space-between",
 
+gap: 6,
 
-  ideaArea: {
-    minWidth:
-      0,
+marginBottom: 5,
 
-    minHeight:
-      0,
+},
 
-    display:
-      "flex",
+ideaAreaTitle: {
+fontSize: 9,
 
-    flexDirection:
-      "column",
-  },
+fontWeight: 800,
 
+color: "#4f545b",
 
-  ideaAreaHeader: {
-    display:
-      "flex",
+},
 
-    alignItems:
-      "center",
+upload: {
+flexShrink: 0,
 
-    justifyContent:
-      "space-between",
+padding:
+  "4px 7px",
 
-    gap:
-      6,
+border: 0,
 
-    marginBottom:
-      5,
-  },
+borderRadius: 5,
 
+background:
+  "#dedfe2",
 
-  ideaAreaTitle: {
-    fontSize:
-      9,
+color: "#454a51",
 
-    fontWeight:
-      800,
+fontSize: 8,
 
-    color:
-      "#4f545b",
-  },
+fontWeight: 700,
 
+cursor: "pointer",
 
-  upload: {
-    flexShrink:
-      0,
+},
 
-    padding:
-      "4px 7px",
+ideaList: {
+display: "flex",
 
-    border:
-      0,
+flexDirection: "column",
 
-    borderRadius:
-      5,
+gap: 4,
 
-    background:
-      "#dedfe2",
+flex: 1,
 
-    color:
-      "#454a51",
+minHeight: 0,
 
-    fontSize:
-      8,
+overflowY: "auto",
 
-    fontWeight:
-      700,
+paddingRight: 2,
 
-    cursor:
-      "pointer",
-  },
+},
 
+ideaCard: {
+minHeight: 48,
 
-  ideaList: {
-    display:
-      "flex",
+flexShrink: 0,
 
-    flexDirection:
-      "column",
+display: "flex",
 
-    gap:
-      4,
+alignItems: "center",
 
-    flex:
-      1,
+gap: 6,
 
-    minHeight:
-      0,
+padding:
+  "5px 6px",
 
-    overflowY:
-      "auto",
+border:
+  "1px solid rgba(30,32,36,0.08)",
 
-    paddingRight:
-      2,
-  },
+borderRadius: 7,
 
+background:
+  "#f8f8f9",
 
-  ideaCard: {
-    minHeight:
-      48,
+},
 
-    flexShrink:
-      0,
+ideaIcon: {
+width: 23,
+height: 23,
 
-    display:
-      "flex",
+flexShrink: 0,
 
-    alignItems:
-      "center",
+display: "flex",
 
-    gap:
-      6,
+alignItems: "center",
 
-    padding:
-      "5px 6px",
+justifyContent: "center",
 
-    border:
-      "1px solid rgba(30,32,36,0.08)",
+borderRadius: 6,
 
-    borderRadius:
-      7,
+background:
+  "#dedfe2",
 
-    background:
-      "#f8f8f9",
-  },
+color:
+  "#60656c",
 
+fontWeight: 900,
 
-  ideaIcon: {
-    width:
-      23,
+fontSize: 12,
 
-    height:
-      23,
+},
 
-    flexShrink:
-      0,
+ideaInfo: {
+flex: 1,
 
-    display:
-      "flex",
+minWidth: 0,
 
-    alignItems:
-      "center",
+},
 
-    justifyContent:
-      "center",
+ideaName: {
+overflow: "hidden",
 
-    borderRadius:
-      6,
+textOverflow: "ellipsis",
 
-    background:
-      "#dedfe2",
+whiteSpace: "nowrap",
 
-    color:
-      "#60656c",
+fontSize: 9,
 
-    fontWeight:
-      900,
+fontWeight: 800,
 
-    fontSize:
-      12,
-  },
+color:
+  "#30343a",
 
+marginBottom: 1,
 
-  ideaInfo: {
-    flex:
-      1,
+},
 
-    minWidth:
-      0,
-  },
+ideaDescription: {
+overflow: "hidden",
 
+textOverflow: "ellipsis",
 
-  ideaName: {
-    overflow:
-      "hidden",
+whiteSpace: "nowrap",
 
-    textOverflow:
-      "ellipsis",
+fontSize: 7.5,
 
-    whiteSpace:
-      "nowrap",
+lineHeight: 1.3,
 
-    fontSize:
-      9,
+color:
+  "#6c7178",
 
-    fontWeight:
-      800,
+},
 
-    color:
-      "#30343a",
+addButton: {
+flexShrink: 0,
 
-    marginBottom:
-      1,
-  },
+padding:
+  "5px 8px",
 
+border: 0,
 
-  ideaDescription: {
-    overflow:
-      "hidden",
+borderRadius: 5,
 
-    textOverflow:
-      "ellipsis",
+background:
+  "#5d83ee",
 
-    whiteSpace:
-      "nowrap",
+color:
+  "#ffffff",
 
-    fontSize:
-      7.5,
+cursor: "pointer",
 
-    lineHeight:
-      1.3,
+fontSize: 8,
 
-    color:
-      "#6c7178",
-  },
+fontWeight: 800,
 
+},
 
-  addButton: {
-    flexShrink:
-      0,
+noIdeas: {
+padding: 12,
 
-    padding:
-      "5px 8px",
+borderRadius: 7,
 
-    border:
-      0,
+background:
+  "#e8e9eb",
 
-    borderRadius:
-      5,
+color:
+  "#686d74",
 
-    background:
-      "#5d83ee",
+textAlign: "center",
 
-    color:
-      "#ffffff",
+fontSize: 8,
 
-    cursor:
-      "pointer",
+},
 
-    fontSize:
-      8,
+pagination: {
+display: "flex",
 
-    fontWeight:
-      800,
-  },
+alignItems: "center",
 
+justifyContent:
+  "center",
 
-  noIdeas: {
-    padding:
-      12,
+gap: 7,
 
-    borderRadius:
-      7,
+marginTop: 5,
 
-    background:
-      "#e8e9eb",
+paddingTop: 5,
 
-    color:
-      "#686d74",
+borderTop:
+  "1px solid rgba(30,32,36,0.08)",
 
-    textAlign:
-      "center",
+fontSize: 8,
 
-    fontSize:
-      8,
-  },
+fontWeight: 800,
 
+color:
+  "#555a62",
 
-  pagination: {
-    display:
-      "flex",
+},
 
-    alignItems:
-      "center",
+pageButton: {
+width: 21,
+height: 21,
 
-    justifyContent:
-      "center",
+border: 0,
 
-    gap:
-      7,
+borderRadius: 5,
 
-    marginTop:
-      5,
+background:
+  "#dedfe2",
 
-    paddingTop:
-      5,
+color:
+  "#454a51",
 
-    borderTop:
-      "1px solid rgba(30,32,36,0.08)",
+cursor: "pointer",
 
-    fontSize:
-      8,
+fontSize: 13,
 
-    fontWeight:
-      800,
-
-    color:
-      "#555a62",
-  },
-
-
-  pageButton: {
-    width:
-      21,
-
-    height:
-      21,
-
-    border:
-      0,
-
-    borderRadius:
-      5,
-
-    background:
-      "#dedfe2",
-
-    color:
-      "#454a51",
-
-    cursor:
-      "pointer",
-
-    fontSize:
-      13,
-  },
+},
 };

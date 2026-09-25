@@ -42,15 +42,17 @@ function createTemplateObject(
 
 
   const object =
-    createSceneObject(
-      definition.type,
-      definition.overrides
-    );
+  createSceneObject(
+    definition.type
+  );
 
+if (definition.overrides) {
+  Object.assign(
+    object,
+    definition.overrides
+  );
+}
 
-  if (definition.id) {
-    object.id = definition.id;
-  }
 
 
   return object;

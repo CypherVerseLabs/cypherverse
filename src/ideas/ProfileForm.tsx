@@ -1,6 +1,6 @@
 // components/ProfileForm.tsx
 import { useState } from "react";
-import { useAuthContext } from "../context/AuthContext"; // adjust path as needed
+import { useAuthContext } from "./context/AuthContext";
 
 export function ProfileForm() {
   const { user, setUser, authFetch } = useAuthContext();

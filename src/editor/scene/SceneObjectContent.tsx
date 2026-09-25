@@ -26,6 +26,15 @@ import Link from "../../ideas/inputs/Link";
 import Speaker from "../../ideas/players/Speaker";
 import Ground from "../../ideas/Ground";
 
+import ToxicGass from "../../ideas/environments/ToxicGass";
+import TransparentFloor from "../../ideas/environments/TransparentFloor";
+import SpeakerRadio from "../../ideas/players/SpeakerRadio";
+import VideoPlayer from "../../ideas/players/VideoPlayer";
+import YouTubePlayer from "../../ideas/players/YouTubePlayer";
+import Probe from "../../ideas/mediated/Probe";
+import Cyrus from "../../ideas/characters/Cyrus";
+import Bloom from "../../ideas/Bloom";
+
 import {
   SceneObject,
 } from "./objectTypes";
@@ -53,6 +62,8 @@ const ENVIRONMENT_TYPES =
     "ground",
     "cloudySky",
     "rain",
+    "toxicGass",
+    "transparentFloor",
     "fog",
     "background",
     "hdri",
@@ -108,7 +119,10 @@ function NonInteractiveEnvironment({
         );
 
         if (!editorActive) {
-          child.raycast = () => {};
+          child.raycast = () => {
+  // Intentionally disabled while editor mode is active.
+};
+
         }
       }
     });
@@ -185,7 +199,10 @@ function EditorInteractionShield({
         );
 
         if (enabled) {
-          child.raycast = () => {};
+          child.raycast = () => {
+  // Intentionally disabled while the editor interaction shield is enabled.
+};
+
         }
       }
     });
@@ -207,6 +224,7 @@ function EditorInteractionShield({
     </group>
   );
 }
+
 
 
 /* =========================================
@@ -487,6 +505,95 @@ export default function SceneObjectContent({
         />
       );
       break;
+
+
+      case "toxicGass":
+  content = (
+    <ToxicGass
+      count={object.props.count}
+      color={
+        object.props.color as ColorRepresentation
+      }
+      size={object.props.size}
+    />
+  );
+  break;
+
+case "transparentFloor":
+  content = (
+    <TransparentFloor
+      opacity={object.props.opacity}
+      color={
+        object.props.color as ColorRepresentation
+      }
+    />
+  );
+  break;
+
+
+
+case "speakerRadio":
+  content = (
+    <SpeakerRadio
+      distance={object.props.distance}
+      volume={object.props.volume}
+      shuffle={object.props.shuffle}
+    />
+  );
+  break;
+
+
+case "videoPlayer":
+  content = (
+    <VideoPlayer
+      videoSrc={object.props.videoSrc}
+      videoDistance={object.props.videoDistance}
+      framed={object.props.framed}
+      volume={object.props.volume}
+      restartOnEnter={object.props.restartOnEnter}
+      audioDistance={object.props.audioDistance}
+      frameColor={object.props.frameColor}
+      previewColor={object.props.previewColor}
+      previewText={object.props.previewText}
+      previewTextColor={object.props.previewTextColor}
+      previewTextFont={object.props.previewTextFont}
+      previewTextSize={object.props.previewTextSize}
+    />
+  );
+  break;
+
+
+case "youtubePlayer":
+  content = (
+    <YouTubePlayer
+      videoId={object.props.videoId}
+      width={object.props.width}
+      height={object.props.height}
+      videoDistance={object.props.videoDistance}
+      controls={object.props.controls}
+      muted={object.props.muted}
+    />
+  );
+  break;
+
+
+case "probe":
+  content = (
+    <Probe />
+  );
+  break;
+
+
+case "cyrus":
+  content = (
+    <Cyrus
+      dialogue={object.props.dialogue}
+      response={object.props.response}
+      link={object.props.link}
+      anim={object.props.anim as any}
+    />
+  );
+  break;
 
 
     /* =====================================
