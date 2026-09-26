@@ -545,10 +545,6 @@ export default function EditorUI({
     return null;
   }
 
-  if (!selectedObject) {
-    return null;
-  }
-
   return (
     <Html
       fullscreen
