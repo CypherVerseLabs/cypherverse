@@ -32,8 +32,8 @@ import SpeakerRadio from "../../ideas/players/SpeakerRadio";
 import VideoPlayer from "../../ideas/players/VideoPlayer";
 import YouTubePlayer from "../../ideas/players/YouTubePlayer";
 import Probe from "../../ideas/mediated/Probe";
+import { Orbiting } from "../../ideas/mediated/Orbiting";
 import Cyrus from "../../ideas/characters/Cyrus";
-import Bloom from "../../ideas/Bloom";
 
 import {
   SceneObject,
@@ -43,19 +43,9 @@ import {
   useEditor,
 } from "../context/EditorContext";
 
-
-/* =========================================
-   TYPES
-========================================= */
-
 type SceneObjectContentProps = {
   object: SceneObject;
 };
-
-
-/* =========================================
-   ENVIRONMENT TYPES
-========================================= */
 
 const ENVIRONMENT_TYPES =
   new Set<SceneObject["type"]>([
@@ -71,66 +61,63 @@ const ENVIRONMENT_TYPES =
     "lostFloor",
   ]);
 
-
-/* =========================================
-   NON-INTERACTIVE ENVIRONMENT
-========================================= */
-
-/*
- * Environment objects remain visible in View
- * Mode but do not steal pointer events from
- * interactive runtime objects.
- *
- * In Edit Mode, their original raycasts are
- * restored so they can be selected.
- */
-
 function NonInteractiveEnvironment({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  const groupRef = useRef<Group>(null);
+  const groupRef =
+    useRef<Group>(null);
 
   const {
     editorActive,
   } = useEditor();
 
   useLayoutEffect(() => {
-    const group = groupRef.current;
+    const group =
+      groupRef.current;
 
     if (!group) {
       return;
     }
 
-    const originalRaycasts = new Map<
-      Object3D,
-      Object3D["raycast"]
-    >();
+    const originalRaycasts =
+      new Map<
+        Object3D,
+        Object3D["raycast"]
+      >();
 
-    group.traverse((child) => {
-      if (
-        "raycast" in child &&
-        typeof child.raycast === "function"
-      ) {
-        originalRaycasts.set(
-          child,
-          child.raycast
-        );
+    group.traverse(
+      (child) => {
+        if (
+          "raycast" in child &&
+          typeof child.raycast ===
+            "function"
+        ) {
+          originalRaycasts.set(
+            child,
+            child.raycast
+          );
 
-        if (!editorActive) {
-          child.raycast = () => {
-  // Intentionally disabled while editor mode is active.
-};
-
+          if (!editorActive) {
+            child.raycast =
+              () => {
+                // Intentionally disabled
+                // while editor is inactive.
+              };
+          }
         }
       }
-    });
+    );
 
     return () => {
       originalRaycasts.forEach(
-        (raycast, child) => {
-          child.raycast = raycast;
+        (
+          raycast,
+          child
+        ) => {
+          child.raycast =
+            raycast;
         }
       );
     };
@@ -139,33 +126,13 @@ function NonInteractiveEnvironment({
   ]);
 
   return (
-    <group ref={groupRef}>
+    <group
+      ref={groupRef}
+    >
       {children}
     </group>
   );
 }
-
-
-/* =========================================
-   EDITOR INTERACTION SHIELD
-========================================= */
-
-/*
- * Runtime Ideas such as Link, Speaker, and
- * other interactive components may contain
- * their own pointer handlers.
- *
- * In Edit Mode, the parent SceneObject must
- * receive the selection click instead of the
- * Idea activating its runtime behavior.
- *
- * Disabling raycasts on the rendered content
- * prevents child meshes from receiving pointer
- * events while editing.
- *
- * The parent SceneObject group still receives
- * the click through its own editor handler.
- */
 
 function EditorInteractionShield({
   children,
@@ -174,43 +141,55 @@ function EditorInteractionShield({
   children: React.ReactNode;
   enabled: boolean;
 }): React.ReactElement {
-  const groupRef = useRef<Group>(null);
+  const groupRef =
+    useRef<Group>(null);
 
   useLayoutEffect(() => {
-    const group = groupRef.current;
+    const group =
+      groupRef.current;
 
     if (!group) {
       return;
     }
 
-    const originalRaycasts = new Map<
-      Object3D,
-      Object3D["raycast"]
-    >();
+    const originalRaycasts =
+      new Map<
+        Object3D,
+        Object3D["raycast"]
+      >();
 
-    group.traverse((child) => {
-      if (
-        "raycast" in child &&
-        typeof child.raycast === "function"
-      ) {
-        originalRaycasts.set(
-          child,
-          child.raycast
-        );
+    group.traverse(
+      (child) => {
+        if (
+          "raycast" in child &&
+          typeof child.raycast ===
+            "function"
+        ) {
+          originalRaycasts.set(
+            child,
+            child.raycast
+          );
 
-        if (enabled) {
-          child.raycast = () => {
-  // Intentionally disabled while the editor interaction shield is enabled.
-};
-
+          if (enabled) {
+            child.raycast =
+              () => {
+                // Intentionally disabled
+                // while editor interaction
+                // shield is enabled.
+              };
+          }
         }
       }
-    });
+    );
 
     return () => {
       originalRaycasts.forEach(
-        (raycast, child) => {
-          child.raycast = raycast;
+        (
+          raycast,
+          child
+        ) => {
+          child.raycast =
+            raycast;
         }
       );
     };
@@ -219,17 +198,52 @@ function EditorInteractionShield({
   ]);
 
   return (
-    <group ref={groupRef}>
+    <group
+      ref={groupRef}
+    >
       {children}
     </group>
   );
 }
 
+function applyModifiers(
+  object: SceneObject,
+  content: React.ReactElement
+): React.ReactElement {
+  const modifiers =
+    object.modifiers ?? [];
 
+  let result =
+    content;
 
-/* =========================================
-   SCENE OBJECT CONTENT
-========================================= */
+  for (
+    const modifier of modifiers
+  ) {
+    switch (
+      modifier.type
+    ) {
+      case "orbiting":
+        result = (
+          <Orbiting
+            radius={
+              modifier.props.radius
+            }
+            ySpeed={
+              modifier.props.ySpeed
+          }
+          >
+            {result}
+          </Orbiting>
+        );
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  return result;
+}
 
 export default function SceneObjectContent({
   object,
@@ -239,117 +253,106 @@ export default function SceneObjectContent({
   } = useEditor();
 
   let content:
-    React.ReactElement | null;
+    | React.ReactElement
+    | null;
 
-
-  /* =======================================
-     IMAGE
-  ======================================= */
-
-  switch (object.type) {
+  switch (
+    object.type
+  ) {
     case "image":
       content = object.props.src ? (
         <Image
-          src={object.props.src}
+          src={
+            object.props.src
+          }
         />
       ) : (
         <ImagePlaceholder />
       );
       break;
 
-
-    /* =====================================
-       MODEL
-    ===================================== */
-
     case "model":
       content = object.props.src ? (
         <Model
-          src={object.props.src}
-          center={object.props.center}
-          normalize={object.props.normalize}
+          src={
+            object.props.src
+          }
+          center={
+            object.props.center
+          }
+          normalize={
+            object.props.normalize
+          }
         />
       ) : (
         <ModelPlaceholder />
       );
       break;
 
-
-    /* =====================================
-       VIDEO
-    ===================================== */
-
     case "video":
       content = object.props.src ? (
         <Video
-          src={object.props.src}
-          size={object.props.size}
-          framed={object.props.framed}
-          muted={object.props.muted}
-          volume={object.props.volume}
+          src={
+            object.props.src
+          }
+          size={
+            object.props.size
+          }
+          framed={
+            object.props.framed
+          }
+          muted={
+            object.props.muted
+          }
+          volume={
+            object.props.volume
+          }
         />
       ) : (
         <VideoPlaceholder />
       );
       break;
 
-
-    /* =====================================
-       AUDIO
-    ===================================== */
-
     case "audio":
       content = object.props.url ? (
         <Audio
-          url={object.props.url}
-          volume={object.props.volume}
-          rollOff={object.props.rollOff}
+          url={
+            object.props.url
+          }
+          volume={
+            object.props.volume
+          }
+          rollOff={
+            object.props.rollOff
+          }
         />
       ) : (
         <AudioPlaceholder />
       );
       break;
 
-
-    /* =====================================
-       HDRI
-    ===================================== */
-
     case "hdri":
-      /*
-       * HDRI rendering can be connected to
-       * the actual CyEngine HDRI component
-       * later.
-       */
       content = null;
       break;
-
-
-    /* =====================================
-       BACKGROUND
-    ===================================== */
 
     case "background":
       content = (
         <color
           attach="background"
           args={[
-            object.props.color as ColorRepresentation,
+            object.props
+              .color as ColorRepresentation,
           ]}
         />
       );
       break;
 
-
-    /* =====================================
-       FOG
-    ===================================== */
-
     case "fog":
       content = (
         <Fog
           color={
-            object.props.color as ColorRepresentation
+            object.props
+              .color as ColorRepresentation
           }
           near={
             object.props.near
@@ -360,11 +363,6 @@ export default function SceneObjectContent({
         />
       );
       break;
-
-
-    /* =====================================
-       INFINITE PLANE
-    ===================================== */
 
     case "infinitePlane":
       content = (
@@ -382,21 +380,12 @@ export default function SceneObjectContent({
       );
       break;
 
-
-    /* =====================================
-       LOST FLOOR
-    ===================================== */
-
     case "lostFloor":
-      content = object.props.visible ? (
-        <LostFloor />
-      ) : null;
+      content =
+        object.props.visible ? (
+          <LostFloor />
+        ) : null;
       break;
-
-
-    /* =====================================
-       CLOUDY SKY
-    ===================================== */
 
     case "cloudySky":
       content = (
@@ -411,11 +400,6 @@ export default function SceneObjectContent({
       );
       break;
 
-
-    /* =====================================
-       RAIN
-    ===================================== */
-
     case "rain":
       content = (
         <Rain
@@ -423,7 +407,8 @@ export default function SceneObjectContent({
             object.props.count
           }
           color={
-            object.props.color as ColorRepresentation
+            object.props
+              .color as ColorRepresentation
           }
           size={
             object.props.size
@@ -431,11 +416,6 @@ export default function SceneObjectContent({
         />
       );
       break;
-
-
-    /* =====================================
-       TITLE
-    ===================================== */
 
     case "title":
       content = (
@@ -445,15 +425,13 @@ export default function SceneObjectContent({
             undefined
           }
         >
-          {object.props.text}
+          {
+            object.props
+              .text
+          }
         </Title>
       );
       break;
-
-
-    /* =====================================
-       LINK
-    ===================================== */
 
     case "link":
       content = (
@@ -462,36 +440,32 @@ export default function SceneObjectContent({
             object.props.href
           }
         >
-          {object.props.text}
+          {
+            object.props
+              .text
+          }
         </Link>
       );
       break;
-
-
-    /* =====================================
-       SPEAKER
-    ===================================== */
 
     case "speaker":
       content = (
         <Speaker
           audioUrl={
-            object.props.audioUrl
+            object.props
+              .audioUrl
           }
           distance={
-            object.props.distance
+            object.props
+              .distance
           }
           volume={
-            object.props.volume
+            object.props
+              .volume
           }
         />
       );
       break;
-
-
-    /* =====================================
-       GROUND
-    ===================================== */
 
     case "ground":
       content = (
@@ -500,124 +474,192 @@ export default function SceneObjectContent({
             object.props.size
           }
           gridSize={
-            object.props.gridSize
+            object.props
+              .gridSize
           }
         />
       );
       break;
 
+    case "toxicGass":
+      content = (
+        <ToxicGass
+          count={
+            object.props.count
+          }
+          color={
+            object.props
+              .color as ColorRepresentation
+          }
+          size={
+            object.props.size
+          }
+        />
+      );
+      break;
 
-      case "toxicGass":
-  content = (
-    <ToxicGass
-      count={object.props.count}
-      color={
-        object.props.color as ColorRepresentation
-      }
-      size={object.props.size}
-    />
-  );
-  break;
+    case "transparentFloor":
+      content = (
+        <TransparentFloor
+          opacity={
+            object.props
+              .opacity
+          }
+          color={
+            object.props
+              .color as ColorRepresentation
+          }
+        />
+      );
+      break;
 
-case "transparentFloor":
-  content = (
-    <TransparentFloor
-      opacity={object.props.opacity}
-      color={
-        object.props.color as ColorRepresentation
-      }
-    />
-  );
-  break;
+    case "speakerRadio":
+      content = (
+        <SpeakerRadio
+          distance={
+            object.props
+              .distance
+          }
+          volume={
+            object.props
+              .volume
+          }
+          shuffle={
+            object.props
+              .shuffle
+          }
+        />
+      );
+      break;
 
+    case "videoPlayer":
+      content = (
+        <VideoPlayer
+          videoSrc={
+            object.props
+              .videoSrc
+          }
+          videoDistance={
+            object.props
+              .videoDistance
+          }
+          framed={
+            object.props
+              .framed
+          }
+          volume={
+            object.props
+              .volume
+          }
+          restartOnEnter={
+            object.props
+              .restartOnEnter
+          }
+          audioDistance={
+            object.props
+              .audioDistance
+          }
+          frameColor={
+            object.props
+              .frameColor
+          }
+          previewColor={
+            object.props
+              .previewColor
+          }
+          previewText={
+            object.props
+              .previewText
+          }
+          previewTextColor={
+            object.props
+              .previewTextColor
+          }
+          previewTextFont={
+            object.props
+              .previewTextFont
+          }
+          previewTextSize={
+            object.props
+              .previewTextSize
+          }
+        />
+      );
+      break;
 
+    case "youtubePlayer":
+      content = (
+        <YouTubePlayer
+          videoId={
+            object.props.videoId
+          }
+          width={
+            object.props.width
+          }
+          height={
+            object.props.height
+          }
+          videoDistance={
+            object.props
+              .videoDistance
+          }
+          controls={
+            object.props.controls
+          }
+          muted={
+            object.props.muted
+          }
+        />
+      );
+      break;
 
-case "speakerRadio":
-  content = (
-    <SpeakerRadio
-      distance={object.props.distance}
-      volume={object.props.volume}
-      shuffle={object.props.shuffle}
-    />
-  );
-  break;
+    case "probe":
+      content = (
+        <Probe />
+      );
+      break;
 
-
-case "videoPlayer":
-  content = (
-    <VideoPlayer
-      videoSrc={object.props.videoSrc}
-      videoDistance={object.props.videoDistance}
-      framed={object.props.framed}
-      volume={object.props.volume}
-      restartOnEnter={object.props.restartOnEnter}
-      audioDistance={object.props.audioDistance}
-      frameColor={object.props.frameColor}
-      previewColor={object.props.previewColor}
-      previewText={object.props.previewText}
-      previewTextColor={object.props.previewTextColor}
-      previewTextFont={object.props.previewTextFont}
-      previewTextSize={object.props.previewTextSize}
-    />
-  );
-  break;
-
-
-case "youtubePlayer":
-  content = (
-    <YouTubePlayer
-      videoId={object.props.videoId}
-      width={object.props.width}
-      height={object.props.height}
-      videoDistance={object.props.videoDistance}
-      controls={object.props.controls}
-      muted={object.props.muted}
-    />
-  );
-  break;
-
-
-case "probe":
-  content = (
-    <Probe />
-  );
-  break;
-
-
-case "cyrus":
-  content = (
-    <Cyrus
-      dialogue={object.props.dialogue}
-      response={object.props.response}
-      link={object.props.link}
-      anim={object.props.anim as any}
-    />
-  );
-  break;
-
-
-    /* =====================================
-       FALLBACK
-    ===================================== */
+    case "cyrus":
+      content = (
+        <Cyrus
+          dialogue={
+            object.props
+              .dialogue
+          }
+          response={
+            object.props
+              .response
+          }
+          link={
+            object.props.link
+          }
+          anim={
+            object.props
+              .anim as any
+          }
+        />
+      );
+      break;
 
     default:
       content = null;
       break;
   }
 
-
-  /* =========================================
-     EMPTY CONTENT
-  ========================================= */
-
   if (!content) {
     return null;
   }
 
-
-  /* =========================================
-     ENVIRONMENT
-  ========================================= */
+  /*
+   * Modifiers operate on the existing
+   * SceneObject content. They do not
+   * create another SceneObject.
+   */
+  content =
+    applyModifiers(
+      object,
+      content
+    );
 
   if (
     ENVIRONMENT_TYPES.has(
@@ -631,24 +673,16 @@ case "cyrus":
     );
   }
 
-
-  /* =========================================
-     NORMAL OBJECT
-  ========================================= */
-
   return (
     <EditorInteractionShield
-      enabled={editorActive}
+      enabled={
+        editorActive
+      }
     >
       {content}
     </EditorInteractionShield>
   );
 }
-
-
-/* =========================================
-   IMAGE PLACEHOLDER
-========================================= */
 
 function ImagePlaceholder(): React.ReactElement {
   return (
@@ -669,11 +703,6 @@ function ImagePlaceholder(): React.ReactElement {
     </mesh>
   );
 }
-
-
-/* =========================================
-   MODEL PLACEHOLDER
-========================================= */
 
 function ModelPlaceholder(): React.ReactElement {
   return (
@@ -712,11 +741,6 @@ function ModelPlaceholder(): React.ReactElement {
   );
 }
 
-
-/* =========================================
-   VIDEO PLACEHOLDER
-========================================= */
-
 function VideoPlaceholder(): React.ReactElement {
   return (
     <mesh>
@@ -736,11 +760,6 @@ function VideoPlaceholder(): React.ReactElement {
     </mesh>
   );
 }
-
-
-/* =========================================
-   AUDIO PLACEHOLDER
-========================================= */
 
 function AudioPlaceholder(): React.ReactElement {
   return (

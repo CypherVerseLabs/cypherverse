@@ -23,11 +23,9 @@ import {
 import EditorLeftPanel from "./EditorLeftPanel";
 import EditorContextualPanel from "./EditorContextualPanel";
 
-
 type EditorUIProps = {
   projectId?: string;
 };
-
 
 type ActivePanel =
   | "add"
@@ -36,11 +34,6 @@ type ActivePanel =
   | "scale"
   | "help"
   | null;
-
-
-/* =========================================
-   CLONE OBJECT
-========================================= */
 
 function cloneSceneObject(
   object: SceneObject
@@ -56,19 +49,12 @@ function cloneSceneObject(
   cloned.transform.position = [
     cloned.transform.position[0] +
       0.75,
-
     cloned.transform.position[1],
-
     cloned.transform.position[2],
   ];
 
   return cloned;
 }
-
-
-/* =========================================
-   EDITOR UI
-========================================= */
 
 export default function EditorUI({
   projectId,
@@ -98,24 +84,20 @@ export default function EditorUI({
       Environment: true,
     });
 
-
   const fileInputRef =
     useRef<HTMLInputElement>(
       null
     );
-
 
   const [
     projectSaving,
     setProjectSaving,
   ] = useState(false);
 
-
   const [
     projectLoading,
     setProjectLoading,
   ] = useState(false);
-
 
   const {
     scene,
@@ -148,17 +130,11 @@ export default function EditorUI({
     loadProject,
   } = useEditor();
 
-
-  /* =========================================
-     SELECTED OBJECT
-  ========================================= */
-
   const selectedObject =
     scene.objects.find(
       (object) =>
         object.id === selectedId
     );
-
 
   const selectedDefinition =
     selectedObject
@@ -166,11 +142,6 @@ export default function EditorUI({
           selectedObject.type
         )
       : undefined;
-
-
-  /* =========================================
-     KEYBOARD CONTROLS
-  ========================================= */
 
   useEffect(() => {
     const handleKeyDown =
@@ -183,22 +154,15 @@ export default function EditorUI({
         const tagName =
           target?.tagName?.toLowerCase();
 
-
         const isTyping =
           tagName === "input" ||
           tagName === "textarea" ||
           tagName === "select" ||
           target?.isContentEditable;
 
-
         if (isTyping) {
           return;
         }
-
-
-        /* ===============================
-           UNDO
-        =============================== */
 
         if (
           (event.ctrlKey ||
@@ -214,11 +178,6 @@ export default function EditorUI({
 
           return;
         }
-
-
-        /* ===============================
-           REDO
-        =============================== */
 
         if (
           (event.ctrlKey ||
@@ -240,11 +199,6 @@ export default function EditorUI({
 
           return;
         }
-
-
-        /* ===============================
-           COPY
-        =============================== */
 
         if (
           (event.ctrlKey ||
@@ -277,11 +231,6 @@ export default function EditorUI({
 
           return;
         }
-
-
-        /* ===============================
-           PASTE
-        =============================== */
 
         if (
           (event.ctrlKey ||
@@ -325,11 +274,6 @@ export default function EditorUI({
           return;
         }
 
-
-        /* ===============================
-           DUPLICATE
-        =============================== */
-
         if (
           (event.ctrlKey ||
             event.metaKey) &&
@@ -350,11 +294,6 @@ export default function EditorUI({
           return;
         }
 
-
-        /* ===============================
-           DELETE
-        =============================== */
-
         if (
           event.key === "Delete" ||
           event.key === "Backspace"
@@ -373,11 +312,6 @@ export default function EditorUI({
           return;
         }
 
-
-        /* ===============================
-           ESCAPE
-        =============================== */
-
         if (
           event.key === "Escape"
         ) {
@@ -389,11 +323,6 @@ export default function EditorUI({
 
           return;
         }
-
-
-        /* ===============================
-           E = EDITOR ON/OFF
-        =============================== */
 
         if (
           event.key.toLowerCase() ===
@@ -407,12 +336,10 @@ export default function EditorUI({
         }
       };
 
-
     window.addEventListener(
       "keydown",
       handleKeyDown
     );
-
 
     return () => {
       window.removeEventListener(
@@ -437,11 +364,6 @@ export default function EditorUI({
     redo,
   ]);
 
-
-  /* =========================================
-     CLEAR UI WHEN SELECTION DISAPPEARS
-  ========================================= */
-
   useEffect(() => {
     if (!selectedObject) {
       setActivePanel(null);
@@ -449,11 +371,6 @@ export default function EditorUI({
   }, [
     selectedObject,
   ]);
-
-
-  /* =========================================
-     LOAD FILE
-  ========================================= */
 
   const handleLoadFile =
     async (
@@ -465,7 +382,6 @@ export default function EditorUI({
       if (!file) {
         return;
       }
-
 
       try {
         await loadScene(file);
@@ -485,11 +401,6 @@ export default function EditorUI({
       }
     };
 
-
-  /* =========================================
-     PUBLISH
-  ========================================= */
-
   const handlePublishProject =
     async () => {
       if (!projectId) {
@@ -500,11 +411,9 @@ export default function EditorUI({
         return;
       }
 
-
       if (projectSaving) {
         return;
       }
-
 
       try {
         setProjectSaving(true);
@@ -528,11 +437,6 @@ export default function EditorUI({
       }
     };
 
-
-  /* =========================================
-     LOAD PROJECT
-  ========================================= */
-
   const handleLoadProject =
     async () => {
       if (!projectId) {
@@ -543,11 +447,9 @@ export default function EditorUI({
         return;
       }
 
-
       if (projectLoading) {
         return;
       }
-
 
       try {
         setProjectLoading(true);
@@ -571,11 +473,6 @@ export default function EditorUI({
       }
     };
 
-
-  /* =========================================
-     ADD IDEA
-  ========================================= */
-
   const addIdea =
     (type: string) => {
       const object =
@@ -585,47 +482,25 @@ export default function EditorUI({
           >[0]
         );
 
-
       addObject(
         object
       );
 
-
-      /*
-       * Newly-created Ideas are immediately
-       * selected so the user can see:
-       *
-       * - highlight
-       * - gizmo
-       * - properties
-       * - toolbar
-       */
       select(
         object.id
       );
     };
-
-
-  /* =========================================
-     IDEA CATEGORY STATE
-  ========================================= */
 
   const toggleIdeaFolder =
     (category: string) => {
       setOpenIdeaFolders(
         (current) => ({
           ...current,
-
           [category]:
             !current[category],
         })
       );
     };
-
-
-  /* =========================================
-     PANEL
-  ========================================= */
 
   const togglePanel =
     (
@@ -639,11 +514,6 @@ export default function EditorUI({
       );
     };
 
-
-  /* =========================================
-     TRANSFORM PANEL
-  ========================================= */
-
   const activateTransform =
     (
       mode:
@@ -651,14 +521,9 @@ export default function EditorUI({
         | "rotate"
         | "scale"
     ) => {
-      /*
-       * Transform mode remains authoritative
-       * in EditorContext.
-       */
       setTransformMode(
         mode
       );
-
 
       setActivePanel(
         (current) => {
@@ -676,43 +541,13 @@ export default function EditorUI({
       );
     };
 
-
-  /* =========================================
-     EDITOR CLOSED
-  ========================================= */
-
   if (!editorActive) {
     return null;
   }
 
-
-  /* =========================================
-     EDITOR OPEN BUT NOTHING SELECTED
-  ========================================= */
-
-  /*
-   * This is intentional.
-   *
-   * Pressing E activates the editor, but
-   * editor controls are only shown once
-   * an actual Idea is selected.
-   *
-   * Therefore:
-   *
-   * no selected Idea =
-   * no toolbar
-   * no contextual panel
-   * no selected-object panel
-   * no editor controls
-   */
   if (!selectedObject) {
     return null;
   }
-
-
-  /* =========================================
-     EDITOR UI
-  ========================================= */
 
   return (
     <Html
@@ -730,23 +565,15 @@ export default function EditorUI({
         style={{
           position:
             "absolute",
-
           inset: 0,
-
           pointerEvents:
             "none",
-
           fontFamily:
             "Inter, ui-sans-serif, system-ui, sans-serif",
-
           color:
             "#25282d",
         }}
       >
-        {/* =================================
-            SELECTED OBJECT PANEL
-        ================================= */}
-
         <EditorLeftPanel
           leftPanelCollapsed={
             leftPanelCollapsed
@@ -805,66 +632,72 @@ export default function EditorUI({
           }
         />
 
-
-        {/* =================================
-            CONTEXTUAL PANEL
-        ================================= */}
-
         <EditorContextualPanel
-          panel={activePanel}
+          panel={
+            activePanel
+          }
 
-          scene={scene}
+          scene={
+            scene
+          }
 
-          selectedId={selectedId}
+          selectedId={
+            selectedId
+          }
 
-          leftPanelCollapsed={leftPanelCollapsed}
+          leftPanelCollapsed={
+            leftPanelCollapsed
+          }
 
-          transformMode={transformMode}
+          transformMode={
+            transformMode
+          }
 
-          setTransformMode={setTransformMode}
+          setTransformMode={
+            setTransformMode
+          }
 
-          updateTransform={updateTransform}
+          updateTransform={
+            updateTransform
+          }
 
-          openIdeaFolders={openIdeaFolders}
+          updateObject={
+            updateObject
+          }
 
-          toggleIdeaFolder={toggleIdeaFolder}
+          openIdeaFolders={
+            openIdeaFolders
+          }
 
-          addIdea={addIdea}
+          toggleIdeaFolder={
+            toggleIdeaFolder
+          }
 
-          onClose={() => setActivePanel(
-            null
-          )} updateObject={function (objectId: string, changes: { modifiers?: SceneObject["modifiers"]; effects?: SceneObject["effects"]; }): void {
-            throw new Error("Function not implemented.");
-          } }        />
+          addIdea={
+            addIdea
+          }
 
-
-        {/* =================================
-            FILE INPUT
-        ================================= */}
+          onClose={() =>
+            setActivePanel(
+              null
+            )
+          }
+        />
 
         <input
           ref={
             fileInputRef
           }
-
           type="file"
-
           accept=".cybuilder,application/json,application/zip"
-
           onChange={
             handleLoadFile
           }
-
           style={{
             display:
               "none",
           }}
         />
-
-
-        {/* =================================
-            BOTTOM TOOLBAR
-        ================================= */}
 
         <div
           style={{
@@ -1021,11 +854,9 @@ export default function EditorUI({
                 ? "Loading…"
                 : "Project"
             }
-
             disabled={
               projectLoading
             }
-
             onClick={
               handleLoadProject
             }
@@ -1037,11 +868,9 @@ export default function EditorUI({
                 ? "Publishing…"
                 : "Publish"
             }
-
             disabled={
               projectSaving
             }
-
             onClick={
               handlePublishProject
             }
@@ -1052,11 +881,6 @@ export default function EditorUI({
   );
 }
 
-
-/* =========================================
-   TOOLBAR DIVIDER
-========================================= */
-
 function ToolbarDivider() {
   return (
     <div
@@ -1064,24 +888,16 @@ function ToolbarDivider() {
       style={{
         width:
           1,
-
         height:
           24,
-
         margin:
           "0 3px",
-
         background:
           "rgba(30, 32, 36, 0.12)",
       }}
     />
   );
 }
-
-
-/* =========================================
-   TOOLBAR BUTTON
-========================================= */
 
 function ToolbarButton({
   label,
@@ -1100,15 +916,12 @@ function ToolbarButton({
   return (
     <button
       type="button"
-
       disabled={
         disabled
       }
-
       onClick={
         onClick
       }
-
       style={{
         height:
           34,
