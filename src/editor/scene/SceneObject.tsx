@@ -47,23 +47,11 @@ export default function SceneObject({
     editorActive,
   } = useEditor();
 
-  /*
-   * The actual Three.js Group for this SceneObject.
-   *
-   * TransformControls attaches directly to this
-   * object when this SceneObject is selected.
-   */
   const [
     gizmoTarget,
     setGizmoTarget,
   ] = useState<Group | null>(null);
 
-  /*
-   * Keep the callback ref stable.
-   *
-   * This avoids the React ref callback being
-   * recreated on every render.
-   */
   const setGroupRef = useCallback(
     (node: Group | null): void => {
       setGizmoTarget(node);
@@ -80,19 +68,11 @@ export default function SceneObject({
     scale,
   } = object.transform;
 
-  /*
-   * Scene hierarchy remains unchanged.
-   */
   const children =
     scene.objects.filter(
       (child) =>
         child.parentId === object.id
     );
-
-
-  /* =========================================
-     OBJECT SELECTION
-  ========================================= */
 
   const handleClick = (
     event: ThreeEvent<MouseEvent>
@@ -123,11 +103,6 @@ export default function SceneObject({
     }
   };
 
-
-  /* =========================================
-     GIZMO TRANSFORM → EDITOR STATE
-  ========================================= */
-
   const handleObjectChange = () => {
     const group =
       gizmoTarget;
@@ -156,10 +131,6 @@ export default function SceneObject({
       ],
     };
 
-    /*
-     * EditorContext remains the single
-     * authoritative transform state.
-     */
     updateTransform(
       object.id,
       transform
@@ -183,11 +154,6 @@ export default function SceneObject({
     }
   };
 
-
-  /* =========================================
-     OBJECT CONTENT
-  ========================================= */
-
   const content = (
     <group
       ref={setGroupRef}
@@ -209,11 +175,16 @@ export default function SceneObject({
       />
 
       {editorActive && (
-        <EditorSelectionMesh />
+        <EditorSelectionTarget
+          object={object}
+          onClick={handleClick}
+        />
       )}
 
       {isSelected && editorActive && (
-        <SelectionIndicator />
+        <SelectionIndicator
+          object={object}
+        />
       )}
 
       {children.map(
@@ -227,13 +198,6 @@ export default function SceneObject({
     </group>
   );
 
-
-  /*
-   * Unselected objects render normally.
-   *
-   * No gizmo exists unless this object
-   * is actually selected.
-   */
   if (
     !isSelected ||
     !editorActive ||
@@ -243,16 +207,6 @@ export default function SceneObject({
     return content;
   }
 
-
-  /*
-   * IMPORTANT:
-   *
-   * TransformControls is a sibling of the
-   * selected Group and explicitly targets
-   * that Group.
-   *
-   * It no longer wraps the object's content.
-   */
   return (
     <>
       {content}
@@ -261,17 +215,14 @@ export default function SceneObject({
         object={
           gizmoTarget
         }
-
         mode={
           transformMode
         }
-
         enabled={
           editorActive &&
           isSelected &&
           !object.locked
         }
-
         onMouseDown={() => {
           beginTransform(
             object.id
@@ -291,11 +242,9 @@ export default function SceneObject({
             );
           }
         }}
-
         onObjectChange={
           handleObjectChange
         }
-
         onMouseUp={() => {
           endTransform();
 
@@ -315,20 +264,43 @@ export default function SceneObject({
 }
 
 
-/* =========================================
-   INVISIBLE EDITOR SELECTION MESH
-========================================= */
+type EditorSelectionTargetProps = {
+  object: SceneObjectData;
+  onClick: (
+    event: ThreeEvent<MouseEvent>
+  ) => void;
+};
 
-function EditorSelectionMesh(): ReactElement {
+
+function EditorSelectionTarget({
+  object,
+  onClick,
+}: EditorSelectionTargetProps): ReactElement | null {
+  const size =
+    getEditorSelectionSize(
+      object
+    );
+
+  if (!size) {
+    return null;
+  }
+
   return (
     <mesh
-      name="editor-selection-hit-area"
+      name={`editor-selection-target-${object.id}`}
+      position={[
+        0,
+        size.offsetY,
+        0,
+      ]}
+      onClick={onClick}
+      
     >
       <boxGeometry
         args={[
-          1.25,
-          1.25,
-          1.25,
+          size.width,
+          size.height,
+          size.depth,
         ]}
       />
 
@@ -343,21 +315,270 @@ function EditorSelectionMesh(): ReactElement {
 }
 
 
-/* =========================================
-   SELECTED OBJECT HIGHLIGHT
-========================================= */
+type EditorSelectionSize = {
+  width: number;
+  height: number;
+  depth: number;
+  offsetY: number;
+};
 
-function SelectionIndicator(): ReactElement {
+
+function getEditorSelectionSize(
+  object: SceneObjectData
+): EditorSelectionSize | null {
+  const props =
+    object.props as Record<
+      string,
+      unknown
+    >;
+
+  switch (
+    object.type
+  ) {
+    /*
+     * These are scene-level settings rather
+     * than spatial objects.
+     */
+    case "background":
+    case "fog":
+    case "hdri":
+      return null;
+
+    /*
+     * Ground uses its configured size instead
+     * of a fixed editor cube.
+     */
+    case "ground": {
+      const configuredSize =
+        typeof props.size ===
+        "number"
+          ? props.size
+          : 500;
+
+      const size =
+        Math.max(
+          0.5,
+          configuredSize
+        );
+
+      return {
+        width: size,
+        height: 0.35,
+        depth: size,
+        offsetY: -0.175,
+      };
+    }
+
+    /*
+     * Infinite floor/environment.
+     */
+    case "infinitePlane": {
+      const configuredSize =
+        typeof props.size ===
+        "number"
+          ? props.size
+          : 50;
+
+      const size =
+        Math.max(
+          0.5,
+          Math.min(
+            configuredSize,
+            50
+          )
+        );
+
+      return {
+        width: size,
+        height: 0.35,
+        depth: size,
+        offsetY: -0.175,
+      };
+    }
+
+    case "lostFloor":
+      return {
+        width: 4,
+        height: 0.35,
+        depth: 4,
+        offsetY: -0.175,
+      };
+
+    /*
+     * Dynamic environment/particle Ideas.
+     * Do not derive selection from live particle
+     * bounds because those bounds continuously move.
+     */
+    case "rain":
+    case "toxicGass":
+      return {
+        width: 3,
+        height: 3,
+        depth: 3,
+        offsetY: 1.5,
+      };
+
+    case "cloudySky":
+      return {
+        width: 4,
+        height: 3,
+        depth: 4,
+        offsetY: 1.5,
+      };
+
+    case "transparentFloor":
+      return {
+        width: 4,
+        height: 0.2,
+        depth: 4,
+        offsetY: 0,
+      };
+
+    /*
+     * Common spatial Ideas.
+     */
+    case "image":
+      return {
+        width: 1.25,
+        height: 1.25,
+        depth: 0.12,
+        offsetY: 0,
+      };
+
+    case "video":
+      return {
+        width: 1.6,
+        height: 0.9,
+        depth: 0.12,
+        offsetY: 0,
+      };
+
+    case "model":
+      return {
+        width: 1.25,
+        height: 1.25,
+        depth: 1.25,
+        offsetY: 0,
+      };
+
+    case "audio":
+      return {
+        width: 0.5,
+        height: 0.5,
+        depth: 0.5,
+        offsetY: 0,
+      };
+
+    case "speaker":
+      return {
+        width: 1,
+        height: 1.5,
+        depth: 1,
+        offsetY: 0.75,
+      };
+
+    case "speakerRadio":
+      return {
+        width: 1,
+        height: 1.5,
+        depth: 1,
+        offsetY: 0.75,
+      };
+
+    case "videoPlayer":
+      return {
+        width: 1.6,
+        height: 1,
+        depth: 0.3,
+        offsetY: 0,
+      };
+
+    case "youtubePlayer":
+      return {
+        width: 1.6,
+        height: 0.9,
+        depth: 0.3,
+        offsetY: 0,
+      };
+
+    case "probe":
+      return {
+        width: 0.75,
+        height: 0.75,
+        depth: 0.75,
+        offsetY: 0,
+      };
+
+    case "cyrus":
+      return {
+        width: 1,
+        height: 2,
+        depth: 1,
+        offsetY: 1,
+      };
+
+    case "title":
+      return {
+        width: 2,
+        height: 0.75,
+        depth: 0.15,
+        offsetY: 0,
+      };
+
+    case "link":
+      return {
+        width: 2,
+        height: 0.75,
+        depth: 0.15,
+        offsetY: 0,
+      };
+
+    /*
+     * Existing generic SceneObject types that
+     * can still appear in saved projects.
+     */
+    
+
+    default:
+      return {
+        width: 1,
+        height: 1,
+        depth: 1,
+        offsetY: 0,
+      };
+  }
+}
+
+
+function SelectionIndicator({
+  object,
+}: {
+  object: SceneObjectData;
+}): ReactElement | null {
+  const size =
+    getEditorSelectionSize(
+      object
+    );
+
+  if (!size) {
+    return null;
+  }
+
   return (
     <mesh
       name="editor-selected-indicator"
+      position={[
+        0,
+        size.offsetY,
+        0,
+      ]}
       raycast={() => null}
     >
       <boxGeometry
         args={[
-          1.08,
-          1.08,
-          1.08,
+          size.width,
+          size.height,
+          size.depth,
         ]}
       />
 

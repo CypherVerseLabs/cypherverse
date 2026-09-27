@@ -43,9 +43,11 @@ import {
   useEditor,
 } from "../context/EditorContext";
 
+
 type SceneObjectContentProps = {
   object: SceneObject;
 };
+
 
 const ENVIRONMENT_TYPES =
   new Set<SceneObject["type"]>([
@@ -60,6 +62,7 @@ const ENVIRONMENT_TYPES =
     "infinitePlane",
     "lostFloor",
   ]);
+
 
 function NonInteractiveEnvironment({
   children,
@@ -99,11 +102,11 @@ function NonInteractiveEnvironment({
             child.raycast
           );
 
-          if (!editorActive) {
+          if (editorActive) {
             child.raycast =
               () => {
-                // Intentionally disabled
-                // while editor is inactive.
+                // Editor selection is handled
+                // by SceneObject's editor target.
               };
           }
         }
@@ -133,6 +136,7 @@ function NonInteractiveEnvironment({
     </group>
   );
 }
+
 
 function EditorInteractionShield({
   children,
@@ -173,9 +177,11 @@ function EditorInteractionShield({
           if (enabled) {
             child.raycast =
               () => {
-                // Intentionally disabled
-                // while editor interaction
-                // shield is enabled.
+                // Runtime Idea interaction is
+                // disabled while editing.
+                //
+                // SceneObject owns editor
+                // selection instead.
               };
           }
         }
@@ -206,6 +212,7 @@ function EditorInteractionShield({
   );
 }
 
+
 function applyModifiers(
   object: SceneObject,
   content: React.ReactElement
@@ -230,7 +237,7 @@ function applyModifiers(
             }
             ySpeed={
               modifier.props.ySpeed
-          }
+            }
           >
             {result}
           </Orbiting>
@@ -245,13 +252,10 @@ function applyModifiers(
   return result;
 }
 
+
 export default function SceneObjectContent({
   object,
 }: SceneObjectContentProps): React.ReactElement | null {
-  const {
-    editorActive,
-  } = useEditor();
-
   let content:
     | React.ReactElement
     | null;
@@ -650,17 +654,19 @@ export default function SceneObjectContent({
     return null;
   }
 
-  /*
-   * Modifiers operate on the existing
-   * SceneObject content. They do not
-   * create another SceneObject.
-   */
   content =
     applyModifiers(
       object,
       content
     );
 
+  /*
+   * Every runtime Idea is protected while
+   * the editor is active.
+   *
+   * Selection is now handled by the dedicated
+   * editor target in SceneObject.tsx.
+   */
   if (
     ENVIRONMENT_TYPES.has(
       object.type
@@ -676,13 +682,14 @@ export default function SceneObjectContent({
   return (
     <EditorInteractionShield
       enabled={
-        editorActive
+        true
       }
     >
       {content}
     </EditorInteractionShield>
   );
 }
+
 
 function ImagePlaceholder(): React.ReactElement {
   return (
@@ -693,7 +700,6 @@ function ImagePlaceholder(): React.ReactElement {
           1,
         ]}
       />
-
       <meshBasicMaterial
         color="#555566"
         wireframe
@@ -703,6 +709,7 @@ function ImagePlaceholder(): React.ReactElement {
     </mesh>
   );
 }
+
 
 function ModelPlaceholder(): React.ReactElement {
   return (
@@ -715,7 +722,6 @@ function ModelPlaceholder(): React.ReactElement {
             1,
           ]}
         />
-
         <meshBasicMaterial
           color="#4c7dff"
           wireframe
@@ -732,7 +738,6 @@ function ModelPlaceholder(): React.ReactElement {
             12,
           ]}
         />
-
         <meshBasicMaterial
           color="#ffffff"
         />
@@ -740,6 +745,7 @@ function ModelPlaceholder(): React.ReactElement {
     </group>
   );
 }
+
 
 function VideoPlaceholder(): React.ReactElement {
   return (
@@ -750,7 +756,6 @@ function VideoPlaceholder(): React.ReactElement {
           0.9,
         ]}
       />
-
       <meshBasicMaterial
         color="#663366"
         wireframe
@@ -760,6 +765,7 @@ function VideoPlaceholder(): React.ReactElement {
     </mesh>
   );
 }
+
 
 function AudioPlaceholder(): React.ReactElement {
   return (
@@ -772,7 +778,6 @@ function AudioPlaceholder(): React.ReactElement {
             16,
           ]}
         />
-
         <meshBasicMaterial
           color="#ffaa00"
           wireframe
@@ -787,7 +792,6 @@ function AudioPlaceholder(): React.ReactElement {
             8,
           ]}
         />
-
         <meshBasicMaterial
           color="#ffaa00"
         />
