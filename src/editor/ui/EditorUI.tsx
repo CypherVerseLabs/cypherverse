@@ -2,6 +2,7 @@ import { Html } from "@react-three/drei";
 
 import {
   ChangeEvent,
+  ReactNode,
   useEffect,
   useRef,
   useState,
@@ -34,6 +35,19 @@ type ActivePanel =
   | "scale"
   | "help"
   | null;
+
+type ToolbarIconName =
+  | "add"
+  | "undo"
+  | "redo"
+  | "move"
+  | "rotate"
+  | "scale"
+  | "help"
+  | "save"
+  | "download"
+  | "folder"
+  | "publish";
 
 function cloneSceneObject(
   object: SceneObject
@@ -124,6 +138,7 @@ export default function EditorUI({
     toggleEditor,
 
     saveScene,
+    saveProject,
     loadScene,
 
     publishProject,
@@ -224,9 +239,7 @@ export default function EditorUI({
           event.stopPropagation();
 
           setClipboardObject(
-            structuredClone(
-              object
-            )
+            structuredClone(object)
           );
 
           return;
@@ -398,6 +411,42 @@ export default function EditorUI({
         );
       } finally {
         event.target.value = "";
+      }
+    };
+
+  const handleSaveProject =
+    async () => {
+      if (!projectId) {
+        window.alert(
+          "No project is selected."
+        );
+
+        return;
+      }
+
+      if (projectSaving) {
+        return;
+      }
+
+      try {
+        setProjectSaving(true);
+
+        await saveProject(
+          projectId
+        );
+      } catch (error) {
+        console.error(
+          "Failed to save CyBuilder project:",
+          error
+        );
+
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : "Failed to save project."
+        );
+      } finally {
+        setProjectSaving(false);
       }
     };
 
@@ -745,6 +794,7 @@ export default function EditorUI({
         >
           <ToolbarButton
             label="Add"
+            icon="add"
             active={
               activePanel ===
               "add"
@@ -758,6 +808,7 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Undo"
+            icon="undo"
             disabled={
               !canUndo
             }
@@ -768,6 +819,7 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Redo"
+            icon="redo"
             disabled={
               !canRedo
             }
@@ -778,9 +830,13 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Move"
+            icon="move"
             active={
               activePanel ===
               "move"
+            }
+            disabled={
+              !selectedObject
             }
             onClick={() =>
               activateTransform(
@@ -791,9 +847,13 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Rotate"
+            icon="rotate"
             active={
               activePanel ===
               "rotate"
+            }
+            disabled={
+              !selectedObject
             }
             onClick={() =>
               activateTransform(
@@ -804,9 +864,13 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Scale"
+            icon="scale"
             active={
               activePanel ===
               "scale"
+            }
+            disabled={
+              !selectedObject
             }
             onClick={() =>
               activateTransform(
@@ -817,6 +881,7 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Help"
+            icon="help"
             active={
               activePanel ===
               "help"
@@ -831,26 +896,38 @@ export default function EditorUI({
           <ToolbarDivider />
 
           <ToolbarButton
-            label="Save"
+            label={
+              projectSaving
+                ? "Saving project…"
+                : "Save project"
+            }
+            icon="save"
+            disabled={
+              !projectId ||
+              projectSaving
+            }
+            onClick={
+              handleSaveProject
+            }
+          />
+
+          <ToolbarButton
+            label="Export"
+            icon="download"
             onClick={
               saveScene
             }
           />
 
           <ToolbarButton
-            label="Load"
-            onClick={() =>
-              fileInputRef.current?.click()
-            }
-          />
-
-          <ToolbarButton
             label={
               projectLoading
-                ? "Loading…"
-                : "Project"
+                ? "Loading project…"
+                : "Load project"
             }
+            icon="folder"
             disabled={
+              !projectId ||
               projectLoading
             }
             onClick={
@@ -864,7 +941,9 @@ export default function EditorUI({
                 ? "Publishing…"
                 : "Publish"
             }
+            icon="publish"
             disabled={
+              !projectId ||
               projectSaving
             }
             onClick={
@@ -897,11 +976,14 @@ function ToolbarDivider() {
 
 function ToolbarButton({
   label,
+  icon,
   onClick,
   active = false,
   disabled = false,
 }: {
   label: string;
+
+  icon: ToolbarIconName;
 
   onClick: () => void;
 
@@ -918,12 +1000,30 @@ function ToolbarButton({
       onClick={
         onClick
       }
+      aria-label={
+        label
+      }
+      title={
+        label
+      }
       style={{
+        width:
+          38,
+
         height:
           34,
 
         padding:
-          "0 11px",
+          0,
+
+        display:
+          "inline-flex",
+
+        alignItems:
+          "center",
+
+        justifyContent:
+          "center",
 
         border:
           0,
@@ -948,12 +1048,6 @@ function ToolbarButton({
             ? "default"
             : "pointer",
 
-        fontSize:
-          11,
-
-        fontWeight:
-          700,
-
         opacity:
           disabled
             ? 0.7
@@ -963,7 +1057,144 @@ function ToolbarButton({
           "background 120ms ease, color 120ms ease",
       }}
     >
-      {label}
+      <ToolbarIcon
+        name={
+          icon
+        }
+      />
     </button>
   );
+}
+
+function ToolbarIcon({
+  name,
+}: {
+  name: ToolbarIconName;
+}) {
+  const commonProps = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap:
+      "round" as const,
+    strokeLinejoin:
+      "round" as const,
+    "aria-hidden":
+      true,
+  };
+
+  switch (name) {
+    case "add":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+      );
+
+    case "undo":
+      return (
+        <svg {...commonProps}>
+          <path d="M9 14 4 9l5-5" />
+          <path d="M4 9h10a6 6 0 0 1 6 6v1" />
+        </svg>
+      );
+
+    case "redo":
+      return (
+        <svg {...commonProps}>
+          <path d="m15 14 5-5-5-5" />
+          <path d="M20 9H10a6 6 0 0 0-6 6v1" />
+        </svg>
+      );
+
+    case "move":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 3v18" />
+          <path d="m8 7 4-4 4 4" />
+          <path d="m8 17 4 4 4-4" />
+          <path d="M3 12h18" />
+          <path d="m7 8-4 4 4 4" />
+          <path d="m17 8 4 4-4 4" />
+        </svg>
+      );
+
+    case "rotate":
+      return (
+        <svg {...commonProps}>
+          <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+          <path d="M20 5v6h-6" />
+        </svg>
+      );
+
+    case "scale":
+      return (
+        <svg {...commonProps}>
+          <path d="M4 9V4h5" />
+          <path d="M20 9V4h-5" />
+          <path d="M4 15v5h5" />
+          <path d="M20 15v5h-5" />
+          <path d="M4 4l6 6" />
+          <path d="m20 4-6 6" />
+          <path d="m4 20 6-6" />
+          <path d="m20 20-6-6" />
+        </svg>
+      );
+
+    case "help":
+      return (
+        <svg {...commonProps}>
+          <circle
+            cx="12"
+            cy="12"
+            r="9"
+          />
+          <path d="M9.7 9a2.4 2.4 0 1 1 4.5 1.2c-.7 1-2.2 1.3-2.2 2.8" />
+          <path d="M12 16h.01" />
+        </svg>
+      );
+
+    case "save":
+      return (
+        <svg {...commonProps}>
+          <path d="M5 4h12l2 2v14H5z" />
+          <path d="M8 4v6h8V4" />
+          <path d="M8 20v-6h8v6" />
+        </svg>
+      );
+
+    case "download":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 3v12" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M5 21h14" />
+        </svg>
+      );
+
+    case "folder":
+      return (
+        <svg {...commonProps}>
+          <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <path d="M3 9h18" />
+        </svg>
+      );
+
+    case "publish":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 16V4" />
+          <path d="m7 9 5-5 5 5" />
+          <path d="M5 20h14" />
+          <path d="M7 16h10" />
+        </svg>
+      );
+
+    default:
+      return null;
+  }
 }
