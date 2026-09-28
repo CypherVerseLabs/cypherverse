@@ -98,6 +98,7 @@ export default function Starter() {
         },
       }}
       playerProps={{
+        height: 1.6,
         flying: false,
       }}
     >
