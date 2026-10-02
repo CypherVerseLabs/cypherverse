@@ -283,6 +283,12 @@ router.post(
                 "This parcel cannot currently be listed.",
             });
 
+          case "CITY_LANDMARK_NOT_TRANSFERABLE":
+            return res.status(409).json({
+              error:
+                "City landmark parcels cannot be listed or transferred through the normal marketplace.",
+            });
+
           case "INVALID_PARCEL_PRICE":
             return res.status(400).json({
               error:
