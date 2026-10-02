@@ -8,6 +8,11 @@ import {
 import { prisma } from "../lib/prisma.js";
 
 import {
+  PARCEL_OWNERSHIP_SOURCE,
+  recordParcelOwnershipTransfer,
+} from "./parcelOwnershipService.js";
+
+import {
   MarketplaceError,
 } from "./marketplaceOrderService.js";
 
@@ -945,6 +950,13 @@ async function grantMarketplaceEntitlement(
    * is the final protection.
    */
 
+  if (order.product.type === "CITY_LANDMARK") {
+    throw new MarketplaceError(
+      "CITY_LANDMARK_NOT_TRANSFERABLE",
+      "City landmark parcels cannot be purchased or transferred through the parcel marketplace."
+    );
+  }
+
   const existingEntitlement =
     order.entitlements[0];
 
@@ -959,6 +971,8 @@ async function grantMarketplaceEntitlement(
       order.product.ownerId !==
       order.userId
     ) {
+      const previousOwnerId = order.product.ownerId;
+
       await tx.parcel.update({
         where: {
           id: order.productId,
@@ -973,6 +987,14 @@ async function grantMarketplaceEntitlement(
 
           price: null,
         },
+      });
+
+      await recordParcelOwnershipTransfer(tx, {
+        parcelId: order.productId,
+        previousOwnerId,
+        newOwnerId: order.userId,
+        source: PARCEL_OWNERSHIP_SOURCE.MARKETPLACE_PURCHASE,
+        marketplaceOrderId: order.id,
       });
     }
 
@@ -1018,6 +1040,13 @@ async function grantMarketplaceEntitlement(
     throw new MarketplaceError(
       "PARCEL_NOT_FOUND",
       "Purchased parcel no longer exists."
+    );
+  }
+
+  if (parcel.type === "CITY_LANDMARK") {
+    throw new MarketplaceError(
+      "CITY_LANDMARK_NOT_TRANSFERABLE",
+      "City landmark parcels cannot be purchased or transferred through the parcel marketplace."
     );
   }
 
@@ -1163,6 +1192,8 @@ async function grantMarketplaceEntitlement(
    * -------------------------------------------------------
    */
 
+  const previousOwnerId = parcel.ownerId;
+
   await tx.parcel.update({
     where: {
       id: order.productId,
@@ -1177,6 +1208,14 @@ async function grantMarketplaceEntitlement(
 
       price: null,
     },
+  });
+
+  await recordParcelOwnershipTransfer(tx, {
+    parcelId: order.productId,
+    previousOwnerId,
+    newOwnerId: order.userId,
+    source: PARCEL_OWNERSHIP_SOURCE.MARKETPLACE_PURCHASE,
+    marketplaceOrderId: order.id,
   });
 
   /**
