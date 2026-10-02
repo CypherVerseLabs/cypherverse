@@ -556,6 +556,10 @@ export async function createParcelListing(
         return null;
       }
 
+      if (parcel.type === "CITY_LANDMARK") {
+        throw new Error("CITY_LANDMARK_NOT_TRANSFERABLE");
+      }
+
       if (
         parcel.ownerId !== sellerId
       ) {
