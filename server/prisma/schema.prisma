@@ -363,31 +363,13 @@ model ParcelOwnershipHistory {
   // Relations
   // -------------------------------------------------------
 
-  parcel Parcel @relation(
-    fields: [parcelId],
-    references: [id],
-    onDelete: Restrict
-  )
+  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Restrict)
 
-  previousOwner User? @relation(
-    "PreviousParcelOwner",
-    fields: [previousOwnerId],
-    references: [id],
-    onDelete: SetNull
-  )
+  previousOwner User? @relation("PreviousParcelOwner", fields: [previousOwnerId], references: [id], onDelete: SetNull)
 
-  newOwner User? @relation(
-    "NewParcelOwner",
-    fields: [newOwnerId],
-    references: [id],
-    onDelete: SetNull
-  )
+  newOwner User? @relation("NewParcelOwner", fields: [newOwnerId], references: [id], onDelete: SetNull)
 
-  marketplaceOrder MarketplaceOrder? @relation(
-    fields: [marketplaceOrderId],
-    references: [id],
-    onDelete: SetNull
-  )
+  marketplaceOrder MarketplaceOrder? @relation(fields: [marketplaceOrderId], references: [id], onDelete: SetNull)
 
   // -------------------------------------------------------
   // Indexes

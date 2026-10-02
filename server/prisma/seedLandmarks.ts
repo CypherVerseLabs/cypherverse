@@ -1,13 +1,22 @@
-import {
-  PrismaClient,
-} from "../generated/prisma/client.js";
+import "dotenv/config";
+import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { CYPHERVERSE_LANDMARKS } from "../data/cypherVerseLandmarks.js";
 
-import {
-  CYPHERVERSE_LANDMARKS,
-} from "../data/cypherVerseLandmarks.js";
+const connectionString = process.env.DATABASE_URL;
 
-const prisma =
-  new PrismaClient();
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined");
+}
+
+const adapter = new PrismaPg({
+  connectionString,
+});
+
+const prisma = new PrismaClient({
+  adapter,
+});
+
 
 async function seedLandmarks() {
   console.log(
