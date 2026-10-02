@@ -24,6 +24,32 @@ enum ParcelStatus {
 }
 
 // =========================================================
+// PARCEL TYPE
+// =========================================================
+//
+// Defines the permanent role of a parcel in the world.
+//
+// STANDARD
+//   Normal CypherVerse parcel.
+//   Can participate in the normal marketplace lifecycle.
+//
+// CITY_LANDMARK
+//   Permanent world landmark.
+//   Must not be sold or transferred through the normal
+//   parcel marketplace.
+//
+// IMPORTANT:
+// Marketplace behavior should be enforced by application
+// services based on this type rather than by adding
+// independent sellable/transferable booleans.
+//
+
+enum ParcelType {
+  STANDARD
+  CITY_LANDMARK
+}
+
+// =========================================================
 // MARKETPLACE ORDER STATUS
 // =========================================================
 
@@ -100,6 +126,20 @@ model User {
   marketplaceIdempotencyKeys MarketplaceIdempotencyKey[]
 
   marketplacePaymentEvents MarketplacePaymentEvent[]
+
+  // -------------------------------------------------------
+  // Parcel ownership history
+  // -------------------------------------------------------
+  //
+  // A user can appear as either:
+  // - the previous owner of a parcel
+  // - the new owner of a parcel
+  //
+  // These relations are historical and must not be deleted
+  // when a user account is removed.
+
+  previousParcelOwnerships ParcelOwnershipHistory[] @relation("PreviousParcelOwner")
+  newParcelOwnerships      ParcelOwnershipHistory[] @relation("NewParcelOwner")
 }
 
 // =========================================================
@@ -178,6 +218,23 @@ model Parcel {
   y Int
 
   // -------------------------------------------------------
+  // Permanent parcel classification
+  // -------------------------------------------------------
+  //
+  // STANDARD
+  //   Normal parcel.
+  //
+  // CITY_LANDMARK
+  //   Permanent world landmark such as Genesis,
+  //   districts, plazas, or other designated locations.
+  //
+  // Marketplace services must enforce that CITY_LANDMARK
+  // parcels cannot be listed, purchased, or transferred
+  // through the normal parcel marketplace.
+
+  type ParcelType @default(STANDARD)
+
+  // -------------------------------------------------------
   // Dynamic marketplace state
   // -------------------------------------------------------
 
@@ -227,9 +284,119 @@ model Parcel {
 
   marketplaceEntitlements MarketplaceEntitlement[]
 
+  // -------------------------------------------------------
+  // Immutable ownership history
+  // -------------------------------------------------------
+  //
+  // This records confirmed ownership transitions.
+  //
+  // Parcel.ownerId remains the authoritative current owner.
+  // This relation preserves the historical ownership ledger.
+
+  ownershipHistory ParcelOwnershipHistory[]
+
   @@index([ownerId])
   @@index([status])
+  @@index([type])
   @@index([x, y])
+}
+
+// =========================================================
+// PARCEL OWNERSHIP HISTORY
+// =========================================================
+//
+// Immutable historical record of confirmed parcel ownership
+// transitions.
+//
+// Parcel.ownerId represents the CURRENT owner.
+//
+// This table represents the HISTORICAL ownership ledger.
+//
+// Examples:
+//
+//   null → User A
+//   User A → User B
+//   User B → User C
+//
+// Existing historical transfers should NOT be fabricated.
+// Only transfers that can be established from authoritative
+// existing records should be backfilled.
+//
+
+model ParcelOwnershipHistory {
+  id String @id @default(uuid())
+
+  // Parcel whose ownership changed.
+  parcelId String
+
+  // Previous owner at the time of the transfer.
+  //
+  // Nullable because a parcel may have no previous user
+  // owner when it is first granted.
+  previousOwnerId String?
+
+  // New owner at the time of the transfer.
+  //
+  // Nullable to allow future system-level ownership
+  // transitions if required.
+  newOwnerId String?
+
+  // When the ownership transition was confirmed.
+  transferredAt DateTime @default(now())
+
+  // Human-readable/system-defined source of the transfer.
+  //
+  // Example:
+  // MARKETPLACE_PURCHASE
+  //
+  // Keep this as a string for now rather than introducing
+  // another enum before all transfer sources are known.
+  source String?
+
+  // Optional link to the marketplace order that caused
+  // this ownership transition.
+  marketplaceOrderId String?
+
+  createdAt DateTime @default(now())
+
+  // -------------------------------------------------------
+  // Relations
+  // -------------------------------------------------------
+
+  parcel Parcel @relation(
+    fields: [parcelId],
+    references: [id],
+    onDelete: Restrict
+  )
+
+  previousOwner User? @relation(
+    "PreviousParcelOwner",
+    fields: [previousOwnerId],
+    references: [id],
+    onDelete: SetNull
+  )
+
+  newOwner User? @relation(
+    "NewParcelOwner",
+    fields: [newOwnerId],
+    references: [id],
+    onDelete: SetNull
+  )
+
+  marketplaceOrder MarketplaceOrder? @relation(
+    fields: [marketplaceOrderId],
+    references: [id],
+    onDelete: SetNull
+  )
+
+  // -------------------------------------------------------
+  // Indexes
+  // -------------------------------------------------------
+
+  @@index([parcelId, transferredAt])
+  @@index([previousOwnerId])
+  @@index([newOwnerId])
+  @@index([marketplaceOrderId])
 }
 
 // =========================================================
@@ -342,6 +509,15 @@ model MarketplaceOrder {
   paymentEvents MarketplacePaymentEvent[]
 
   idempotencyKeys MarketplaceIdempotencyKey[]
+
+  // -------------------------------------------------------
+  // Parcel ownership history
+  // -------------------------------------------------------
+  //
+  // Allows an ownership-history entry to reference the
+  // marketplace order that caused the transfer.
+
+  ownershipHistory ParcelOwnershipHistory[]
 
   @@index([userId])
   @@index([productId])

@@ -1,11 +1,11 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import nonceRoute from "../routes/auth/nonce";
-import verifyRoute from "../routes/auth/verify";
-import signupRoute from "../routes/auth/signup";
-import loginRoute from "../routes/auth/login";
-import meRoute from "../routes/auth/me";
+import nonceRoute from "../routes/auth/nonce.js";
+import verifyRoute from "../routes/auth/verify.js";
+import signupRoute from "../routes/auth/signup.js";
+import loginRoute from "../routes/auth/login.js";
+import meRoute from "../routes/auth/me.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;

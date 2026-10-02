@@ -1,144 +1,412 @@
+// server/index.ts
+import dotenv from "dotenv";
+dotenv.config({
+    path: ".env",
+});
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import { verifyMessage } from "ethers";
-import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
-// Routers
+// =========================================================
+// AUTH ROUTES
+// =========================================================
 import nonceRouter from "./routes/auth/nonce.js";
+import verifyRouter from "./routes/auth/verify.js";
+import refreshRouter from "./routes/auth/refresh.js";
 import emailAuthRouter from "./routes/auth/emailAuth.js";
-// Stores
-import nonces from "./stores/nonceStore.js";
-import { updateUserByAddress, updateUserByEmail, } from "./stores/userStore.js";
-// Middleware
-import { authenticateToken } from "./middleware/authMiddleware.js";
-// Init
-dotenv.config({ path: "server/.env" });
-console.log("JWT_SECRET loaded:", process.env.JWT_SECRET); // for debug
-const app = express();
-const PORT = process.env.PORT || 5000;
+import meRouter from "./routes/auth/me.js";
+import projectRouter from "./routes/auth/projects.js";
+import aiRouter from "./routes/auth/ai.js";
+import publicProjectRouter from "./routes/public/projects.js";
+import parcelRouter from "./routes/parcels.js";
+import marketplaceRouter from "./routes/marketplace.js";
+import marketplaceRoutes from "./routes/marketplaceRoutes.js";
+import ideasRouter from "./routes/ideas.js";
+// =========================================================
+// AUTH MIDDLEWARE
+// =========================================================
+import { authenticateToken, } from "./middleware/authMiddleware.js";
+// =========================================================
+// USER STORE
+// =========================================================
+import { getUserById, updateUserById, } from "./stores/userStore.js";
+// =========================================================
+// ENVIRONMENT
+// =========================================================
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     throw new Error("JWT_SECRET is not defined");
 }
-// Middleware
+const PORT = Number(process.env.PORT) || 5000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+// =========================================================
+// APP
+// =========================================================
+const app = express();
+// =========================================================
+// CORS
+// =========================================================
 const allowedOrigins = (process.env.CORS_ORIGIN || "")
     .split(",")
-    .map(origin => origin.trim());
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Allow non-browser requests.
+        if (!origin) {
             callback(null, true);
+            return;
         }
-        else {
-            callback(new Error("Not allowed by CORS"));
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
         }
+        callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
 }));
-app.use(express.json());
+// =========================================================
+// BODY PARSING
+// =========================================================
+/*
+ * 12 MB request limit.
+ *
+ * This is intentionally larger than the
+ * 10 MB scene limit so the application can
+ * still return a controlled 413 response.
+ */
+app.use(express.json({
+    limit: "12mb",
+}));
+// =========================================================
+// COOKIES
+// =========================================================
 app.use(cookieParser());
-// Routes
+// =========================================================
+// HEALTH CHECK
+// =========================================================
+app.get("/", (_req, res) => {
+    return res.status(200).json({
+        ok: true,
+        service: "CyBuilder Auth Server",
+        environment: NODE_ENV,
+    });
+});
+app.get("/health", (_req, res) => {
+    return res.status(200).json({
+        ok: true,
+    });
+});
+// =========================================================
+// AUTH ROUTES
+// =========================================================
 app.use("/auth", nonceRouter);
+app.use("/auth", verifyRouter);
+app.use("/auth/refresh", refreshRouter);
+app.use("/auth/me", meRouter);
 app.use("/api", emailAuthRouter);
-app.post("/auth/verify", (req, res) => {
-    const { address, signature } = req.body;
-    if (!address || !signature) {
-        return res.status(400).json({ error: "Missing parameters" });
-    }
-    const lowercaseAddress = address.toLowerCase();
-    const nonce = nonces.get(lowercaseAddress);
-    if (!nonce) {
-        return res.status(400).json({ error: "No nonce found for address" });
-    }
-    const message = `Sign this message to log in: ${nonce}`;
-    try {
-        const recovered = verifyMessage(message, signature);
-        if (recovered.toLowerCase() !== lowercaseAddress) {
-            return res.status(401).json({ error: "Signature does not match address" });
-        }
-        const accessToken = jwt.sign({ address: lowercaseAddress }, JWT_SECRET, { expiresIn: "1h" });
-        const refreshToken = jwt.sign({ address: lowercaseAddress }, JWT_SECRET, { expiresIn: "7d" });
-        nonces.delete(lowercaseAddress);
-        res
-            .cookie("refreshToken", refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "strict",
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        })
-            .json({ token: accessToken });
-    }
-    catch (err) {
-        console.error("Verification error:", err);
-        res.status(500).json({ error: "Internal verification error" });
-    }
+// =========================================================
+// PUBLIC PROJECT ROUTES
+// =========================================================
+app.use("/api/public/projects", publicProjectRouter);
+// =========================================================
+// AUTHENTICATED PROJECT ROUTES
+// =========================================================
+console.log("MOUNTING PROJECT ROUTER");
+app.use("/api/projects", (req, _res, next) => {
+    console.log("🔥 API PROJECTS REQUEST:", req.method, req.originalUrl);
+    next();
 });
-// ===== Refresh Token =====
-app.post("/auth/refresh", (req, res) => {
-    const refreshToken = req.cookies?.refreshToken;
-    if (!refreshToken) {
-        return res.status(401).json({ error: "No refresh token provided" });
-    }
-    try {
-        const payload = jwt.verify(refreshToken, JWT_SECRET);
-        const newAccessToken = jwt.sign({ address: payload.address }, JWT_SECRET, {
-            expiresIn: "1h",
+app.use("/api/projects", projectRouter);
+// =========================================================
+// IDEAS ROUTES
+// =========================================================
+console.log("MOUNTING IDEAS ROUTER");
+app.use("/api/ideas", (req, _res, next) => {
+    console.log("🔥 API IDEAS REQUEST:", req.method, req.originalUrl);
+    next();
+});
+app.use("/api/ideas", ideasRouter);
+console.log("IDEAS ROUTER MOUNTED");
+// =========================================================
+// PARCEL ROUTES
+// =========================================================
+console.log("MOUNTING PARCEL ROUTER");
+app.use("/api/parcels", (req, _res, next) => {
+    console.log("🔥 API PARCELS REQUEST:", req.method, req.originalUrl);
+    next();
+});
+app.use("/api/parcels", parcelRouter);
+console.log("PARCEL ROUTER MOUNTED");
+// =========================================================
+// MARKETPLACE ROUTES
+// =========================================================
+console.log("MOUNTING MARKETPLACE ROUTER");
+app.use("/api/marketplace", (req, _res, next) => {
+    console.log("🔥 API MARKETPLACE REQUEST:", req.method, req.originalUrl);
+    next();
+});
+app.use("/api/marketplace", marketplaceRouter);
+console.log("MARKETPLACE ROUTER MOUNTED");
+app.use("/api/marketplace", marketplaceRoutes);
+// =========================================================
+// AI ROUTES
+// =========================================================
+app.use("/api/ai", aiRouter);
+// =========================================================
+// CURRENT USER
+// =========================================================
+app.get("/auth/me", authenticateToken, async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(401).json({
+            error: "Unauthorized",
         });
-        res.json({ token: newAccessToken });
     }
-    catch (err) {
-        console.error("Refresh token error:", err);
-        res.status(403).json({ error: "Invalid or expired refresh token" });
+    try {
+        const user = await getUserById(req.user.id);
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found",
+            });
+        }
+        return res.status(200).json({
+            user: {
+                id: user.id,
+                address: user.address,
+                email: user.email,
+                username: user.username,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Get current user error:", error);
+        return res.status(500).json({
+            error: "Failed to load user",
+        });
     }
 });
-// ===== Logout Route =====
-app.post("/auth/logout", (req, res) => {
+// =========================================================
+// UPDATE PROFILE
+// =========================================================
+app.post("/auth/profile", authenticateToken, async (req, res) => {
+    if (!req.user?.id) {
+        return res.status(401).json({
+            error: "Unauthorized",
+        });
+    }
+    const { email, username, } = req.body ?? {};
+    // -------------------------------------------------------
+    // VALIDATE EMAIL
+    // -------------------------------------------------------
+    if (email !== undefined &&
+        typeof email !== "string") {
+        return res.status(400).json({
+            error: "Email must be a string",
+        });
+    }
+    // -------------------------------------------------------
+    // VALIDATE USERNAME
+    // -------------------------------------------------------
+    if (username !== undefined &&
+        typeof username !== "string") {
+        return res.status(400).json({
+            error: "Username must be a string",
+        });
+    }
+    // -------------------------------------------------------
+    // NORMALIZE VALUES
+    // -------------------------------------------------------
+    const normalizedEmail = typeof email === "string"
+        ? email.trim().toLowerCase()
+        : undefined;
+    const normalizedUsername = typeof username === "string"
+        ? username.trim()
+        : undefined;
+    // -------------------------------------------------------
+    // VALIDATE EMAIL LENGTH
+    // -------------------------------------------------------
+    if (normalizedEmail !== undefined &&
+        normalizedEmail.length > 320) {
+        return res.status(400).json({
+            error: "Email must be 320 characters or less",
+        });
+    }
+    // -------------------------------------------------------
+    // VALIDATE USERNAME LENGTH
+    // -------------------------------------------------------
+    if (normalizedUsername !== undefined &&
+        normalizedUsername.length > 50) {
+        return res.status(400).json({
+            error: "Username must be 50 characters or less",
+        });
+    }
+    // -------------------------------------------------------
+    // UPDATE USER
+    // -------------------------------------------------------
+    try {
+        const updatedUser = await updateUserById(req.user.id, {
+            ...(normalizedEmail !== undefined
+                ? {
+                    email: normalizedEmail,
+                }
+                : {}),
+            ...(normalizedUsername !== undefined
+                ? {
+                    username: normalizedUsername,
+                }
+                : {}),
+        });
+        // -----------------------------------------------------
+        // USER NOT FOUND
+        // -----------------------------------------------------
+        if (!updatedUser) {
+            return res.status(404).json({
+                error: "User not found",
+            });
+        }
+        // -----------------------------------------------------
+        // SUCCESS
+        // -----------------------------------------------------
+        return res.status(200).json({
+            user: {
+                id: updatedUser.id,
+                address: updatedUser.address,
+                email: updatedUser.email,
+                username: updatedUser.username,
+                createdAt: updatedUser.createdAt,
+                updatedAt: updatedUser.updatedAt,
+            },
+        });
+    }
+    catch (error) {
+        console.error("Update profile error:", error);
+        // -----------------------------------------------------
+        // PRISMA UNIQUE CONSTRAINT
+        // -----------------------------------------------------
+        //
+        // P2002 means a unique field already exists.
+        // For example, another account may already
+        // own the requested email address.
+        //
+        if (typeof error === "object" &&
+            error !== null &&
+            "code" in error &&
+            error.code ===
+                "P2002") {
+            return res.status(409).json({
+                error: "That email is already in use",
+            });
+        }
+        // -----------------------------------------------------
+        // GENERAL ERROR
+        // -----------------------------------------------------
+        return res.status(500).json({
+            error: "Failed to update profile",
+        });
+    }
+});
+// =========================================================
+// LOGOUT
+// =========================================================
+app.post("/auth/logout", (_req, res) => {
     res.clearCookie("refreshToken", {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: NODE_ENV ===
+            "production",
         sameSite: "strict",
+        path: "/",
     });
-    res.status(200).json({ message: "Logged out" });
+    return res.status(200).json({
+        message: "Logged out",
+    });
 });
-// ===== Get Current User Info =====
-app.get("/auth/me", authenticateToken, (req, res) => {
-    if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-    res.json({ user: req.user });
+// =========================================================
+// 404
+// =========================================================
+app.use((req, res) => {
+    console.warn(`404 ${req.method} ${req.originalUrl}`);
+    return res.status(404).json({
+        error: "Route not found",
+    });
 });
-// ===== Update User Profile (email, username) =====
-app.post("/auth/profile", authenticateToken, (req, res) => {
-    const { email, username } = req.body;
-    if (!req.user) {
-        return res.status(401).json({ error: "Unauthorized" });
+// =========================================================
+// GLOBAL ERROR HANDLER
+// =========================================================
+app.use((error, _req, res, _next) => {
+    console.error("Server error:", error);
+    // -------------------------------------------------------
+    // CORS ERROR
+    // -------------------------------------------------------
+    if (error instanceof Error &&
+        error.message ===
+            "Not allowed by CORS") {
+        return res.status(403).json({
+            error: "CORS origin not allowed",
+        });
     }
-    let updatedUser;
-    if ("address" in req.user && typeof req.user.address === "string") {
-        updatedUser = updateUserByAddress(req.user.address, { email, username });
+    // -------------------------------------------------------
+    // INVALID JSON
+    // -------------------------------------------------------
+    if (error instanceof SyntaxError) {
+        return res.status(400).json({
+            error: "Invalid JSON request",
+        });
     }
-    else if ("email" in req.user && typeof req.user.email === "string") {
-        updatedUser = updateUserByEmail(req.user.email, { email, username });
-    }
-    else {
-        return res.status(400).json({ error: "Invalid user data" });
-    }
-    if (!updatedUser) {
-        return res.status(404).json({ error: "User not found" });
-    }
-    res.json({ user: updatedUser });
+    // -------------------------------------------------------
+    // GENERAL SERVER ERROR
+    // -------------------------------------------------------
+    return res.status(500).json({
+        error: "Internal server error",
+    });
 });
-// ===== Server Start =====
-app.listen(PORT, () => {
-    console.log(`✅ Auth server running at http://localhost:${PORT}`);
+// =========================================================
+// SERVER
+// =========================================================
+const server = app.listen(PORT, () => {
+    console.log(`✅ CyBuilder server running on port ${PORT}`);
+    console.log(`Environment: ${NODE_ENV}`);
+    console.log("Registered routes:");
+    console.log("  GET    /");
+    console.log("  GET    /health");
+    console.log("  POST   /auth/nonce");
+    console.log("  POST   /auth/verify");
+    console.log("  POST   /auth/refresh");
+    console.log("  GET    /auth/me");
+    console.log("  POST   /auth/profile");
+    console.log("  POST   /auth/logout");
+    console.log("  GET    /api/projects");
+    console.log("  POST   /api/projects");
+    console.log("  GET    /api/projects/:id");
+    console.log("  PATCH  /api/projects/:id");
+    console.log("  DELETE /api/projects/:id");
+    console.log("  POST   /api/projects/:id/publish");
+    // =====================================================
+    // MARKETPLACE
+    // =====================================================
+    console.log("  GET    /api/marketplace/listings");
+    console.log("  POST   /api/marketplace/parcels/:id/buy");
+    console.log("  POST   /api/marketplace/parcels/:id/reserve");
+    console.log("  POST   /api/marketplace/parcels/:id/list");
+    console.log("  POST   /api/marketplace/parcels/:id/release");
+    // =====================================================
+    // AI
+    // =====================================================
+    console.log("  POST   /api/ai");
 });
-// ===== Graceful Shutdown =====
-process.on("SIGINT", () => {
-    console.log("🛑 Server shutting down...");
-    process.exit(0);
-});
-process.on("SIGTERM", () => {
-    console.log("🛑 Caught SIGTERM, exiting...");
-    process.exit(0);
-});
+// =========================================================
+// GRACEFUL SHUTDOWN
+// =========================================================
+function shutdown(signal) {
+    console.log(`🛑 ${signal} received. Shutting down...`);
+    server.close(() => {
+        console.log("✅ Server closed.");
+        process.exit(0);
+    });
+    setTimeout(() => {
+        console.error("⚠️ Forced shutdown.");
+        process.exit(1);
+    }, 10000).unref();
+}
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

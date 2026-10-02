@@ -42,6 +42,7 @@ import type {
 import {
   useMarketplace,
 } from "../marketplace";
+import LandmarkLayer from "./LandmarkLayer";
 
 
 /**
@@ -81,12 +82,11 @@ interface WorldBounds {
  */
 
 const WORLD_BOUNDS: WorldBounds = {
-  minX: -50,
-  maxX: 50,
-  minY: -50,
-  maxY: 50,
+  minX: 0,
+  maxX: 2384,
+  minY: 0,
+  maxY: 2384,
 };
-
 
 /**
  * =========================================================
@@ -818,6 +818,60 @@ useEffect(() => {
     actionError
   }
 />
+
+<ParcelLayer
+  parcels={parcels}
+  tileSize={16}
+  origin={[0, 0, 0]}
+  interactive={true}
+
+  selectedParcelId={
+    selectedParcelId
+  }
+
+  onParcelSelect={({
+    parcel,
+  }) => {
+    handleParcelSelect(
+      parcel
+    );
+  }}
+
+  onParcelClose={() => {
+    setSelectedParcelId(null);
+  }}
+
+  onBuy={
+    handleBuyParcel
+  }
+
+  onReserve={
+    handleReserveParcel
+  }
+
+  onList={
+    handleListParcel
+  }
+
+  actionParcelId={
+    actionParcelId
+  }
+
+  actionType={
+    parcelActionType
+  }
+
+  actionError={
+    actionError
+  }
+/>
+
+<LandmarkLayer
+  parcels={parcels}
+  tileSize={16}
+  origin={[0, 0, 0]}
+/>
+
 </group>
 
 

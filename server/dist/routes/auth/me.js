@@ -1,35 +1,94 @@
-import { Router } from "express";
-import jwt from "jsonwebtoken";
-import { getUserByAddress, getUserByEmail } from "../../stores/userStore.js";
+// server/routes/auth/me.ts
+import { Router, } from "express";
+import { verifyAuthToken, } from "../../utils/auth.js";
+import { getUserById, } from "../../stores/userStore.js";
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "YOUR_SECRET_KEY";
-router.get("/", (req, res) => {
+/*
+ * =========================================================
+ * GET CURRENT USER
+ * =========================================================
+ *
+ * GET /auth/me
+ *
+ * Authorization:
+ *
+ * Bearer <access-token>
+ *
+ * The JWT `sub` is the canonical User.id.
+ */
+router.get("/", async (req, res) => {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Missing or invalid Authorization header" });
+    /*
+     * -------------------------------------------------------
+     * AUTHORIZATION HEADER
+     * -------------------------------------------------------
+     */
+    if (!authHeader ||
+        !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({
+            error: "Missing or invalid Authorization header",
+        });
     }
-    const token = authHeader.split(" ")[1];
+    const token = authHeader
+        .substring(7)
+        .trim();
+    if (!token) {
+        return res.status(401).json({
+            error: "Access token missing",
+        });
+    }
     try {
-        // JWT payload can contain either address or email
-        const decoded = jwt.verify(token, JWT_SECRET);
-        let user;
-        if (decoded.address) {
-            user = getUserByAddress(decoded.address);
+        /*
+         * -----------------------------------------------------
+         * VERIFY JWT
+         * -----------------------------------------------------
+         */
+        const decoded = verifyAuthToken(token);
+        /*
+         * /auth/me accepts access tokens only.
+         */
+        if (decoded.type !==
+            "access") {
+            return res.status(401).json({
+                error: "Invalid access token",
+            });
         }
-        else if (decoded.email) {
-            user = getUserByEmail(decoded.email);
-        }
-        else {
-            return res.status(400).json({ error: "Invalid token payload" });
-        }
+        /*
+         * -----------------------------------------------------
+         * CANONICAL USER LOOKUP
+         * -----------------------------------------------------
+         *
+         * The database User.id is the source of truth.
+         */
+        const user = await getUserById(decoded.sub);
         if (!user) {
-            return res.status(404).json({ error: "User not found" });
+            return res.status(404).json({
+                error: "User not found",
+            });
         }
-        res.json({ user });
+        /*
+         * -----------------------------------------------------
+         * RESPONSE
+         * -----------------------------------------------------
+         *
+         * Never expose passwordHash.
+         */
+        return res.status(200).json({
+            user: {
+                id: user.id,
+                address: user.address,
+                email: user.email,
+                username: user.username,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            },
+        });
     }
-    catch (err) {
-        console.error("Token verification error:", err);
-        res.status(401).json({ error: "Invalid or expired token" });
+    catch (error) {
+        console.error("Token verification error:", error);
+        return res.status(401).json({
+            error: "Invalid or expired token",
+        });
     }
 });
 export default router;

@@ -32,6 +32,7 @@ import {
 import {
   defaultEditorTemplate,
 } from "./templates";
+import CyVerseBot from "ideas/ai/CyVerseBot";
 
 
 type EditorRealityProps = {
@@ -274,6 +275,12 @@ export default function EditorReality({
             resolvedProjectId
           }
         />
+
+        <CyVerseBot
+          projectId={
+            resolvedProjectId
+          }
+/>
 
 
         {/* EXTRA CHILDREN */}

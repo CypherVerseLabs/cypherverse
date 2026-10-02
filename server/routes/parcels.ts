@@ -20,14 +20,20 @@ const router = Router();
 // GET /api/parcels
 // =========================================================
 //
+// World parcel endpoint.
+//
 // Optional query parameters:
 //
-//   ?minX=-50
-//   ?maxX=50
-//   ?minY=-50
-//   ?maxY=50
+//   ?minX=0
+//   ?maxX=2384
+//   ?minY=0
+//   ?maxY=2384
 //
-// Returns all parcels within the requested coordinate bounds.
+// The world can contain 22,500 parcels.
+//
+// This endpoint intentionally returns lightweight parcel
+// data. Detailed owner/listing/project information should
+// be loaded when an individual parcel is selected.
 //
 // =========================================================
 
@@ -54,7 +60,8 @@ router.get(
           return undefined;
         }
 
-        const parsed = Number(value);
+        const parsed =
+          Number(value);
 
         return Number.isFinite(parsed)
           ? parsed
@@ -113,6 +120,9 @@ router.get(
        * =====================================================
        * LOAD PARCELS
        * =====================================================
+       *
+       * getParcels() performs the coordinate filtering
+       * inside Prisma/database.
        */
 
       const parcels =
@@ -125,28 +135,30 @@ router.get(
 
       /**
        * =====================================================
-       * SERIALIZE PARCELS
+       * LIGHTWEIGHT WORLD RESPONSE
        * =====================================================
        *
-       * Prisma Decimal values should be converted before
-       * sending them to the browser.
+       * Do not send owner objects, listings, or full project
+       * data for every parcel.
        *
-       * Project data is intentionally lightweight.
-       * The full project scene should be loaded separately
-       * through /api/projects/:id.
+       * The world only needs enough information to draw and
+       * identify parcels.
        */
 
       const serializedParcels =
         parcels.map(
           (parcel) => ({
-            id: parcel.id,
+            id:
+              parcel.id,
 
             estateId:
               parcel.estateId,
 
-            x: parcel.x,
+            x:
+              parcel.x,
 
-            y: parcel.y,
+            y:
+              parcel.y,
 
             status:
               parcel.status,
@@ -163,39 +175,6 @@ router.get(
 
             name:
               parcel.name,
-
-            description:
-              parcel.description,
-
-            blockchainAddress:
-              parcel.blockchainAddress,
-
-            tokenId:
-              parcel.tokenId,
-
-            project:
-              parcel.project
-                ? {
-                    id:
-                      parcel.project.id,
-
-                    name:
-                      parcel.project.name,
-
-                    description:
-                      parcel.project.description,
-
-                    template:
-                      parcel.project.template,
-
-                    slug:
-                      parcel.project.slug,
-
-                    publishedAt:
-                      parcel.project.publishedAt,
-
-                  }
-                : null,
           })
         );
 
@@ -208,6 +187,9 @@ router.get(
       return res.status(200).json({
         parcels:
           serializedParcels,
+
+        count:
+          serializedParcels.length,
       });
 
     } catch (error) {

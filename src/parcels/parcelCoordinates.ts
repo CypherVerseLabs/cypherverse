@@ -1,37 +1,44 @@
 /**
  * Convert a parcel coordinate into a 3D world position.
  *
- * Parcel coordinates:
+ * The database already stores parcel coordinates in world units:
  *
- *     x = east / west
- *     y = north / south
+ *     0
+ *     16
+ *     32
+ *     48
+ *     ...
+ *     2384
  *
- * 3D coordinates:
+ * Therefore x/y are mapped directly into the 3D world.
  *
- *     x = horizontal
- *     y = vertical
- *     z = depth
- *
- * Parcel Y therefore maps to THREE Z.
+ * Parcel Y maps to THREE Z.
  */
 
 export function parcelToWorldPosition(
   x: number,
   y: number,
-  tileSize: number,
+  _tileSize: number,
   origin: [number, number, number] = [0, 0, 0]
 ): [number, number, number] {
   return [
-    origin[0] + x * tileSize,
+    origin[0] + x,
     origin[1],
-    origin[2] + y * tileSize,
+    origin[2] + y,
   ];
 }
 
+
+/**
+ * Convert a 3D world position back into a parcel coordinate.
+ *
+ * Because database coordinates are already in world units,
+ * no additional tile-size multiplication is required.
+ */
 export function worldToParcelCoordinates(
   worldX: number,
   worldZ: number,
-  tileSize: number,
+  _tileSize: number,
   origin: [number, number, number] = [0, 0, 0]
 ): {
   x: number;
@@ -39,10 +46,11 @@ export function worldToParcelCoordinates(
 } {
   return {
     x: Math.floor(
-      (worldX - origin[0]) / tileSize
+      worldX - origin[0]
     ),
+
     y: Math.floor(
-      (worldZ - origin[2]) / tileSize
+      worldZ - origin[2]
     ),
   };
 }

@@ -1,8 +1,15 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+
+import {
+  useFrame,
+  useThree,
+} from "@react-three/fiber";
 
 import type {
   Parcel,
@@ -16,25 +23,9 @@ import {
 import ParcelTile from "./ParcelTile";
 import ParcelPanel from "./ParcelPanel";
 
+const DEFAULT_RENDER_DISTANCE = 256;
 
-/**
- * =========================================================
- * PARCEL LAYER
- * =========================================================
- *
- * Physical 3D parcel system.
- *
- * Responsibilities:
- *
- *   - Render parcel tiles
- *   - Track/select a parcel
- *   - Display the selected parcel panel
- *   - Forward marketplace callbacks to ParcelPanel
- *
- * Marketplace business logic remains owned by CypherVerse
- * and useMarketplace().
- * =========================================================
- */
+const CAMERA_UPDATE_INTERVAL = 150;
 
 export default function ParcelLayer({
   parcels = [],
@@ -53,13 +44,11 @@ export default function ParcelLayer({
   actionError,
 }: ParcelLayerProps) {
 
-
-
-  /**
-   * =======================================================
-   * INTERNAL SELECTION
-   * =======================================================
-   */
+  const camera =
+    useThree(
+      (state) =>
+        state.camera
+    );
 
   const [
     internalSelectedId,
@@ -68,26 +57,10 @@ export default function ParcelLayer({
     null
   );
 
-
-  /**
-   * =======================================================
-   * ACTIVE SELECTION
-   * =======================================================
-   *
-   * Parent-controlled selection always wins.
-   */
-
   const activeSelectedId =
     selectedParcelId !== undefined
       ? selectedParcelId
       : internalSelectedId;
-
-
-  /**
-   * =======================================================
-   * SELECTED PARCEL
-   * =======================================================
-   */
 
   const selectedParcel =
     useMemo(() => {
@@ -108,6 +81,185 @@ export default function ParcelLayer({
       parcels,
       activeSelectedId,
     ]);
+
+  const [
+    nearbyParcels,
+    setNearbyParcels,
+  ] = useState<Parcel[]>([]);
+
+  const lastCameraUpdate =
+    useRef(0);
+
+
+  /**
+   * =======================================================
+   * FIND NEARBY PARCELS
+   * =======================================================
+   */
+
+  const calculateNearby =
+    useCallback(() => {
+
+      if (
+        parcels.length === 0
+      ) {
+        setNearbyParcels([]);
+        return;
+      }
+
+      const cameraX =
+        camera.position.x;
+
+      const cameraZ =
+        camera.position.z;
+
+      const distance =
+        DEFAULT_RENDER_DISTANCE;
+
+      const minWorldX =
+        cameraX - distance;
+
+      const maxWorldX =
+        cameraX + distance;
+
+      const minWorldZ =
+        cameraZ - distance;
+
+      const maxWorldZ =
+        cameraZ + distance;
+
+      const minParcelX =
+        Math.floor(
+          (minWorldX -
+            origin[0]) /
+            tileSize
+        ) *
+        tileSize;
+
+      const maxParcelX =
+        Math.ceil(
+          (maxWorldX -
+            origin[0]) /
+            tileSize
+        ) *
+        tileSize;
+
+      const minParcelY =
+        Math.floor(
+          (minWorldZ -
+            origin[2]) /
+            tileSize
+        ) *
+        tileSize;
+
+      const maxParcelY =
+        Math.ceil(
+          (maxWorldZ -
+            origin[2]) /
+            tileSize
+        ) *
+        tileSize;
+
+      const visibleParcels =
+        parcels.filter(
+          (parcel) =>
+            parcel.x >=
+              minParcelX &&
+            parcel.x <=
+              maxParcelX &&
+            parcel.y >=
+              minParcelY &&
+            parcel.y <=
+              maxParcelY
+        );
+
+      /**
+       * Keep the selected parcel rendered even when
+       * the player is far away from it.
+       */
+
+      if (
+        activeSelectedId
+      ) {
+
+        const selected =
+          parcels.find(
+            (parcel) =>
+              parcel.id ===
+              activeSelectedId
+          );
+
+        if (
+          selected &&
+          !visibleParcels.some(
+            (parcel) =>
+              parcel.id ===
+              selected.id
+          )
+        ) {
+          visibleParcels.push(
+            selected
+          );
+        }
+      }
+
+      setNearbyParcels(
+        visibleParcels
+      );
+
+    }, [
+      parcels,
+      camera,
+      tileSize,
+      origin,
+      activeSelectedId,
+    ]);
+
+
+  /**
+   * =======================================================
+   * INITIAL LOAD
+   * =======================================================
+   */
+
+  useEffect(() => {
+
+    calculateNearby();
+
+  }, [
+    calculateNearby,
+  ]);
+
+
+  /**
+   * =======================================================
+   * CAMERA MOVEMENT
+   * =======================================================
+   */
+
+  useFrame(() => {
+
+    if (!visible) {
+      return;
+    }
+
+    const now =
+      performance.now();
+
+    if (
+      now -
+        lastCameraUpdate.current <
+      CAMERA_UPDATE_INTERVAL
+    ) {
+      return;
+    }
+
+    lastCameraUpdate.current =
+      now;
+
+    calculateNearby();
+
+  });
 
 
   /**
@@ -148,18 +300,17 @@ export default function ParcelLayer({
    */
 
   const handleClose =
-  useCallback(() => {
+    useCallback(() => {
 
-    setInternalSelectedId(
-      null
-    );
+      setInternalSelectedId(
+        null
+      );
 
-    onParcelClose?.();
+      onParcelClose?.();
 
-  }, [
-    onParcelClose,
-  ]);
-
+    }, [
+      onParcelClose,
+    ]);
 
 
   /**
@@ -181,15 +332,11 @@ export default function ParcelLayer({
 
   return (
     <>
-      {/* ===================================================
-          PHYSICAL PARCEL WORLD
-          =================================================== */}
-
       <group
         name="parcel-layer"
       >
 
-        {parcels.map(
+        {nearbyParcels.map(
           (parcel) => {
 
             const position =
@@ -239,12 +386,7 @@ export default function ParcelLayer({
       </group>
 
 
-      {/* ===================================================
-          SELECTED PARCEL PANEL
-          =================================================== */}
-
       <ParcelPanel
-
         parcel={
           selectedParcel
         }
@@ -276,7 +418,6 @@ export default function ParcelLayer({
         actionError={
           actionError
         }
-
       />
 
     </>

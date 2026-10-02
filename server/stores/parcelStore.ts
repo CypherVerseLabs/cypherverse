@@ -159,10 +159,14 @@ export async function getParcels(options?: {
   minY?: number;
   maxY?: number;
 }) {
-  const where: Prisma.ParcelWhereInput = {};
+  const where:
+    Prisma.ParcelWhereInput = {};
 
-  if (options?.status !== undefined) {
-    where.status = options.status;
+  if (
+    options?.status !== undefined
+  ) {
+    where.status =
+      options.status;
   }
 
   if (
@@ -171,12 +175,18 @@ export async function getParcels(options?: {
   ) {
     where.x = {};
 
-    if (options.minX !== undefined) {
-      where.x.gte = options.minX;
+    if (
+      options.minX !== undefined
+    ) {
+      where.x.gte =
+        options.minX;
     }
 
-    if (options.maxX !== undefined) {
-      where.x.lte = options.maxX;
+    if (
+      options.maxX !== undefined
+    ) {
+      where.x.lte =
+        options.maxX;
     }
   }
 
@@ -186,12 +196,18 @@ export async function getParcels(options?: {
   ) {
     where.y = {};
 
-    if (options.minY !== undefined) {
-      where.y.gte = options.minY;
+    if (
+      options.minY !== undefined
+    ) {
+      where.y.gte =
+        options.minY;
     }
 
-    if (options.maxY !== undefined) {
-      where.y.lte = options.maxY;
+    if (
+      options.maxY !== undefined
+    ) {
+      where.y.lte =
+        options.maxY;
     }
   }
 
@@ -207,39 +223,33 @@ export async function getParcels(options?: {
       },
     ],
 
-    include: {
-  owner: {
+    /**
+     * =====================================================
+     * WORLD PAYLOAD
+     * =====================================================
+     *
+     * Keep this query lightweight.
+     *
+     * Do NOT include owner/listings/project here.
+     */
+
     select: {
       id: true,
-      address: true,
-      username: true,
-    },
-  },
 
-  listings: {
-    where: {
-      active: true,
-    },
+      estateId: true,
 
-    orderBy: {
-      createdAt: "desc",
-    },
+      x: true,
 
-    take: 1,
-  },
+      y: true,
 
-  project: {
-    select: {
-      id: true,
+      status: true,
+
+      ownerId: true,
+
+      price: true,
+
       name: true,
-      description: true,
-      template: true,
-      slug: true,
-      publishedAt: true,
     },
-  },
-},
-
   });
 }
 
