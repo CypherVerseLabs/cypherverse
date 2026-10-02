@@ -7,6 +7,11 @@ import {
 
 import { prisma } from "../lib/prisma.js";
 
+import {
+  PARCEL_OWNERSHIP_SOURCE,
+  recordParcelOwnershipTransfer,
+} from "./parcelOwnershipService.js";
+
 /**
  * =========================================================
  * MARKETPLACE ORDER SERVICE
@@ -296,6 +301,13 @@ export async function createParcelOrder(
          * VERIFY PARCEL STATE
          * ---------------------------------------------------
          */
+
+        if (parcel.type === "CITY_LANDMARK") {
+          throw new MarketplaceError(
+            "CITY_LANDMARK_NOT_TRANSFERABLE",
+            "City landmark parcels cannot be purchased or transferred through the parcel marketplace."
+          );
+        }
 
         if (
           parcel.status !==
