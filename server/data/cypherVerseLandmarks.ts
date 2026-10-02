@@ -11,10 +11,6 @@ import { $Enums } from "../generated/prisma/client.js";
  *   x = east / west
  *   y = north / south
  *
- * Parcel coordinates map directly to:
- *   Parcel.x
- *   Parcel.y
- *
  * Landmark spacing:
  *   22 parcels horizontally
  *   22 parcels vertically
@@ -59,18 +55,8 @@ export type CypherVerseLandmark = {
 
 export const CYPHERVERSE_LANDMARKS: CypherVerseLandmark[] = [
   // =======================================================
-  // NORTHWEST
+  // NORTH
   // =======================================================
-
-  {
-    estateId: "landmark-northwest-frontier",
-    x: -66,
-    y: 66,
-    name: "Northwest Frontier",
-    description:
-      "A permanent landmark marking the northwest frontier of CypherVerse.",
-    type: $Enums.ParcelType.CITY_LANDMARK,
-  },
 
   {
     estateId: "landmark-northwest-highlands",
@@ -119,16 +105,6 @@ export const CYPHERVERSE_LANDMARKS: CypherVerseLandmark[] = [
     name: "Northstar",
     description:
       "A major landmark marking the northern expansion region.",
-    type: $Enums.ParcelType.CITY_LANDMARK,
-  },
-
-  {
-    estateId: "landmark-northeast-frontier",
-    x: 66,
-    y: 66,
-    name: "Northeast Frontier",
-    description:
-      "A permanent landmark marking the northeast frontier.",
     type: $Enums.ParcelType.CITY_LANDMARK,
   },
 
@@ -553,16 +529,6 @@ export const CYPHERVERSE_LANDMARKS: CypherVerseLandmark[] = [
     name: "Southwatch",
     description:
       "A permanent landmark marking the southern expansion region.",
-    type: $Enums.ParcelType.CITY_LANDMARK,
-  },
-
-  {
-    estateId: "landmark-southern-frontier",
-    x: 66,
-    y: -66,
-    name: "Southern Frontier",
-    description:
-      "A permanent landmark marking the southern world boundary.",
     type: $Enums.ParcelType.CITY_LANDMARK,
   },
 ];
