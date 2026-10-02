@@ -36,8 +36,10 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-    "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
-    "frontend": "next dev -p 3000",
-    "dev": "concurrently \"yarn server\" \"yarn frontend\""
-  }
+  "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
+  "frontend": "next dev -p 3000",
+  "dev": "concurrently \"yarn server\" \"yarn frontend\"",
+  "build": "tsc --noEmit"
+}
+
 }
