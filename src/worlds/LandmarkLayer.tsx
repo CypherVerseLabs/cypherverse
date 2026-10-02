@@ -109,6 +109,15 @@ export default function LandmarkLayer({
         }) => {
 
           /**
+           * Genesis is the central landmark and receives
+           * the larger beacon treatment.
+           */
+
+          const isGenesis =
+            landmark.estateId ===
+            "landmark-genesis";
+
+          /**
            * The landmark can still be positioned even
            * when its parcel hasn't been loaded yet.
            */
@@ -128,10 +137,10 @@ export default function LandmarkLayer({
           ] = position;
 
           const height =
-            landmark.role ===
-            "genesis"
+            isGenesis
               ? 10
               : 6;
+
 
           return (
             <group
@@ -166,15 +175,13 @@ export default function LandmarkLayer({
 
                 <meshStandardMaterial
                   color={
-                    landmark.role ===
-                    "genesis"
+                    isGenesis
                       ? "#ffd166"
                       : "#38bdf8"
                   }
 
                   emissive={
-                    landmark.role ===
-                    "genesis"
+                    isGenesis
                       ? "#ff9f1c"
                       : "#0369a1"
                   }
@@ -208,15 +215,13 @@ export default function LandmarkLayer({
 
                 <meshStandardMaterial
                   color={
-                    landmark.role ===
-                    "genesis"
+                    isGenesis
                       ? "#fff3b0"
                       : "#7dd3fc"
                   }
 
                   emissive={
-                    landmark.role ===
-                    "genesis"
+                    isGenesis
                       ? "#f59e0b"
                       : "#0ea5e9"
                   }
@@ -238,14 +243,12 @@ export default function LandmarkLayer({
                   0,
                 ]}
                 color={
-                  landmark.role ===
-                  "genesis"
+                  isGenesis
                     ? "#ffd166"
                     : "#38bdf8"
                 }
                 intensity={
-                  landmark.role ===
-                  "genesis"
+                  isGenesis
                     ? 25
                     : 10
                 }
@@ -264,8 +267,7 @@ export default function LandmarkLayer({
                   0,
                 ]}
                 fontSize={
-                  landmark.role ===
-                  "genesis"
+                  isGenesis
                     ? 2
                     : 1.5
                 }
@@ -309,3 +311,4 @@ export default function LandmarkLayer({
     </group>
   );
 }
+
