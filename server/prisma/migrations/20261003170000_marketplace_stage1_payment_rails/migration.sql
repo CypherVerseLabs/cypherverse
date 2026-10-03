@@ -52,6 +52,9 @@ RENAME COLUMN "currency_new" TO "currency";
 ALTER TABLE "MarketplacePayment"
 RENAME COLUMN "providerTransactionId" TO "externalTransactionId";
 
+ALTER INDEX "MarketplacePayment_providerTransactionId_key"
+RENAME TO "MarketplacePayment_externalTransactionId_key";
+
 ALTER TABLE "MarketplacePayment"
 ADD COLUMN "method" "MarketplacePaymentMethod" NOT NULL DEFAULT 'USD_PROVIDER';
 
@@ -71,8 +74,15 @@ RENAME COLUMN "paidAt" TO "confirmedAt";
 ALTER TABLE "MarketplacePaymentEvent"
 RENAME COLUMN "providerEventId" TO "externalEventId";
 
+ALTER INDEX "MarketplacePaymentEvent_providerEventId_key"
+RENAME TO "MarketplacePaymentEvent_externalEventId_key";
+
 ALTER TABLE "MarketplacePaymentEvent"
 RENAME COLUMN "providerTransactionId" TO "externalTransactionId";
+
+ALTER TABLE "MarketplacePaymentEvent"
+RENAME CONSTRAINT "MarketplacePaymentEvent_providerTransactionId_fkey"
+TO "MarketplacePaymentEvent_externalTransactionId_fkey";
 
 ALTER TABLE "MarketplacePaymentEvent"
 ALTER COLUMN "environment" SET DEFAULT 'LOCAL';
