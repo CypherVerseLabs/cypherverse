@@ -741,7 +741,7 @@ export async function getMarketplaceOrdersForUser(
           status: true,
           environment: true,
           createdAt: true,
-          paidAt: true,
+          confirmedAt: true,
           failedAt: true,
           cancelledAt: true,
         },
