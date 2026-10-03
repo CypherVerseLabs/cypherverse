@@ -3,6 +3,7 @@ import {
   MarketplaceOrderStatus,
   MarketplacePaymentStatus,
   MarketplacePaymentEnvironment,
+  MarketplaceCurrency,
 } from "../generated/prisma/client.js";
 
 import { prisma } from "../lib/prisma.js";
@@ -37,7 +38,6 @@ export const MARKETPLACE_OPERATION = {
   CREATE_PARCEL_ORDER: "CREATE_PARCEL_ORDER",
 } as const;
 
-export const MARKETPLACE_CURRENCY = "USD";
 
 /**
  * =========================================================
@@ -463,7 +463,7 @@ export async function createParcelOrder(
                 amount,
 
                 currency:
-                  MARKETPLACE_CURRENCY,
+                  listing.currency,
 
                 status:
                   MarketplaceOrderStatus.PENDING,
