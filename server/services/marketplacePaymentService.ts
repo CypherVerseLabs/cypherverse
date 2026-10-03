@@ -323,7 +323,7 @@ export async function confirmTestMarketplacePayment(
       MarketplacePaymentStatus.PAID,
 
     environment:
-      MarketplacePaymentEnvironment.TEST,
+      MarketplacePaymentEnvironment.LOCAL,
   });
 }
 
@@ -363,7 +363,7 @@ export async function failTestMarketplacePayment(
       MarketplacePaymentStatus.FAILED,
 
     environment:
-      MarketplacePaymentEnvironment.TEST,
+      MarketplacePaymentEnvironment.LOCAL,
   });
 }
 
@@ -403,7 +403,7 @@ export async function cancelTestMarketplacePayment(
       MarketplacePaymentStatus.CANCELLED,
 
     environment:
-      MarketplacePaymentEnvironment.TEST,
+      MarketplacePaymentEnvironment.LOCAL,
   });
 }
 
