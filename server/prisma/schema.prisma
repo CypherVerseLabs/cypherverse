@@ -77,8 +77,22 @@ enum MarketplacePaymentStatus {
 // MARKETPLACE PAYMENT ENVIRONMENT
 // =========================================================
 
+enum MarketplaceCurrency {
+  USD
+  ETH
+  CYPH
+}
+
+enum MarketplacePaymentMethod {
+  USD_PROVIDER
+  ETH_BLOCKCHAIN
+  CYPH_LEDGER
+}
+
 enum MarketplacePaymentEnvironment {
-  TEST
+  LOCAL
+  STAGING
+  PRODUCTION
 }
 
 // =========================================================
@@ -396,7 +410,9 @@ model ParcelListing {
   parcelId String
   sellerId String
 
-  price Decimal @db.Decimal(12, 2)
+  // One listing has exactly one settlement currency.
+  price Decimal @db.Decimal(36, 18)
+  currency MarketplaceCurrency @default(USD)
 
   active Boolean @default(true)
 
@@ -474,9 +490,9 @@ model MarketplaceOrder {
   //
   // Keeping the amount on the order prevents later product
   // price changes from silently changing an existing order.
-  amount Decimal @db.Decimal(12, 2)
+  amount Decimal @db.Decimal(36, 18)
 
-  currency String @default("USD")
+  currency MarketplaceCurrency @default(USD)
 
   status MarketplaceOrderStatus @default(PENDING)
 
@@ -532,23 +548,31 @@ model MarketplacePayment {
   // Authenticated user who initiated the payment.
   userId String
 
-  // Unique sandbox/test transaction identifier.
-  providerTransactionId String @unique
+  // Rail-neutral external transaction identifier.
+  // USD: provider payment/transaction ID
+  // ETH: blockchain transaction hash
+  // CYPH: null (internal ledger)
+  externalTransactionId String? @unique
 
-  // Server-authoritative amount.
-  amount Decimal @db.Decimal(12, 2)
+  // Rail-neutral settlement method.
+  method MarketplacePaymentMethod
 
-  // Server-authoritative currency.
-  currency String
+  // Server-authoritative amount and currency.
+  amount Decimal @db.Decimal(36, 18)
+  currency MarketplaceCurrency
+
+  // Optional blockchain/provider verification context.
+  network String?
+  metadata Json?
 
   status MarketplacePaymentStatus @default(PENDING)
 
-  environment MarketplacePaymentEnvironment @default(TEST)
+  environment MarketplacePaymentEnvironment @default(LOCAL)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  paidAt DateTime?
+  confirmedAt DateTime?
 
   failedAt DateTime?
 
@@ -579,9 +603,9 @@ model MarketplacePayment {
 model MarketplacePaymentEvent {
   id String @id @default(uuid())
 
-  providerEventId String @unique
+  externalEventId String @unique
 
-  providerTransactionId String?
+  externalTransactionId String?
 
   orderId String
 
@@ -589,7 +613,7 @@ model MarketplacePaymentEvent {
 
   status MarketplacePaymentStatus
 
-  environment MarketplacePaymentEnvironment @default(TEST)
+  environment MarketplacePaymentEnvironment @default(LOCAL)
 
   processed Boolean @default(false)
 
@@ -600,9 +624,9 @@ model MarketplacePaymentEvent {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  payment MarketplacePayment? @relation(fields: [providerTransactionId], references: [providerTransactionId], onDelete: SetNull)
+  payment MarketplacePayment? @relation(fields: [externalTransactionId], references: [externalTransactionId], onDelete: SetNull)
 
-  @@index([providerTransactionId])
+  @@index([externalTransactionId])
   @@index([orderId])
   @@index([userId])
   @@index([processed])
@@ -717,7 +741,10 @@ model CyphAccount {
   userId String @unique
 
   // Current available CYPH balance.
-  balance Decimal @default(0) @db.Decimal(24, 8)
+  // Server-maintained available-balance projection.
+  // Never writable from the frontend; CyphLedgerEntry is the
+  // immutable accounting history/source for every balance change.
+  balance Decimal @default(0) @db.Decimal(36, 18)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -751,7 +778,7 @@ model CyphLedgerEntry {
 
   // Positive = credit
   // Negative = debit
-  amount Decimal @db.Decimal(24, 8)
+  amount Decimal @db.Decimal(36, 18)
 
   // Examples:
   // PURCHASE
