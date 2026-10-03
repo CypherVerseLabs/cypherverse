@@ -353,7 +353,7 @@ export async function failTestMarketplacePayment(
     createTestEventId();
 
   return processMarketplacePaymentEvent({
-    providerEventId,
+    externalEventId,
 
     paymentId,
 
@@ -393,7 +393,7 @@ export async function cancelTestMarketplacePayment(
     createTestEventId();
 
   return processMarketplacePaymentEvent({
-    providerEventId,
+    externalEventId,
 
     paymentId,
 
@@ -433,7 +433,7 @@ interface PaymentEventInput {
  * This is the important production boundary.
  *
  * Duplicate provider events are ignored using the unique
- * providerEventId database constraint.
+ * externalEventId database constraint.
  *
  * Successful payment causes entitlement granting.
  * =========================================================
@@ -550,8 +550,8 @@ export async function processMarketplacePaymentEvent(
       const event =
         await tx.marketplacePaymentEvent.create({
           data: {
-            providerEventId:
-              input.providerEventId,
+            externalEventId:
+              input.externalEventId,
 
             externalTransactionId:
               payment.externalTransactionId,
