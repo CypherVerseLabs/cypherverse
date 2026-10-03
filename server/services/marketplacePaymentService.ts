@@ -226,6 +226,9 @@ export async function createMarketplacePayment(
             externalTransactionId:
               createTestTransactionId(),
 
+            method:
+              MarketplacePaymentMethod.USD_PROVIDER,
+
             amount:
               new Prisma.Decimal(
                 order.amount
