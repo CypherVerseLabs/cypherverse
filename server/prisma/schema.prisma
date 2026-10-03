@@ -596,7 +596,7 @@ model MarketplacePayment {
 //
 // Durable payment event record.
 //
-// providerEventId is unique so duplicate callbacks/events
+// externalEventId is unique so duplicate callbacks/events
 // cannot be processed twice.
 //
 
