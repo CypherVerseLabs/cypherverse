@@ -3,6 +3,8 @@ import {
   MarketplaceOrderStatus,
   MarketplacePaymentStatus,
   MarketplacePaymentEnvironment,
+  MarketplacePaymentMethod,
+  MarketplaceCurrency,
 } from "../generated/prisma/client.js";
 
 import { prisma } from "../lib/prisma.js";
@@ -45,7 +47,7 @@ export const MARKETPLACE_PAYMENT_OPERATION = {
 } as const;
 
 export const MARKETPLACE_PAYMENT_ENVIRONMENT =
-  MarketplacePaymentEnvironment.TEST;
+  MarketplacePaymentEnvironment.LOCAL;
 
 /**
  * =========================================================
@@ -221,7 +223,7 @@ export async function createMarketplacePayment(
             userId:
               order.userId,
 
-            providerTransactionId:
+            externalTransactionId:
               createTestTransactionId(),
 
             amount:
@@ -307,11 +309,11 @@ export async function confirmTestMarketplacePayment(
     );
   }
 
-  const providerEventId =
+  const externalEventId =
     createTestEventId();
 
   return processMarketplacePaymentEvent({
-    providerEventId,
+    externalEventId,
 
     paymentId,
 
@@ -347,7 +349,7 @@ export async function failTestMarketplacePayment(
     );
   }
 
-  const providerEventId =
+  const externalEventId =
     createTestEventId();
 
   return processMarketplacePaymentEvent({
@@ -387,7 +389,7 @@ export async function cancelTestMarketplacePayment(
     );
   }
 
-  const providerEventId =
+  const externalEventId =
     createTestEventId();
 
   return processMarketplacePaymentEvent({
@@ -412,7 +414,7 @@ export async function cancelTestMarketplacePayment(
  */
 
 interface PaymentEventInput {
-  providerEventId: string;
+  externalEventId: string;
 
   paymentId: string;
 
@@ -451,8 +453,8 @@ export async function processMarketplacePaymentEvent(
       const existingEvent =
         await tx.marketplacePaymentEvent.findUnique({
           where: {
-            providerEventId:
-              input.providerEventId,
+            externalEventId:
+              input.externalEventId,
           },
         });
 
@@ -551,8 +553,8 @@ export async function processMarketplacePaymentEvent(
             providerEventId:
               input.providerEventId,
 
-            providerTransactionId:
-              payment.providerTransactionId,
+            externalTransactionId:
+              payment.externalTransactionId,
 
             orderId:
               payment.orderId,
@@ -668,7 +670,7 @@ export async function processMarketplacePaymentEvent(
               status:
                 MarketplacePaymentStatus.PAID,
 
-              paidAt:
+              confirmedAt:
                 new Date(),
 
               failedAt: null,
