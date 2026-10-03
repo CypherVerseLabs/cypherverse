@@ -25,7 +25,19 @@ export type MarketplaceAction =
  */
 
 export type PaymentsMode =
-  | "test";
+  | "local"
+  | "staging"
+  | "production";
+
+export type MarketplaceCurrency =
+  | "USD"
+  | "ETH"
+  | "CYPH";
+
+export type MarketplacePaymentMethod =
+  | "USD_PROVIDER"
+  | "ETH_BLOCKCHAIN"
+  | "CYPH_LEDGER";
 
 
 /**
@@ -163,7 +175,7 @@ export interface MarketplaceOrder {
 
   amount: string;
 
-  currency: string;
+  currency: MarketplaceCurrency;
 
   status: string;
 
@@ -181,9 +193,17 @@ export interface MarketplacePayment {
 
   amount: string;
 
-  currency: string;
+  currency: MarketplaceCurrency;
+
+  method: MarketplacePaymentMethod;
+
+  externalTransactionId?: string | null;
+
+  network?: string | null;
 
   status: string;
+
+  environment?: PaymentsMode;
 
   createdAt: string;
 
