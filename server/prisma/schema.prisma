@@ -127,6 +127,11 @@ model User {
 
   marketplacePaymentEvents MarketplacePaymentEvent[]
 
+  cyphAccount CyphAccount?
+
+  cyphLedgerEntries CyphLedgerEntry[]
+
+
   // -------------------------------------------------------
   // Parcel ownership history
   // -------------------------------------------------------
@@ -693,5 +698,84 @@ model MarketplaceIdempotencyKey {
   @@unique([userId, operation, key])
   @@index([userId])
   @@index([orderId])
+  @@index([createdAt])
+}
+
+// =========================================================
+// CYPHR COIN ACCOUNT
+// =========================================================
+//
+// Internal CYPH balance for a marketplace user.
+//
+// CYPH is an internal marketplace currency at this stage.
+// It is NOT an on-chain cryptocurrency yet.
+//
+
+model CyphAccount {
+  id String @id @default(uuid())
+
+  userId String @unique
+
+  // Current available CYPH balance.
+  balance Decimal @default(0) @db.Decimal(24, 8)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ledgerEntries CyphLedgerEntry[]
+
+  @@index([userId])
+}
+
+// =========================================================
+// CYPHR COIN LEDGER
+// =========================================================
+//
+// Permanent history of CYPH entering and leaving an account.
+//
+// Positive amount = CYPH added
+// Negative amount = CYPH spent
+//
+// Existing entries should never be edited or deleted.
+// Corrections should create a new opposite ledger entry.
+//
+
+model CyphLedgerEntry {
+  id String @id @default(uuid())
+
+  userId String
+
+  accountId String
+
+  // Positive = credit
+  // Negative = debit
+  amount Decimal @db.Decimal(24, 8)
+
+  // Examples:
+  // PURCHASE
+  // MARKETPLACE_PURCHASE
+  // REFUND
+  // ADJUSTMENT
+  type String
+
+  // What caused this ledger entry.
+  referenceType String?
+  referenceId String?
+
+  // Prevents the same operation from creating
+  // multiple ledger entries.
+  idempotencyKey String? @unique
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  account CyphAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([referenceType, referenceId])
   @@index([createdAt])
 }
