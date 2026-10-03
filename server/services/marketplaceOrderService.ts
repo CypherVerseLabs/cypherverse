@@ -735,7 +735,7 @@ export async function getMarketplaceOrdersForUser(
       payments: {
         select: {
           id: true,
-          providerTransactionId: true,
+          externalTransactionId: true,
           amount: true,
           currency: true,
           status: true,
