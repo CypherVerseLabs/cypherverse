@@ -275,6 +275,44 @@ function assertTestPaymentAllowed(): void {
   }
 }
 
+async function assertTestPaymentOwnership(
+  paymentId: string,
+  userId: string
+): Promise<void> {
+  const payment =
+    await prisma.marketplacePayment.findUnique({
+      where: {
+        id: paymentId,
+      },
+      select: {
+        userId: true,
+        order: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+    });
+
+  if (!payment) {
+    throw new MarketplaceError(
+      "PAYMENT_NOT_FOUND",
+      "Payment not found."
+    );
+  }
+
+  if (
+    payment.userId !== userId ||
+    payment.order.userId !== userId
+  ) {
+    throw new MarketplaceError(
+      "PAYMENT_NOT_OWNED",
+      "You are not authorized to operate on this payment."
+    );
+  }
+}
+
+
 /**
  * =========================================================
  * CONFIRM TEST PAYMENT
@@ -298,6 +336,11 @@ export async function confirmTestMarketplacePayment(
       "USER_ID_REQUIRED"
     );
   }
+
+  await assertTestPaymentOwnership(
+    paymentId,
+    userId
+  );
 
   return processMarketplacePaymentEvent({
     externalEventId:
@@ -340,6 +383,11 @@ export async function failTestMarketplacePayment(
     );
   }
 
+  await assertTestPaymentOwnership(
+    paymentId,
+    userId
+  );
+
   return processMarketplacePaymentEvent({
     externalEventId:
       createTestEventId(),
@@ -380,6 +428,11 @@ export async function cancelTestMarketplacePayment(
       "USER_ID_REQUIRED"
     );
   }
+
+  await assertTestPaymentOwnership(
+    paymentId,
+    userId
+  );
 
   return processMarketplacePaymentEvent({
     externalEventId:
