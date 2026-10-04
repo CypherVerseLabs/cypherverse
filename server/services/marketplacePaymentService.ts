@@ -134,8 +134,9 @@ export async function createMarketplacePayment(
 
   assertSandboxPaymentAllowed();
 
-  return prisma.$transaction(
-    async (tx) => {
+  return runMarketplaceTransaction(
+  async (tx) => {
+
       const order =
         await tx.marketplaceOrder.findFirst({
           where: {
@@ -253,10 +254,7 @@ export async function createMarketplacePayment(
       return payment;
     },
 
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
-    }
+    
   );
 }
 
@@ -274,6 +272,60 @@ function assertTestPaymentAllowed(): void {
     );
   }
 }
+
+const MARKETPLACE_TRANSACTION_MAX_ATTEMPTS = 3;
+
+function isRetryableMarketplaceTransactionError(
+  error: unknown
+): boolean {
+  if (
+    error instanceof
+      Prisma.PrismaClientKnownRequestError
+  ) {
+    return error.code === "P2034";
+  }
+
+  return false;
+}
+
+async function runMarketplaceTransaction<T>(
+  operation: (
+    tx: Prisma.TransactionClient
+  ) => Promise<T>
+): Promise<T> {
+  let lastError: unknown;
+
+  for (
+    let attempt = 1;
+    attempt <= MARKETPLACE_TRANSACTION_MAX_ATTEMPTS;
+    attempt += 1
+  ) {
+    try {
+      return await prisma.$transaction(
+        operation,
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+        }
+      );
+    } catch (error) {
+      lastError = error;
+
+      if (
+        !isRetryableMarketplaceTransactionError(
+          error
+        ) ||
+        attempt ===
+          MARKETPLACE_TRANSACTION_MAX_ATTEMPTS
+      ) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 
 async function assertTestPaymentOwnership(
   paymentId: string,
