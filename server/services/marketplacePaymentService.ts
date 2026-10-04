@@ -265,13 +265,17 @@ export async function createMarketplacePayment(
  */
 
 function assertTestPaymentAllowed(): void {
-  if (isProductionEnvironment()) {
+  if (
+    process.env.MARKETPLACE_TEST_PAYMENTS_ENABLED !==
+    "true"
+  ) {
     throw new MarketplaceError(
       "TEST_PAYMENT_DISABLED",
-      "Test payment operations are disabled in production."
+      "Test payment operations are disabled."
     );
   }
 }
+
 
 const MARKETPLACE_TRANSACTION_MAX_ATTEMPTS = 3;
 
