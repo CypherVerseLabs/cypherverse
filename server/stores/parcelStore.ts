@@ -1,6 +1,7 @@
 import {
   Prisma,
-  $Enums,
+  ParcelStatus as PrismaParcelStatus,
+  ParcelType,
 } from "../generated/prisma/client.js";
 
 import { prisma } from "../lib/prisma.js";
@@ -24,13 +25,12 @@ import { prisma } from "../lib/prisma.js";
  * =========================================================
  */
 
-export type ParcelStatus = $Enums.ParcelStatus;
+export type ParcelStatus = PrismaParcelStatus;
 
 export type ParcelPrice =
   | Prisma.Decimal
   | number
   | string;
-
 
 /**
  * =========================================================
@@ -76,16 +76,15 @@ export async function getParcelById(
       },
 
       project: {
-  select: {
-    id: true,
-    name: true,
-    description: true,
-    template: true,
-    slug: true,
-    publishedAt: true,
-  },
-},
-
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          template: true,
+          slug: true,
+          publishedAt: true,
+        },
+      },
     },
   });
 }
@@ -126,16 +125,15 @@ export async function getParcelByEstateId(
       },
 
       project: {
-  select: {
-    id: true,
-    name: true,
-    description: true,
-    template: true,
-    slug: true,
-    publishedAt: true,
-  },
-},
-
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          template: true,
+          slug: true,
+          publishedAt: true,
+        },
+      },
     },
   });
 }
@@ -159,14 +157,10 @@ export async function getParcels(options?: {
   minY?: number;
   maxY?: number;
 }) {
-  const where:
-    Prisma.ParcelWhereInput = {};
+  const where: Prisma.ParcelWhereInput = {};
 
-  if (
-    options?.status !== undefined
-  ) {
-    where.status =
-      options.status;
+  if (options?.status !== undefined) {
+    where.status = options.status;
   }
 
   if (
@@ -175,18 +169,12 @@ export async function getParcels(options?: {
   ) {
     where.x = {};
 
-    if (
-      options.minX !== undefined
-    ) {
-      where.x.gte =
-        options.minX;
+    if (options.minX !== undefined) {
+      where.x.gte = options.minX;
     }
 
-    if (
-      options.maxX !== undefined
-    ) {
-      where.x.lte =
-        options.maxX;
+    if (options.maxX !== undefined) {
+      where.x.lte = options.maxX;
     }
   }
 
@@ -196,18 +184,12 @@ export async function getParcels(options?: {
   ) {
     where.y = {};
 
-    if (
-      options.minY !== undefined
-    ) {
-      where.y.gte =
-        options.minY;
+    if (options.minY !== undefined) {
+      where.y.gte = options.minY;
     }
 
-    if (
-      options.maxY !== undefined
-    ) {
-      where.y.lte =
-        options.maxY;
+    if (options.maxY !== undefined) {
+      where.y.lte = options.maxY;
     }
   }
 
@@ -235,19 +217,12 @@ export async function getParcels(options?: {
 
     select: {
       id: true,
-
       estateId: true,
-
       x: true,
-
       y: true,
-
       status: true,
-
       ownerId: true,
-
       price: true,
-
       name: true,
     },
   });
@@ -261,7 +236,7 @@ export async function getParcels(options?: {
 
 export async function getAvailableParcels() {
   return getParcels({
-    status: $Enums.ParcelStatus.available,
+    status: PrismaParcelStatus.available,
   });
 }
 
@@ -273,7 +248,7 @@ export async function getAvailableParcels() {
 
 export async function getParcelsForSale() {
   return getParcels({
-    status: $Enums.ParcelStatus.for_sale,
+    status: PrismaParcelStatus.for_sale,
   });
 }
 
@@ -308,17 +283,16 @@ export async function createParcel(data: {
 
       status:
         data.status ??
-        $Enums.ParcelStatus.available,
+        PrismaParcelStatus.available,
 
       ownerId:
         data.ownerId ?? null,
 
       price:
-      data.price !== undefined &&
-      data.price !== null
-    ? new Prisma.Decimal(data.price)
-    : null,
-
+        data.price !== undefined &&
+        data.price !== null
+          ? new Prisma.Decimal(data.price)
+          : null,
 
       name:
         data.name ?? null,
@@ -370,49 +344,54 @@ export async function updateParcel(
     },
 
     data: {
-  ...(data.price !== undefined
-    ? {
-        price:
-          data.price === null
-            ? null
-            : new Prisma.Decimal(
-                data.price
-              ),
-      }
-    : {}),
+      ...(data.status !== undefined
+        ? {
+            status: data.status,
+          }
+        : {}),
 
-  ...(data.ownerId !== undefined
-    ? {
-        ownerId: data.ownerId,
-      }
-    : {}),
+      ...(data.price !== undefined
+        ? {
+            price:
+              data.price === null
+                ? null
+                : new Prisma.Decimal(
+                    data.price
+                  ),
+          }
+        : {}),
 
-  ...(data.name !== undefined
-    ? {
-        name: data.name,
-      }
-    : {}),
+      ...(data.ownerId !== undefined
+        ? {
+            ownerId: data.ownerId,
+          }
+        : {}),
 
-  ...(data.description !== undefined
-    ? {
-        description: data.description,
-      }
-    : {}),
+      ...(data.name !== undefined
+        ? {
+            name: data.name,
+          }
+        : {}),
 
-  ...(data.blockchainAddress !== undefined
-    ? {
-        blockchainAddress:
-          data.blockchainAddress,
-      }
-    : {}),
+      ...(data.description !== undefined
+        ? {
+            description: data.description,
+          }
+        : {}),
 
-  ...(data.tokenId !== undefined
-    ? {
-        tokenId: data.tokenId,
-      }
-    : {}),
-},
+      ...(data.blockchainAddress !== undefined
+        ? {
+            blockchainAddress:
+              data.blockchainAddress,
+          }
+        : {}),
 
+      ...(data.tokenId !== undefined
+        ? {
+            tokenId: data.tokenId,
+          }
+        : {}),
+    },
   });
 }
 
@@ -447,16 +426,15 @@ export async function getParcelsByOwnerId(
       },
 
       project: {
-  select: {
-    id: true,
-    name: true,
-    description: true,
-    template: true,
-    slug: true,
-    publishedAt: true,
-  },
-},
-
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          template: true,
+          slug: true,
+          publishedAt: true,
+        },
+      },
     },
   });
 }
@@ -491,7 +469,7 @@ export async function claimParcel(
 
       if (
         parcel.status !==
-        $Enums.ParcelStatus.available
+        PrismaParcelStatus.available
       ) {
         throw new Error(
           "PARCEL_NOT_AVAILABLE"
@@ -507,7 +485,7 @@ export async function claimParcel(
           ownerId: userId,
 
           status:
-            $Enums.ParcelStatus.owned,
+            PrismaParcelStatus.owned,
 
           price: null,
         },
@@ -522,6 +500,8 @@ export async function claimParcel(
  * =========================================================
  *
  * Creates a marketplace listing for an owned parcel.
+ *
+ * CITY_LANDMARK parcels can NEVER be listed for sale.
  */
 
 export async function createParcelListing(
@@ -541,8 +521,6 @@ export async function createParcelListing(
     );
   }
 
-
-
   return prisma.$transaction(
     async (tx) => {
       const parcel =
@@ -556,6 +534,27 @@ export async function createParcelListing(
         return null;
       }
 
+      /**
+       * CITY LANDMARKS ARE NEVER LISTABLE.
+       */
+      if (
+        parcel.type ===
+        ParcelType.CITY_LANDMARK
+      ) {
+        throw new Error(
+          "CITY_LANDMARK_NOT_FOR_SALE"
+        );
+      }
+
+      if (
+        parcel.status !==
+        PrismaParcelStatus.owned
+      ) {
+        throw new Error(
+          "PARCEL_NOT_LISTABLE"
+        );
+      }
+
       if (
         parcel.ownerId !== sellerId
       ) {
@@ -564,14 +563,10 @@ export async function createParcelListing(
         );
       }
 
-      if (
-        parcel.status !==
-        $Enums.ParcelStatus.owned
-      ) {
-        throw new Error(
-          "PARCEL_NOT_LISTABLE"
-        );
-      }
+      /**
+       * Deactivate any previous active
+       * listings for this parcel.
+       */
 
       await tx.parcelListing.updateMany({
         where: {
@@ -584,6 +579,10 @@ export async function createParcelListing(
         },
       });
 
+      /**
+       * Create the new listing.
+       */
+
       const listing =
         await tx.parcelListing.create({
           data: {
@@ -594,6 +593,11 @@ export async function createParcelListing(
           },
         });
 
+      /**
+       * The parcel itself must also reflect
+       * that it is currently for sale.
+       */
+
       await tx.parcel.update({
         where: {
           id: parcelId,
@@ -601,7 +605,7 @@ export async function createParcelListing(
 
         data: {
           status:
-            $Enums.ParcelStatus.for_sale,
+            PrismaParcelStatus.for_sale,
 
           price: decimalPrice,
         },
@@ -665,7 +669,7 @@ export async function cancelParcelListing(
 
         data: {
           status:
-            $Enums.ParcelStatus.owned,
+            PrismaParcelStatus.owned,
 
           price: null,
         },
@@ -686,9 +690,14 @@ export async function getActiveParcelListings() {
   return prisma.parcelListing.findMany({
     where: {
       active: true,
+
       parcel: {
         status:
-          $Enums.ParcelStatus.for_sale,
+          PrismaParcelStatus.for_sale,
+
+        type: {
+          not: ParcelType.CITY_LANDMARK,
+        },
       },
     },
 
@@ -730,6 +739,7 @@ export async function getActiveParcelListings() {
  * Server-side rules:
  * - User must be authenticated.
  * - Parcel must exist.
+ * - CITY_LANDMARK cannot be purchased.
  * - Parcel must currently be for sale.
  * - An active listing must exist.
  * - Buyer cannot buy their own parcel.
@@ -769,9 +779,22 @@ export async function buyParcel(
         return null;
       }
 
+      /**
+       * CITY LANDMARKS ARE NEVER FOR SALE.
+       */
+
+      if (
+        parcel.type ===
+        ParcelType.CITY_LANDMARK
+      ) {
+        throw new Error(
+          "CITY_LANDMARK_NOT_FOR_SALE"
+        );
+      }
+
       if (
         parcel.status !==
-        $Enums.ParcelStatus.for_sale
+        PrismaParcelStatus.for_sale
       ) {
         throw new Error(
           "PARCEL_NOT_FOR_SALE"
@@ -794,7 +817,6 @@ export async function buyParcel(
           "ACTIVE_LISTING_NOT_FOUND"
         );
       }
-
       if (
         listing.sellerId === buyerId
       ) {
@@ -802,41 +824,38 @@ export async function buyParcel(
           "CANNOT_BUY_OWN_PARCEL"
         );
       }
+/*
+ * Transfer ownership.
+ */
 
-      /*
-       * Transfer ownership.
-       */
+await tx.parcel.update({
+  where: {
+    id: parcelId,
+  },
 
-      await tx.parcel.update({
-        where: {
-          id: parcelId,
-        },
+  data: {
+    ownerId: buyerId,
+    status: PrismaParcelStatus.owned,
+    price: null,
+  },
+});
 
-        data: {
-          ownerId: buyerId,
+/*
+ * Close the listing.
+ */
 
-          status:
-            $Enums.ParcelStatus.owned,
+await tx.parcelListing.update({
+  where: {
+    id: listing.id,
+  },
 
-          price: null,
-        },
-      });
+  data: {
+    active: false,
+  },
+});
 
-      /*
-       * Close the listing.
-       */
 
-      await tx.parcelListing.update({
-        where: {
-          id: listing.id,
-        },
-
-        data: {
-          active: false,
-        },
-      });
-
-      /*
+      /**
        * Return the authoritative parcel state.
        */
 
@@ -861,16 +880,15 @@ export async function buyParcel(
           },
 
           project: {
-  select: {
-    id: true,
-    name: true,
-    description: true,
-    template: true,
-    slug: true,
-    publishedAt: true,
-  },
-},
-
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              template: true,
+              slug: true,
+              publishedAt: true,
+            },
+          },
         },
       });
     }
@@ -914,7 +932,7 @@ export async function reserveParcel(
         return null;
       }
 
-      /*
+      /**
        * Clean up expired reservations
        * for this parcel before checking
        * its current state.
@@ -947,7 +965,7 @@ export async function reserveParcel(
 
       if (
         parcel.status !==
-        $Enums.ParcelStatus.available
+        PrismaParcelStatus.available
       ) {
         throw new Error(
           "PARCEL_NOT_AVAILABLE"
@@ -960,7 +978,7 @@ export async function reserveParcel(
         );
       }
 
-      /*
+      /**
        * Create reservation.
        */
 
@@ -972,7 +990,7 @@ export async function reserveParcel(
         },
       });
 
-      /*
+      /**
        * Change parcel state.
        */
 
@@ -983,11 +1001,11 @@ export async function reserveParcel(
 
         data: {
           status:
-            $Enums.ParcelStatus.reserved,
+            PrismaParcelStatus.reserved,
         },
       });
 
-      /*
+      /**
        * Return authoritative state.
        */
 
@@ -1026,16 +1044,15 @@ export async function reserveParcel(
           },
 
           project: {
-  select: {
-    id: true,
-    name: true,
-    description: true,
-    template: true,
-    slug: true,
-    publishedAt: true,
-  },
-},
-
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              template: true,
+              slug: true,
+              publishedAt: true,
+            },
+          },
         },
       });
     }
@@ -1080,7 +1097,7 @@ export async function releaseParcelReservation(
         },
       });
 
-      /*
+      /**
        * Only make the parcel available again if
        * there isn't another active reservation.
        */
@@ -1104,7 +1121,7 @@ export async function releaseParcelReservation(
 
           data: {
             status:
-              $Enums.ParcelStatus.available,
+              PrismaParcelStatus.available,
           },
         });
       }
@@ -1118,15 +1135,8 @@ export async function releaseParcelReservation(
   );
 }
 
-
 /**
  * =========================================================
- * RESERVE PARCEL
+ * END
  * =========================================================
- *
- * Reserves an available parcel for a user.
- *
- * Reservation duration:
- * 15 minutes.
  */
-

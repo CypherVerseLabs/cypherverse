@@ -1,8 +1,8 @@
 import {
   Prisma,
+  ParcelStatus,
+  ParcelType,
   MarketplaceOrderStatus,
-  MarketplacePaymentStatus,
-  MarketplacePaymentEnvironment,
 } from "../generated/prisma/client.js";
 
 import { prisma } from "../lib/prisma.js";
@@ -37,7 +37,6 @@ export const MARKETPLACE_OPERATION = {
   CREATE_PARCEL_ORDER: "CREATE_PARCEL_ORDER",
 } as const;
 
-
 /**
  * =========================================================
  * ERRORS
@@ -66,25 +65,8 @@ export class MarketplaceError extends Error {
 
 export interface CreateParcelOrderInput {
   userId: string;
-
   parcelId: string;
-
-  /**
-   * Optional listing ID.
-   *
-   * If supplied, the listing must be the currently active
-   * listing for the parcel.
-   *
-   * If omitted, the service will use the current active
-   * listing automatically.
-   */
   listingId?: string | null;
-
-  /**
-   * Client-generated idempotency key.
-   *
-   * This must be stable when retrying the same purchase.
-   */
   idempotencyKey: string;
 }
 
@@ -106,9 +88,6 @@ function validateIdempotencyKey(
     );
   }
 
-  /**
-   * Prevent accidentally enormous database values.
-   */
   if (normalized.length > 255) {
     throw new MarketplaceError(
       "IDEMPOTENCY_KEY_TOO_LONG",
@@ -163,21 +142,6 @@ async function getExistingIdempotentOrder(
  * =========================================================
  * CREATE PARCEL ORDER
  * =========================================================
- *
- * Creates one authoritative marketplace order.
- *
- * Important concurrency properties:
- *
- * - idempotency key is unique at the database level
- * - price comes from the database
- * - listing must currently be active
- * - parcel must currently be for sale
- * - buyer cannot buy their own parcel
- *
- * This function DOES NOT transfer ownership.
- *
- * Ownership is granted only after successful payment.
- * =========================================================
  */
 
 export async function createParcelOrder(
@@ -207,8 +171,6 @@ export async function createParcelOrder(
    * -------------------------------------------------------
    * FAST IDEMPOTENCY LOOKUP
    * -------------------------------------------------------
-   *
-   * This makes normal client retries cheap.
    */
 
   const existing =
@@ -235,11 +197,6 @@ export async function createParcelOrder(
          * ---------------------------------------------------
          * RECHECK IDEMPOTENCY INSIDE TRANSACTION
          * ---------------------------------------------------
-         *
-         * The initial lookup is not enough because two
-         * concurrent requests can both pass it.
-         *
-         * The unique database constraint is authoritative.
          */
 
         const existingKey =
@@ -292,13 +249,29 @@ export async function createParcelOrder(
 
         /**
          * ---------------------------------------------------
+         * CITY LANDMARKS CANNOT BE SOLD
+         * ---------------------------------------------------
+         */
+
+        if (
+          parcel.type ===
+          ParcelType.CITY_LANDMARK
+        ) {
+          throw new MarketplaceError(
+            "CITY_LANDMARK_NOT_FOR_SALE",
+            "City landmarks cannot be listed or purchased."
+          );
+        }
+
+        /**
+         * ---------------------------------------------------
          * VERIFY PARCEL STATE
          * ---------------------------------------------------
          */
 
         if (
           parcel.status !==
-          "for_sale"
+          ParcelStatus.for_sale
         ) {
           throw new MarketplaceError(
             "PARCEL_NOT_FOR_SALE",
@@ -340,14 +313,6 @@ export async function createParcelOrder(
 
             take: 2,
           });
-
-        /**
-         * There should only be one active listing.
-         *
-         * The application already deactivates previous
-         * listings, but we fail safely if bad historical
-         * state exists.
-         */
 
         if (
           activeListings.length === 0
@@ -422,14 +387,8 @@ export async function createParcelOrder(
 
         /**
          * ---------------------------------------------------
-         * VERIFY PARCEL SNAPSHOT PRICE
+         * SNAPSHOT LISTING PRICE
          * ---------------------------------------------------
-         *
-         * Parcel.price is maintained by the marketplace
-         * service as the current listing price.
-         *
-         * Listing.price remains the authoritative listing
-         * price for this purchase.
          */
 
         const amount =
@@ -450,32 +409,17 @@ export async function createParcelOrder(
             await tx.marketplaceOrder.create({
               data: {
                 userId,
-
-                productId:
-                  parcel.id,
-
-                listingId:
-                  listing.id,
-
+                productId: parcel.id,
+                listingId: listing.id,
+                sellerId: listing.sellerId,
                 quantity: 1,
-
                 amount,
-
-                currency:
-                  listing.currency,
-
+                currency: listing.currency,
                 status:
                   MarketplaceOrderStatus.PENDING,
               },
             });
         } catch (error) {
-          /**
-           * A concurrent request may have inserted the
-           * idempotency key/order first.
-           *
-           * We re-query after a uniqueness race.
-           */
-
           const concurrent =
             await tx.marketplaceIdempotencyKey.findUnique({
               where: {
@@ -535,13 +479,6 @@ export async function createParcelOrder(
             },
           });
         } catch (error) {
-          /**
-           * A concurrent request may have won the unique
-           * idempotency constraint.
-           *
-           * Returning the existing order is safe.
-           */
-
           const concurrent =
             await tx.marketplaceIdempotencyKey.findUnique({
               where: {
@@ -600,25 +537,11 @@ export async function createParcelOrder(
         });
       },
       {
-        /**
-         * Serializable is intentionally used for the
-         * purchase/order creation boundary.
-         *
-         * The database remains authoritative under
-         * concurrent purchase attempts.
-         */
         isolationLevel:
           Prisma.TransactionIsolationLevel.Serializable,
       }
     );
   } catch (error) {
-    /**
-     * Prisma transaction serialization can retry/fail under
-     * concurrent requests.
-     *
-     * The caller should retry using the SAME idempotency key.
-     */
-
     if (
       error instanceof MarketplaceError
     ) {
@@ -765,14 +688,8 @@ export async function getMarketplaceOrdersForUser(
 }
 
 /**
- =========================================================
- * CANCEL UNPAID ORDER
  * =========================================================
- *
- * Only unpaid orders can be cancelled.
- *
- * This function intentionally does NOT cancel a paid or
- * granted order.
+ * CANCEL UNPAID ORDER
  * =========================================================
  */
 

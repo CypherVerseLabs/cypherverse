@@ -1,10 +1,10 @@
 import {
   Prisma,
+  ParcelStatus,
   MarketplaceOrderStatus,
   MarketplacePaymentStatus,
   MarketplacePaymentEnvironment,
   MarketplacePaymentMethod,
-  MarketplaceCurrency,
 } from "../generated/prisma/client.js";
 
 import { prisma } from "../lib/prisma.js";
@@ -18,20 +18,23 @@ import {
  * MARKETPLACE PAYMENT SERVICE
  * =========================================================
  *
- * TEST/SANDBOX PAYMENT PROVIDER.
+ * AUTHORITATIVE PAYMENT GATE
  *
- * This provider intentionally lives server-side.
+ * Successful payment is the only path that can grant
+ * marketplace entitlement and transfer parcel ownership.
  *
- * The client can request payment creation, but cannot:
+ * The browser is never trusted for:
  *
- * - choose the amount
- * - choose the currency
- * - choose the order
- * - mark payment as paid
- * - grant entitlement
+ * - amount
+ * - currency
+ * - payment status
+ * - buyer identity
+ * - seller identity
+ * - entitlement state
+ * - parcel ownership
  *
- * The actual payment confirmation endpoint should eventually
- * be replaced by a real provider webhook/SDK integration.
+ * All ownership transfer occurs inside a SERIALIZABLE
+ * transaction and uses an atomic conditional parcel update.
  * =========================================================
  */
 
@@ -48,6 +51,28 @@ export const MARKETPLACE_PAYMENT_OPERATION = {
 
 export const MARKETPLACE_PAYMENT_ENVIRONMENT =
   MarketplacePaymentEnvironment.LOCAL;
+
+/**
+ * =========================================================
+ * PRODUCTION SAFETY
+ * =========================================================
+ */
+
+function isProductionEnvironment(): boolean {
+  return (
+    process.env.NODE_ENV ===
+    "production"
+  );
+}
+
+function assertSandboxPaymentAllowed(): void {
+  if (isProductionEnvironment()) {
+    throw new MarketplaceError(
+      "PAYMENT_GATEWAY_NOT_CONFIGURED",
+      "The marketplace payment gateway is not configured for production."
+    );
+  }
+}
 
 /**
  * =========================================================
@@ -89,17 +114,6 @@ function createTestEventId(): string {
  * =========================================================
  * CREATE PAYMENT
  * =========================================================
- *
- * Creates a pending payment using the authoritative order
- * amount.
- *
- * The caller provides only:
- *
- *     orderId
- *     userId
- *
- * The amount comes from MarketplaceOrder.
- * =========================================================
  */
 
 export async function createMarketplacePayment(
@@ -118,18 +132,16 @@ export async function createMarketplacePayment(
     );
   }
 
+  assertSandboxPaymentAllowed();
+
   return prisma.$transaction(
     async (tx) => {
-      /**
-       * ---------------------------------------------------
-       * LOAD ORDER
-       * ---------------------------------------------------
-       */
-
       const order =
         await tx.marketplaceOrder.findFirst({
           where: {
-            id: orderId,
+            id:
+              orderId,
+
             userId,
           },
 
@@ -141,10 +153,12 @@ export async function createMarketplacePayment(
               },
 
               orderBy: {
-                createdAt: "desc",
+                createdAt:
+                  "desc",
               },
 
-              take: 1,
+              take:
+                1,
             },
           },
         });
@@ -155,12 +169,6 @@ export async function createMarketplacePayment(
           "Marketplace order not found."
         );
       }
-
-      /**
-       * ---------------------------------------------------
-       * ORDER STATE
-       * ---------------------------------------------------
-       */
 
       if (
         order.status ===
@@ -192,27 +200,12 @@ export async function createMarketplacePayment(
         );
       }
 
-      /**
-       * ---------------------------------------------------
-       * EXISTING PENDING PAYMENT
-       * ---------------------------------------------------
-       *
-       * Returning an existing pending payment makes retries
-       * safe.
-       */
-
       const existingPayment =
         order.payments[0];
 
       if (existingPayment) {
         return existingPayment;
       }
-
-      /**
-       * ---------------------------------------------------
-       * AUTHORITATIVE PAYMENT
-       * ---------------------------------------------------
-       */
 
       const payment =
         await tx.marketplacePayment.create({
@@ -245,15 +238,10 @@ export async function createMarketplacePayment(
           },
         });
 
-      /**
-       * ---------------------------------------------------
-       * MOVE ORDER TO PAYMENT PROCESSING
-       * ---------------------------------------------------
-       */
-
       await tx.marketplaceOrder.update({
         where: {
-          id: order.id,
+          id:
+            order.id,
         },
 
         data: {
@@ -262,14 +250,9 @@ export async function createMarketplacePayment(
         },
       });
 
-      /**
-       * ---------------------------------------------------
-       * RETURN PAYMENT
-       * ---------------------------------------------------
-       */
-
       return payment;
     },
+
     {
       isolationLevel:
         Prisma.TransactionIsolationLevel.Serializable,
@@ -279,20 +262,22 @@ export async function createMarketplacePayment(
 
 /**
  * =========================================================
- * CONFIRM TEST PAYMENT
+ * TEST PAYMENT GUARD
  * =========================================================
- *
- * This is a SANDBOX ONLY helper.
- *
- * Production real-money payments should NOT expose an
- * arbitrary client endpoint capable of confirming payment.
- *
- * In production, this operation should be triggered by a
- * verified payment-provider webhook or server-side provider
- * SDK callback.
- *
- * The grant operation itself remains transactionally
- * protected.
+ */
+
+function assertTestPaymentAllowed(): void {
+  if (isProductionEnvironment()) {
+    throw new MarketplaceError(
+      "TEST_PAYMENT_DISABLED",
+      "Test payment operations are disabled in production."
+    );
+  }
+}
+
+/**
+ * =========================================================
+ * CONFIRM TEST PAYMENT
  * =========================================================
  */
 
@@ -300,6 +285,8 @@ export async function confirmTestMarketplacePayment(
   paymentId: string,
   userId: string
 ) {
+  assertTestPaymentAllowed();
+
   if (!paymentId.trim()) {
     throw new MarketplaceError(
       "PAYMENT_ID_REQUIRED"
@@ -312,21 +299,20 @@ export async function confirmTestMarketplacePayment(
     );
   }
 
-  const externalEventId =
-    createTestEventId();
-
   return processMarketplacePaymentEvent({
-    externalEventId,
+    externalEventId:
+      createTestEventId(),
 
     paymentId,
-
-    userId,
 
     status:
       MarketplacePaymentStatus.PAID,
 
     environment:
       MarketplacePaymentEnvironment.LOCAL,
+
+    source:
+      "TEST",
   });
 }
 
@@ -340,6 +326,8 @@ export async function failTestMarketplacePayment(
   paymentId: string,
   userId: string
 ) {
+  assertTestPaymentAllowed();
+
   if (!paymentId.trim()) {
     throw new MarketplaceError(
       "PAYMENT_ID_REQUIRED"
@@ -352,21 +340,20 @@ export async function failTestMarketplacePayment(
     );
   }
 
-  const externalEventId =
-    createTestEventId();
-
   return processMarketplacePaymentEvent({
-    externalEventId,
+    externalEventId:
+      createTestEventId(),
 
     paymentId,
-
-    userId,
 
     status:
       MarketplacePaymentStatus.FAILED,
 
     environment:
       MarketplacePaymentEnvironment.LOCAL,
+
+    source:
+      "TEST",
   });
 }
 
@@ -380,6 +367,8 @@ export async function cancelTestMarketplacePayment(
   paymentId: string,
   userId: string
 ) {
+  assertTestPaymentAllowed();
+
   if (!paymentId.trim()) {
     throw new MarketplaceError(
       "PAYMENT_ID_REQUIRED"
@@ -392,21 +381,20 @@ export async function cancelTestMarketplacePayment(
     );
   }
 
-  const externalEventId =
-    createTestEventId();
-
   return processMarketplacePaymentEvent({
-    externalEventId,
+    externalEventId:
+      createTestEventId(),
 
     paymentId,
-
-    userId,
 
     status:
       MarketplacePaymentStatus.CANCELLED,
 
     environment:
       MarketplacePaymentEnvironment.LOCAL,
+
+    source:
+      "TEST",
   });
 }
 
@@ -421,30 +409,41 @@ interface PaymentEventInput {
 
   paymentId: string;
 
-  userId: string;
-
   status: MarketplacePaymentStatus;
 
   environment: MarketplacePaymentEnvironment;
+
+  source?: "TEST" | "PROVIDER";
 }
 
 /**
  * =========================================================
  * PROCESS PAYMENT EVENT
  * =========================================================
- *
- * This is the important production boundary.
- *
- * Duplicate provider events are ignored using the unique
- * externalEventId database constraint.
- *
- * Successful payment causes entitlement granting.
- * =========================================================
  */
 
 export async function processMarketplacePaymentEvent(
   input: PaymentEventInput
 ) {
+  if (!input.externalEventId.trim()) {
+    throw new MarketplaceError(
+      "EXTERNAL_EVENT_ID_REQUIRED",
+      "Payment provider event ID is required."
+    );
+  }
+
+  if (!input.paymentId.trim()) {
+    throw new MarketplaceError(
+      "PAYMENT_ID_REQUIRED"
+    );
+  }
+
+  if (
+    input.source === "TEST"
+  ) {
+    assertTestPaymentAllowed();
+  }
+
   return prisma.$transaction(
     async (tx) => {
       /**
@@ -463,7 +462,9 @@ export async function processMarketplacePaymentEvent(
 
       if (existingEvent) {
         return {
-          duplicate: true,
+          duplicate:
+            true,
+
           event:
             existingEvent,
         };
@@ -478,11 +479,17 @@ export async function processMarketplacePaymentEvent(
       const payment =
         await tx.marketplacePayment.findUnique({
           where: {
-            id: input.paymentId,
+            id:
+              input.paymentId,
           },
 
           include: {
-            order: true,
+            order: {
+              include: {
+                listing:
+                  true,
+              },
+            },
           },
         });
 
@@ -490,22 +497,6 @@ export async function processMarketplacePaymentEvent(
         throw new MarketplaceError(
           "PAYMENT_NOT_FOUND",
           "Payment not found."
-        );
-      }
-
-      /**
-       * ---------------------------------------------------
-       * SECURITY CHECK
-       * ---------------------------------------------------
-       */
-
-      if (
-        payment.userId !==
-        input.userId
-      ) {
-        throw new MarketplaceError(
-          "PAYMENT_NOT_OWNED",
-          "Payment does not belong to this user."
         );
       }
 
@@ -527,10 +518,8 @@ export async function processMarketplacePaymentEvent(
 
       /**
        * ---------------------------------------------------
-       * AMOUNT CHECK
+       * PAYMENT / ORDER AMOUNT CHECK
        * ---------------------------------------------------
-       *
-       * Payment amount and order amount must match exactly.
        */
 
       if (
@@ -546,44 +535,103 @@ export async function processMarketplacePaymentEvent(
 
       /**
        * ---------------------------------------------------
+       * PAYMENT / ORDER CURRENCY CHECK
+       * ---------------------------------------------------
+       */
+
+      if (
+        payment.currency !==
+        payment.order.currency
+      ) {
+        throw new MarketplaceError(
+          "PAYMENT_CURRENCY_MISMATCH",
+          "Payment currency does not match the order."
+        );
+      }
+
+      /**
+       * ---------------------------------------------------
+       * ORDER OWNERSHIP CONSISTENCY
+       * ---------------------------------------------------
+       */
+
+      if (
+        payment.userId !==
+        payment.order.userId
+      ) {
+        throw new MarketplaceError(
+          "PAYMENT_ORDER_USER_MISMATCH",
+          "Payment owner does not match the order buyer."
+        );
+      }
+
+      /**
+       * ---------------------------------------------------
        * CREATE DURABLE PAYMENT EVENT
        * ---------------------------------------------------
        */
 
-      const event =
-        await tx.marketplacePaymentEvent.create({
-          data: {
-            externalEventId:
-              input.externalEventId,
+      let event;
 
-            externalTransactionId:
-              payment.externalTransactionId,
+      try {
+        event =
+          await tx.marketplacePaymentEvent.create({
+            data: {
+              externalEventId:
+                input.externalEventId,
 
-            orderId:
-              payment.orderId,
+              externalTransactionId:
+                payment.externalTransactionId,
 
-            userId:
-              payment.userId,
+              orderId:
+                payment.orderId,
 
-            status:
-              input.status,
+              userId:
+                payment.userId,
 
-            environment:
-              input.environment,
+              status:
+                input.status,
 
-            processed: false,
-          },
-        });
+              environment:
+                input.environment,
+
+              processed:
+                false,
+            },
+          });
+      } catch (error) {
+        if (
+          error instanceof
+            Prisma.PrismaClientKnownRequestError &&
+          error.code ===
+            "P2002"
+        ) {
+          const concurrentEvent =
+            await tx.marketplacePaymentEvent.findUnique({
+              where: {
+                externalEventId:
+                  input.externalEventId,
+              },
+            });
+
+          if (concurrentEvent) {
+            return {
+              duplicate:
+                true,
+
+              event:
+                concurrentEvent,
+            };
+          }
+        }
+
+        throw error;
+      }
 
       /**
-       * ---------------------------------------------------
-       * ALREADY FINAL PAYMENT
-       * ---------------------------------------------------
-       *
-       * Duplicate provider callbacks can happen with a
-       * different event ID.
-       *
-       * Never move a final payment backwards.
+       * ===================================================
+       * ALREADY PAID
+       * ===================================================
        */
 
       if (
@@ -602,23 +650,37 @@ export async function processMarketplacePaymentEvent(
 
         await tx.marketplacePaymentEvent.update({
           where: {
-            id: event.id,
+            id:
+              event.id,
           },
 
           data: {
-            processed: true,
+            processed:
+              true,
+
             processedAt:
               new Date(),
           },
         });
 
         return {
-          duplicate: false,
-          alreadyFinal: true,
+          duplicate:
+            false,
+
+          alreadyFinal:
+            true,
+
           event,
+
           payment,
         };
       }
+
+      /**
+       * ===================================================
+       * ALREADY CANCELLED
+       * ===================================================
+       */
 
       if (
         payment.status ===
@@ -630,43 +692,49 @@ export async function processMarketplacePaymentEvent(
         );
       }
 
+      /**
+       * ===================================================
+       * ALREADY FAILED
+       * ===================================================
+       */
+
       if (
         payment.status ===
         MarketplacePaymentStatus.FAILED
       ) {
-        /**
-         * A failed payment cannot be changed to paid by
-         * this event path.
-         */
-        if (
-          input.status ===
-          MarketplacePaymentStatus.PAID
-        ) {
-          throw new MarketplaceError(
-            "PAYMENT_ALREADY_FAILED",
-            "Payment is already failed."
-          );
-        }
+        throw new MarketplaceError(
+          "PAYMENT_ALREADY_FAILED",
+          "Payment is already failed."
+        );
       }
 
       /**
-       * ---------------------------------------------------
+       * ===================================================
        * SUCCESSFUL PAYMENT
-       * ---------------------------------------------------
+       * ===================================================
        */
 
       if (
         input.status ===
         MarketplacePaymentStatus.PAID
       ) {
-        /**
-         * Update payment first.
-         */
+        if (
+          payment.order.status ===
+            MarketplaceOrderStatus.CANCELLED ||
+          payment.order.status ===
+            MarketplaceOrderStatus.FAILED
+        ) {
+          throw new MarketplaceError(
+            "ORDER_NOT_PAYABLE",
+            "The marketplace order is no longer payable."
+          );
+        }
 
         const updatedPayment =
           await tx.marketplacePayment.update({
             where: {
-              id: payment.id,
+              id:
+                payment.id,
             },
 
             data: {
@@ -676,18 +744,18 @@ export async function processMarketplacePaymentEvent(
               confirmedAt:
                 new Date(),
 
-              failedAt: null,
-              cancelledAt: null,
+              failedAt:
+                null,
+
+              cancelledAt:
+                null,
             },
           });
 
-        /**
-         * Order becomes PAID before entitlement grant.
-         */
-
         await tx.marketplaceOrder.update({
           where: {
-            id: payment.orderId,
+            id:
+              payment.orderId,
           },
 
           data: {
@@ -698,10 +766,8 @@ export async function processMarketplacePaymentEvent(
 
         /**
          * -------------------------------------------------
-         * GRANT ENTITLEMENT
+         * AUTHORITATIVE ENTITLEMENT / OWNERSHIP
          * -------------------------------------------------
-         *
-         * This function owns the final parcel transfer.
          */
 
         const grant =
@@ -711,13 +777,15 @@ export async function processMarketplacePaymentEvent(
           );
 
         /**
-         * Mark order granted after entitlement/ownership
-         * transaction succeeds.
+         * -------------------------------------------------
+         * ORDER = GRANTED
+         * -------------------------------------------------
          */
 
         await tx.marketplaceOrder.update({
           where: {
-            id: payment.orderId,
+            id:
+              payment.orderId,
           },
 
           data: {
@@ -727,16 +795,20 @@ export async function processMarketplacePaymentEvent(
         });
 
         /**
-         * Mark payment event processed.
+         * -------------------------------------------------
+         * EVENT = PROCESSED
+         * -------------------------------------------------
          */
 
         await tx.marketplacePaymentEvent.update({
           where: {
-            id: event.id,
+            id:
+              event.id,
           },
 
           data: {
-            processed: true,
+            processed:
+              true,
 
             processedAt:
               new Date(),
@@ -744,18 +816,22 @@ export async function processMarketplacePaymentEvent(
         });
 
         return {
-          duplicate: false,
+          duplicate:
+            false,
+
           event,
+
           payment:
             updatedPayment,
+
           grant,
         };
       }
 
       /**
-       * ---------------------------------------------------
+       * ===================================================
        * FAILED PAYMENT
-       * ---------------------------------------------------
+       * ===================================================
        */
 
       if (
@@ -765,7 +841,8 @@ export async function processMarketplacePaymentEvent(
         const updatedPayment =
           await tx.marketplacePayment.update({
             where: {
-              id: payment.id,
+              id:
+                payment.id,
             },
 
             data: {
@@ -777,24 +854,32 @@ export async function processMarketplacePaymentEvent(
             },
           });
 
-        await tx.marketplaceOrder.update({
-          where: {
-            id: payment.orderId,
-          },
+        if (
+          payment.order.status !==
+            MarketplaceOrderStatus.GRANTED
+        ) {
+          await tx.marketplaceOrder.update({
+            where: {
+              id:
+                payment.orderId,
+            },
 
-          data: {
-            status:
-              MarketplaceOrderStatus.FAILED,
-          },
-        });
+            data: {
+              status:
+                MarketplaceOrderStatus.FAILED,
+            },
+          });
+        }
 
         await tx.marketplacePaymentEvent.update({
           where: {
-            id: event.id,
+            id:
+              event.id,
           },
 
           data: {
-            processed: true,
+            processed:
+              true,
 
             processedAt:
               new Date(),
@@ -802,17 +887,20 @@ export async function processMarketplacePaymentEvent(
         });
 
         return {
-          duplicate: false,
+          duplicate:
+            false,
+
           event,
+
           payment:
             updatedPayment,
         };
       }
 
       /**
-       * ---------------------------------------------------
+       * ===================================================
        * CANCELLED PAYMENT
-       * ---------------------------------------------------
+       * ===================================================
        */
 
       if (
@@ -822,7 +910,8 @@ export async function processMarketplacePaymentEvent(
         const updatedPayment =
           await tx.marketplacePayment.update({
             where: {
-              id: payment.id,
+              id:
+                payment.id,
             },
 
             data: {
@@ -834,24 +923,32 @@ export async function processMarketplacePaymentEvent(
             },
           });
 
-        await tx.marketplaceOrder.update({
-          where: {
-            id: payment.orderId,
-          },
+        if (
+          payment.order.status !==
+            MarketplaceOrderStatus.GRANTED
+        ) {
+          await tx.marketplaceOrder.update({
+            where: {
+              id:
+                payment.orderId,
+            },
 
-          data: {
-            status:
-              MarketplaceOrderStatus.CANCELLED,
-          },
-        });
+            data: {
+              status:
+                MarketplaceOrderStatus.CANCELLED,
+            },
+          });
+        }
 
         await tx.marketplacePaymentEvent.update({
           where: {
-            id: event.id,
+            id:
+              event.id,
           },
 
           data: {
-            processed: true,
+            processed:
+              true,
 
             processedAt:
               new Date(),
@@ -859,8 +956,11 @@ export async function processMarketplacePaymentEvent(
         });
 
         return {
-          duplicate: false,
+          duplicate:
+            false,
+
           event,
+
           payment:
             updatedPayment,
         };
@@ -871,6 +971,7 @@ export async function processMarketplacePaymentEvent(
         "Unsupported payment status."
       );
     },
+
     {
       isolationLevel:
         Prisma.TransactionIsolationLevel.Serializable,
@@ -883,20 +984,20 @@ export async function processMarketplacePaymentEvent(
  * GRANT MARKETPLACE ENTITLEMENT
  * =========================================================
  *
- * This is the authoritative ownership-transfer function.
+ * This is the authoritative ownership-transfer boundary.
  *
- * Everything happens in the same transaction:
+ * IMPORTANT CONCURRENCY RULE:
  *
- * 1. Verify order.
- * 2. Verify parcel.
- * 3. Verify listing.
- * 4. Prevent duplicate entitlement.
- * 5. Create entitlement.
- * 6. Transfer parcel.
- * 7. Close listing.
- * 8. Clear parcel marketplace price.
+ * The parcel is claimed using an atomic conditional UPDATE:
  *
- * If ANY operation fails, the transaction rolls back.
+ *     ownerId = seller
+ *     status  = for_sale
+ *
+ * Only one concurrent buyer can satisfy that condition.
+ *
+ * If another buyer has already purchased the parcel,
+ * updateMany() returns count = 0 and the entire transaction
+ * rolls back.
  * =========================================================
  */
 
@@ -913,20 +1014,25 @@ async function grantMarketplaceEntitlement(
   const order =
     await tx.marketplaceOrder.findUnique({
       where: {
-        id: orderId,
+        id:
+          orderId,
       },
 
       include: {
-        product: true,
+        product:
+          true,
 
-        listing: true,
+        listing:
+          true,
 
         entitlements: {
           where: {
-            status: "GRANTED",
+            status:
+              "GRANTED",
           },
 
-          take: 1,
+          take:
+            1,
         },
       },
     });
@@ -940,82 +1046,15 @@ async function grantMarketplaceEntitlement(
 
   /**
    * -------------------------------------------------------
-   * EXACTLY-ONCE ENTITLEMENT
-   * -------------------------------------------------------
-   *
-   * The database unique constraint on:
-   *
-   *     userId + productId
-   *
-   * is the final protection.
-   */
-
-  const existingEntitlement =
-    order.entitlements[0];
-
-  if (existingEntitlement) {
-    /**
-     * The entitlement already exists.
-     *
-     * Verify parcel ownership is also correct.
-     */
-
-    if (
-      order.product.ownerId !==
-      order.userId
-    ) {
-      await tx.parcel.update({
-        where: {
-          id: order.productId,
-        },
-
-        data: {
-          ownerId:
-            order.userId,
-
-          status:
-            "owned",
-
-          price: null,
-        },
-      });
-    }
-
-    /**
-     * Close any still-active listing.
-     */
-
-    if (order.listingId) {
-      await tx.parcelListing.updateMany({
-        where: {
-          id: order.listingId,
-          active: true,
-        },
-
-        data: {
-          active: false,
-        },
-      });
-    }
-
-    return {
-      entitlement:
-        existingEntitlement,
-
-      alreadyGranted: true,
-    };
-  }
-
-  /**
-   * -------------------------------------------------------
-   * VERIFY PARCEL STATE
+   * LOAD CURRENT PARCEL
    * -------------------------------------------------------
    */
 
   const parcel =
     await tx.parcel.findUnique({
       where: {
-        id: order.productId,
+        id:
+          order.productId,
       },
     });
 
@@ -1027,35 +1066,159 @@ async function grantMarketplaceEntitlement(
   }
 
   /**
-   * -------------------------------------------------------
-   * BUYER CANNOT ALREADY OWN IT
-   * -------------------------------------------------------
+   * =======================================================
+   * EXISTING ENTITLEMENT / RECOVERY
+   * =======================================================
    */
 
-  if (
-    parcel.ownerId ===
-    order.userId
-  ) {
+  const existingEntitlement =
+    order.entitlements[0];
+
+  if (existingEntitlement) {
     /**
-     * If ownership already transferred but entitlement
-     * wasn't created, create the entitlement now.
-     *
-     * This is safe because the unique constraint protects
-     * against duplicate grants.
+     * Existing entitlement is only recoverable when the
+     * buyer already owns the parcel or when ownership can
+     * safely be restored from the original listing seller.
      */
+
+    if (
+      parcel.ownerId !==
+      order.userId
+    ) {
+      if (!order.listing) {
+        throw new MarketplaceError(
+          "LISTING_NOT_FOUND",
+          "Cannot recover marketplace ownership without the original listing."
+        );
+      }
+
+      if (
+        parcel.ownerId !==
+        order.listing.sellerId
+      ) {
+        throw new MarketplaceError(
+          "PARCEL_OWNER_MISMATCH",
+          "The parcel is no longer owned by the original listing seller."
+        );
+      }
+
+      const claimedParcel =
+        await tx.parcel.updateMany({
+          where: {
+            id:
+              order.productId,
+
+            ownerId:
+              order.listing.sellerId,
+
+            status:
+              ParcelStatus.for_sale,
+          },
+
+          data: {
+            ownerId:
+              order.userId,
+
+            status:
+              ParcelStatus.owned,
+
+            price:
+              null,
+          },
+        });
+
+      if (
+        claimedParcel.count !== 1
+      ) {
+        throw new MarketplaceError(
+          "PARCEL_ALREADY_SOLD",
+          "The parcel is no longer available for purchase."
+        );
+      }
+
+      await tx.parcelOwnershipHistory.create({
+        data: {
+          parcelId:
+            order.productId,
+
+          previousOwnerId:
+            order.listing.sellerId,
+
+          newOwnerId:
+            order.userId,
+
+          source:
+            "MARKETPLACE_PAYMENT_RECOVERY",
+
+          marketplaceOrderId:
+            order.id,
+        },
+      });
+    } else if (
+      parcel.price !== null ||
+      parcel.status !==
+        ParcelStatus.owned
+    ) {
+      await tx.parcel.update({
+        where: {
+          id:
+            order.productId,
+        },
+
+        data: {
+          status:
+            ParcelStatus.owned,
+
+          price:
+            null,
+        },
+      });
+    }
+
+    /**
+     * Once ownership is granted, no listing may remain
+     * active.
+     */
+
+    await tx.parcelListing.updateMany({
+      where: {
+        parcelId:
+          order.productId,
+
+        active:
+          true,
+      },
+
+      data: {
+        active:
+          false,
+      },
+    });
+
+    return {
+      entitlement:
+        existingEntitlement,
+
+      alreadyGranted:
+        true,
+    };
   }
 
   /**
-   * -------------------------------------------------------
+   * =======================================================
    * VERIFY LISTING
-   * -------------------------------------------------------
+   * =======================================================
    */
 
+  let listing =
+    null;
+
   if (order.listingId) {
-    const listing =
+    listing =
       await tx.parcelListing.findUnique({
         where: {
-          id: order.listingId,
+          id:
+            order.listingId,
         },
       });
 
@@ -1067,11 +1230,9 @@ async function grantMarketplaceEntitlement(
     }
 
     /**
-     * A listing can be inactive here if another recovery
-     * attempt already closed it.
-     *
-     * Do not blindly reject an already-paid order solely
-     * because the listing is now inactive.
+     * -----------------------------------------------------
+     * BUYER CANNOT BUY OWN LISTING
+     * -----------------------------------------------------
      */
 
     if (
@@ -1080,9 +1241,15 @@ async function grantMarketplaceEntitlement(
     ) {
       throw new MarketplaceError(
         "CANNOT_BUY_OWN_PARCEL",
-        "Buyer cannot own the seller listing."
+        "Buyer cannot purchase their own listing."
       );
     }
+
+    /**
+     * -----------------------------------------------------
+     * LISTING / ORDER PRICE CHECK
+     * -----------------------------------------------------
+     */
 
     if (
       !listing.price.equals(
@@ -1094,18 +1261,199 @@ async function grantMarketplaceEntitlement(
         "Listing price no longer matches order amount."
       );
     }
+
+    /**
+     * -----------------------------------------------------
+     * LISTING / PRODUCT CHECK
+     * -----------------------------------------------------
+     */
+
+    if (
+      listing.parcelId !==
+      order.productId
+    ) {
+      throw new MarketplaceError(
+        "LISTING_PRODUCT_MISMATCH",
+        "The listing does not match the purchased parcel."
+      );
+    }
+
+    /**
+     * -----------------------------------------------------
+     * LISTING MUST STILL BE ACTIVE
+     * -----------------------------------------------------
+     */
+
+    if (
+      !listing.active &&
+      parcel.ownerId !==
+        order.userId
+    ) {
+      throw new MarketplaceError(
+        "LISTING_NOT_ACTIVE",
+        "The marketplace listing is no longer active."
+      );
+    }
+
+    /**
+     * -----------------------------------------------------
+     * SELLER OWNERSHIP CHECK
+     * -----------------------------------------------------
+     */
+
+    if (
+      parcel.ownerId !==
+        listing.sellerId &&
+      parcel.ownerId !==
+        order.userId
+    ) {
+      throw new MarketplaceError(
+        "PARCEL_OWNER_MISMATCH",
+        "The parcel is no longer owned by the listing seller."
+      );
+    }
   }
 
   /**
-   * -------------------------------------------------------
+   * =======================================================
+   * SELLER CONSISTENCY
+   * =======================================================
+   */
+
+  if (
+    listing &&
+    listing.sellerId !==
+      order.sellerId
+  ) {
+    throw new MarketplaceError(
+      "LISTING_OWNER_MISMATCH",
+      "The marketplace order seller does not match the listing seller."
+    );
+  }
+
+  /**
+   * =======================================================
+   * BUYER ALREADY OWNS PARCEL
+   * =======================================================
+   */
+
+  const buyerAlreadyOwnsParcel =
+    parcel.ownerId ===
+    order.userId;
+
+  /**
+   * =======================================================
+   * ATOMIC PARCEL OWNERSHIP CLAIM
+   * =======================================================
+   *
+   * THIS IS THE IMPORTANT CONCURRENCY FIX.
+   *
+   * The database will only perform the ownership transfer
+   * if the parcel is still owned by the original seller and
+   * is still marked for sale.
+   *
+   * Two buyers cannot both successfully change this row.
+   */
+
+  if (!buyerAlreadyOwnsParcel) {
+    if (!listing) {
+      throw new MarketplaceError(
+        "LISTING_NOT_FOUND",
+        "Cannot purchase parcel without a listing."
+      );
+    }
+
+    const claimedParcel =
+      await tx.parcel.updateMany({
+        where: {
+          id:
+            order.productId,
+
+          ownerId:
+            listing.sellerId,
+
+          status:
+            ParcelStatus.for_sale,
+        },
+
+        data: {
+          ownerId:
+            order.userId,
+
+          status:
+            ParcelStatus.owned,
+
+          price:
+            null,
+        },
+      });
+
+    if (
+      claimedParcel.count !== 1
+    ) {
+      throw new MarketplaceError(
+        "PARCEL_ALREADY_SOLD",
+        "The parcel is no longer available for purchase."
+      );
+    }
+
+    /**
+     * -----------------------------------------------------
+     * IMMUTABLE OWNERSHIP HISTORY
+     * -----------------------------------------------------
+     *
+     * Only write this after the atomic ownership claim
+     * succeeds.
+     */
+
+    await tx.parcelOwnershipHistory.create({
+      data: {
+        parcelId:
+          order.productId,
+
+        previousOwnerId:
+          listing.sellerId,
+
+        newOwnerId:
+          order.userId,
+
+        source:
+          "MARKETPLACE_PAYMENT",
+
+        marketplaceOrderId:
+          order.id,
+      },
+    });
+  } else {
+    /**
+     * Buyer already owns the parcel.
+     *
+     * This is a recovery/idempotency path.
+     */
+
+    await tx.parcel.update({
+      where: {
+        id:
+          order.productId,
+      },
+
+      data: {
+        status:
+          ParcelStatus.owned,
+
+        price:
+          null,
+      },
+    });
+  }
+
+  /**
+   * =======================================================
    * CREATE ENTITLEMENT
-   * -------------------------------------------------------
+   * =======================================================
    *
-   * The database unique constraint:
-   *
-   *     @@unique([userId, productId])
-   *
-   * protects this operation.
+   * Ownership has already been atomically claimed before
+   * reaching this point.
    */
 
   let entitlement;
@@ -1135,81 +1483,67 @@ async function grantMarketplaceEntitlement(
       });
   } catch (error) {
     /**
-     * A concurrent transaction may have created the
-     * entitlement first.
-     *
-     * Re-query it.
+     * Recover ONLY from the entitlement uniqueness
+     * constraint.
      */
 
-    const concurrent =
-      await tx.marketplaceEntitlement.findUnique({
-        where: {
-          userId_productId: {
-            userId:
-              order.userId,
+    if (
+      error instanceof
+        Prisma.PrismaClientKnownRequestError &&
+      error.code ===
+        "P2002"
+    ) {
+      const concurrent =
+        await tx.marketplaceEntitlement.findUnique({
+          where: {
+            userId_productId: {
+              userId:
+                order.userId,
 
-            productId:
-              order.productId,
+              productId:
+                order.productId,
+            },
           },
-        },
-      });
+        });
 
-    if (!concurrent) {
+      if (!concurrent) {
+        throw error;
+      }
+
+      entitlement =
+        concurrent;
+    } else {
       throw error;
     }
-
-    entitlement =
-      concurrent;
   }
 
   /**
-   * -------------------------------------------------------
-   * TRANSFER OWNERSHIP
-   * -------------------------------------------------------
-   */
-
-  await tx.parcel.update({
-    where: {
-      id: order.productId,
-    },
-
-    data: {
-      ownerId:
-        order.userId,
-
-      status:
-        "owned",
-
-      price: null,
-    },
-  });
-
-  /**
-   * -------------------------------------------------------
+   * =======================================================
    * CLOSE PURCHASED LISTING
-   * -------------------------------------------------------
+   * =======================================================
    */
 
   if (order.listingId) {
     await tx.parcelListing.updateMany({
       where: {
-        id: order.listingId,
-        active: true,
+        id:
+          order.listingId,
+
+        active:
+          true,
       },
 
       data: {
-        active: false,
+        active:
+          false,
       },
     });
   }
 
   /**
-   * -------------------------------------------------------
-   * CLOSE ANY OTHER ACTIVE LISTINGS
-   * -------------------------------------------------------
-   *
-   * A parcel should never remain purchasable through an
-   * older active listing after ownership transfers.
+   * =======================================================
+   * CLOSE ALL OTHER ACTIVE LISTINGS
+   * =======================================================
    */
 
   await tx.parcelListing.updateMany({
@@ -1217,24 +1551,27 @@ async function grantMarketplaceEntitlement(
       parcelId:
         order.productId,
 
-      active: true,
+      active:
+        true,
     },
 
     data: {
-      active: false,
+      active:
+        false,
     },
   });
 
   /**
-   * -------------------------------------------------------
+   * =======================================================
    * RETURN AUTHORITATIVE RESULT
-   * -------------------------------------------------------
+   * =======================================================
    */
 
   return {
     entitlement,
 
-    alreadyGranted: false,
+    alreadyGranted:
+      false,
   };
 }
 
@@ -1248,9 +1585,23 @@ export async function getMarketplacePaymentById(
   paymentId: string,
   userId: string
 ) {
+  if (!paymentId.trim()) {
+    throw new MarketplaceError(
+      "PAYMENT_ID_REQUIRED"
+    );
+  }
+
+  if (!userId.trim()) {
+    throw new MarketplaceError(
+      "USER_ID_REQUIRED"
+    );
+  }
+
   return prisma.marketplacePayment.findFirst({
     where: {
-      id: paymentId,
+      id:
+        paymentId,
+
       userId,
     },
 
@@ -1259,12 +1610,23 @@ export async function getMarketplacePaymentById(
         include: {
           product: {
             select: {
-              id: true,
-              estateId: true,
-              x: true,
-              y: true,
-              name: true,
-              status: true,
+              id:
+                true,
+
+              estateId:
+                true,
+
+              x:
+                true,
+
+              y:
+                true,
+
+              name:
+                true,
+
+              status:
+                true,
             },
           },
         },
@@ -1272,7 +1634,8 @@ export async function getMarketplacePaymentById(
 
       events: {
         orderBy: {
-          createdAt: "desc",
+          createdAt:
+            "desc",
         },
       },
     },

@@ -28,6 +28,13 @@ import {
  * =========================================================
  */
 
+/**
+ * Get the authenticated user ID from the request.
+ *
+ * Authentication itself is handled by authenticateToken.
+ * This helper makes sure downstream marketplace services
+ * never receive an empty user ID.
+ */
 function getAuthenticatedUserId(
   req: AuthenticatedRequest
 ): string | null {
@@ -41,6 +48,54 @@ function getAuthenticatedUserId(
   return userId;
 }
 
+/**
+ * Get a required route parameter safely.
+ */
+function getRequiredRouteParam(
+  value: string | undefined
+): string | null {
+  if (
+    typeof value !== "string"
+  ) {
+    return null;
+  }
+
+  const normalized =
+    value.trim();
+
+  return normalized.length > 0
+    ? normalized
+    : null;
+}
+
+/**
+ * Get the Idempotency-Key header.
+ *
+ * Express can represent headers as string | string[] | undefined.
+ * Marketplace order creation only accepts a single string value.
+ */
+function getIdempotencyKey(
+  req: AuthenticatedRequest
+): string {
+  const header =
+    req.headers[
+      "idempotency-key"
+    ];
+
+  if (typeof header !== "string") {
+    return "";
+  }
+
+  return header.trim();
+}
+
+/**
+ * Convert service errors into stable HTTP responses.
+ *
+ * The service layer remains authoritative for marketplace
+ * business rules. Controllers only translate known errors
+ * into HTTP responses.
+ */
 function sendMarketplaceError(
   res: Response,
   error: unknown
@@ -53,6 +108,7 @@ function sendMarketplaceError(
       number
     > = {
       USER_ID_REQUIRED: 401,
+
       PARCEL_ID_REQUIRED: 400,
       ORDER_ID_REQUIRED: 400,
       PAYMENT_ID_REQUIRED: 400,
@@ -127,16 +183,27 @@ function sendMarketplaceError(
  *   "parcelId": "..."
  * }
  *
- * Header:
+ * Optional body:
  *
- * Idempotency-Key: unique-client-key
+ * {
+ *   "parcelId": "...",
+ *   "listingId": "..."
+ * }
+ *
+ * Required header:
+ *
+ * Idempotency-Key: <unique-client-key>
  *
  * IMPORTANT:
  *
- * Price is NEVER accepted from the client.
+ * The client NEVER supplies the price.
+ *
+ * The server obtains the authoritative parcel/listing price
+ * inside the marketplace order service.
+ *
+ * Creating an order does NOT grant parcel ownership.
  * =========================================================
  */
-
 export async function createParcelOrderController(
   req: AuthenticatedRequest,
   res: Response
@@ -154,33 +221,24 @@ export async function createParcelOrderController(
   const parcelId =
     typeof req.body?.parcelId ===
     "string"
-      ? req.body.parcelId
+      ? req.body.parcelId.trim()
       : "";
 
   const listingId =
     typeof req.body?.listingId ===
     "string"
-      ? req.body.listingId
+      ? req.body.listingId.trim()
       : undefined;
 
   const idempotencyKey =
-    typeof req.headers[
-      "idempotency-key"
-    ] === "string"
-      ? req.headers[
-          "idempotency-key"
-        ]
-      : "";
+    getIdempotencyKey(req);
 
   try {
     const order =
       await createParcelOrder({
         userId,
-
         parcelId,
-
         listingId,
-
         idempotencyKey,
       });
 
@@ -201,9 +259,10 @@ export async function createParcelOrderController(
  * =========================================================
  *
  * GET /api/marketplace/orders/:orderId
+ *
+ * A user can only retrieve their own order.
  * =========================================================
  */
-
 export async function getMarketplaceOrderController(
   req: AuthenticatedRequest,
   res: Response
@@ -219,7 +278,16 @@ export async function getMarketplaceOrderController(
   }
 
   const orderId =
-    req.params.orderId;
+    getRequiredRouteParam(
+      req.params.orderId
+    );
+
+  if (!orderId) {
+    return res.status(400).json({
+      error:
+        "ORDER_ID_REQUIRED",
+    });
+  }
 
   try {
     const order =
@@ -235,7 +303,7 @@ export async function getMarketplaceOrderController(
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       order,
     });
   } catch (error) {
@@ -252,9 +320,10 @@ export async function getMarketplaceOrderController(
  * =========================================================
  *
  * GET /api/marketplace/orders
+ *
+ * Returns only orders belonging to the authenticated user.
  * =========================================================
  */
-
 export async function getMarketplaceOrdersController(
   req: AuthenticatedRequest,
   res: Response
@@ -275,7 +344,7 @@ export async function getMarketplaceOrdersController(
         userId
       );
 
-    return res.json({
+    return res.status(200).json({
       orders,
     });
   } catch (error) {
@@ -292,9 +361,12 @@ export async function getMarketplaceOrdersController(
  * =========================================================
  *
  * POST /api/marketplace/orders/:orderId/cancel
+ *
+ * Only the authenticated owner of the order can cancel it.
+ *
+ * Cancellation must never transfer ownership.
  * =========================================================
  */
-
 export async function cancelMarketplaceOrderController(
   req: AuthenticatedRequest,
   res: Response
@@ -309,10 +381,22 @@ export async function cancelMarketplaceOrderController(
     });
   }
 
+  const orderId =
+    getRequiredRouteParam(
+      req.params.orderId
+    );
+
+  if (!orderId) {
+    return res.status(400).json({
+      error:
+        "ORDER_ID_REQUIRED",
+    });
+  }
+
   try {
     const order =
       await cancelMarketplaceOrder(
-        req.params.orderId,
+        orderId,
         userId
       );
 
@@ -323,7 +407,7 @@ export async function cancelMarketplaceOrderController(
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       order,
     });
   } catch (error) {
@@ -342,9 +426,16 @@ export async function cancelMarketplaceOrderController(
  * POST /api/marketplace/orders/:orderId/payment
  *
  * No amount is accepted from the client.
+ *
+ * The payment service must derive the authoritative amount
+ * from the existing marketplace order.
+ *
+ * Creating a payment does NOT grant parcel ownership.
+ *
+ * Ownership may only be granted after authoritative payment
+ * confirmation.
  * =========================================================
  */
-
 export async function createMarketplacePaymentController(
   req: AuthenticatedRequest,
   res: Response
@@ -359,10 +450,22 @@ export async function createMarketplacePaymentController(
     });
   }
 
+  const orderId =
+    getRequiredRouteParam(
+      req.params.orderId
+    );
+
+  if (!orderId) {
+    return res.status(400).json({
+      error:
+        "ORDER_ID_REQUIRED",
+    });
+  }
+
   try {
     const payment =
       await createMarketplacePayment(
-        req.params.orderId,
+        orderId,
         userId
       );
 
@@ -383,9 +486,11 @@ export async function createMarketplacePaymentController(
  * =========================================================
  *
  * GET /api/marketplace/payments/:paymentId
+ *
+ * A user may only retrieve a payment associated with their
+ * own marketplace order/payment record.
  * =========================================================
  */
-
 export async function getMarketplacePaymentController(
   req: AuthenticatedRequest,
   res: Response
@@ -400,10 +505,22 @@ export async function getMarketplacePaymentController(
     });
   }
 
+  const paymentId =
+    getRequiredRouteParam(
+      req.params.paymentId
+    );
+
+  if (!paymentId) {
+    return res.status(400).json({
+      error:
+        "PAYMENT_ID_REQUIRED",
+    });
+  }
+
   try {
     const payment =
       await getMarketplacePaymentById(
-        req.params.paymentId,
+        paymentId,
         userId
       );
 
@@ -414,7 +531,7 @@ export async function getMarketplacePaymentController(
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       payment,
     });
   } catch (error) {
@@ -434,11 +551,26 @@ export async function getMarketplacePaymentController(
  *
  * TEST/SANDBOX ONLY.
  *
- * Do not expose this route in a real production payment
- * environment.
+ * The service is responsible for:
+ *
+ *   payment confirmation
+ *          ↓
+ *   order transition
+ *          ↓
+ *   entitlement creation
+ *          ↓
+ *   ownership transfer
+ *
+ * The controller does not perform any of those operations
+ * directly.
+ *
+ * IMPORTANT:
+ *
+ * The route itself must also be protected at the routing /
+ * application layer so these test endpoints cannot be
+ * accidentally exposed in a production payment environment.
  * =========================================================
  */
-
 export async function confirmTestPaymentController(
   req: AuthenticatedRequest,
   res: Response
@@ -453,14 +585,28 @@ export async function confirmTestPaymentController(
     });
   }
 
+  const paymentId =
+    getRequiredRouteParam(
+      req.params.paymentId
+    );
+
+  if (!paymentId) {
+    return res.status(400).json({
+      error:
+        "PAYMENT_ID_REQUIRED",
+    });
+  }
+
   try {
     const result =
       await confirmTestMarketplacePayment(
-        req.params.paymentId,
+        paymentId,
         userId
       );
 
-    return res.json(result);
+    return res.status(200).json(
+      result
+    );
   } catch (error) {
     return sendMarketplaceError(
       res,
@@ -473,8 +619,14 @@ export async function confirmTestPaymentController(
  * =========================================================
  * TEST PAYMENT FAILURE
  * =========================================================
+ *
+ * POST /api/marketplace/test/payments/:paymentId/fail
+ *
+ * TEST/SANDBOX ONLY.
+ *
+ * A failed payment must never grant parcel ownership.
+ * =========================================================
  */
-
 export async function failTestPaymentController(
   req: AuthenticatedRequest,
   res: Response
@@ -489,14 +641,28 @@ export async function failTestPaymentController(
     });
   }
 
+  const paymentId =
+    getRequiredRouteParam(
+      req.params.paymentId
+    );
+
+  if (!paymentId) {
+    return res.status(400).json({
+      error:
+        "PAYMENT_ID_REQUIRED",
+    });
+  }
+
   try {
     const result =
       await failTestMarketplacePayment(
-        req.params.paymentId,
+        paymentId,
         userId
       );
 
-    return res.json(result);
+    return res.status(200).json(
+      result
+    );
   } catch (error) {
     return sendMarketplaceError(
       res,
@@ -509,8 +675,14 @@ export async function failTestPaymentController(
  * =========================================================
  * TEST PAYMENT CANCELLATION
  * =========================================================
+ *
+ * POST /api/marketplace/test/payments/:paymentId/cancel
+ *
+ * TEST/SANDBOX ONLY.
+ *
+ * A cancelled payment must never grant parcel ownership.
+ * =========================================================
  */
-
 export async function cancelTestPaymentController(
   req: AuthenticatedRequest,
   res: Response
@@ -525,14 +697,28 @@ export async function cancelTestPaymentController(
     });
   }
 
+  const paymentId =
+    getRequiredRouteParam(
+      req.params.paymentId
+    );
+
+  if (!paymentId) {
+    return res.status(400).json({
+      error:
+        "PAYMENT_ID_REQUIRED",
+    });
+  }
+
   try {
     const result =
       await cancelTestMarketplacePayment(
-        req.params.paymentId,
+        paymentId,
         userId
       );
 
-    return res.json(result);
+    return res.status(200).json(
+      result
+    );
   } catch (error) {
     return sendMarketplaceError(
       res,

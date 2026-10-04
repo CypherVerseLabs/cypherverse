@@ -8,7 +8,6 @@ import {
   AuthenticatedRequest,
 } from "../middleware/authMiddleware.js";
 
-
 import {
   reserveParcel,
   createParcelListing,
@@ -16,29 +15,45 @@ import {
   getActiveParcelListings,
 } from "../stores/parcelStore.js";
 
-
-
 const router = Router();
-
-
 
 /**
  * =========================================================
- * CREATE MARKETPLACE ORDER
+ * MARKETPLACE PARCEL ROUTES
  * =========================================================
  *
- * POST /api/marketplace/parcels/:id/buy
- *
  * IMPORTANT:
- * This endpoint creates the server-authoritative order.
  *
- * It does NOT directly transfer parcel ownership.
- * Ownership should only be granted after successful
- * payment processing.
+ * This router handles parcel marketplace operations such as:
+ *
+ * - reserving parcels
+ * - creating listings
+ * - releasing reservations
+ * - reading active listings
+ *
+ * PURCHASES ARE NOT COMPLETED HERE.
+ *
+ * Parcel ownership must only change through the authoritative
+ * marketplace order/payment flow in:
+ *
+ *   server/routes/marketplaceRoutes.ts
+ *
+ * The purchase flow is:
+ *
+ *   create order
+ *        ↓
+ *   create payment
+ *        ↓
+ *   payment succeeds
+ *        ↓
+ *   grant entitlement
+ *        ↓
+ *   transfer parcel ownership
+ *
+ * DO NOT add a direct "buy parcel" endpoint here that calls
+ * buyParcel() or otherwise transfers ownership immediately.
+ * =========================================================
  */
-
-
-
 
 /**
  * =========================================================
@@ -46,8 +61,9 @@ const router = Router();
  * =========================================================
  *
  * POST /api/marketplace/parcels/:id/reserve
+ *
+ * Authentication required.
  */
-
 router.post(
   "/parcels/:id/reserve",
   authenticateToken,
@@ -55,11 +71,8 @@ router.post(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-    const parcelId =
-      req.params.id;
-
-    const userId =
-      req.user?.id;
+    const parcelId = req.params.id;
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -69,22 +82,19 @@ router.post(
 
     if (!parcelId) {
       return res.status(400).json({
-        error:
-          "Parcel ID is required",
+        error: "Parcel ID is required",
       });
     }
 
     try {
-      const parcel =
-        await reserveParcel(
-          parcelId,
-          userId
-        );
+      const parcel = await reserveParcel(
+        parcelId,
+        userId
+      );
 
       if (!parcel) {
         return res.status(404).json({
-          error:
-            "Parcel not found",
+          error: "Parcel not found",
         });
       }
 
@@ -93,19 +103,14 @@ router.post(
         action: "reserve",
         parcel,
       });
-
     } catch (error) {
       console.error(
         "Reserve parcel error:",
         error
       );
 
-      if (
-        error instanceof Error
-      ) {
-        switch (
-          error.message
-        ) {
+      if (error instanceof Error) {
+        switch (error.message) {
           case "PARCEL_NOT_AVAILABLE":
             return res.status(409).json({
               error:
@@ -121,13 +126,11 @@ router.post(
       }
 
       return res.status(500).json({
-        error:
-          "Failed to reserve parcel",
+        error: "Failed to reserve parcel",
       });
     }
   }
 );
-
 
 /**
  * =========================================================
@@ -136,13 +139,19 @@ router.post(
  *
  * POST /api/marketplace/parcels/:id/list
  *
+ * Authentication required.
+ *
  * Body:
  *
  * {
  *   "price": "19.99"
  * }
+ *
+ * IMPORTANT:
+ *
+ * Creating a listing does not transfer ownership.
+ * The seller must already own the parcel.
  */
-
 router.post(
   "/parcels/:id/list",
   authenticateToken,
@@ -150,11 +159,8 @@ router.post(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-    const parcelId =
-      req.params.id;
-
-    const sellerId =
-      req.user?.id;
+    const parcelId = req.params.id;
+    const sellerId = req.user?.id;
 
     if (!sellerId) {
       return res.status(401).json({
@@ -164,29 +170,24 @@ router.post(
 
     if (!parcelId) {
       return res.status(400).json({
-        error:
-          "Parcel ID is required",
+        error: "Parcel ID is required",
       });
     }
 
-    const rawPrice =
-      req.body?.price;
+    const rawPrice = req.body?.price;
 
     if (
       rawPrice === undefined ||
       rawPrice === null
     ) {
       return res.status(400).json({
-        error:
-          "Listing price is required",
+        error: "Listing price is required",
       });
     }
 
     if (
-      typeof rawPrice !==
-        "string" &&
-      typeof rawPrice !==
-        "number"
+      typeof rawPrice !== "string" &&
+      typeof rawPrice !== "number"
     ) {
       return res.status(400).json({
         error:
@@ -194,29 +195,27 @@ router.post(
       });
     }
 
-    const price =
-      String(rawPrice).trim();
+    const price = String(rawPrice).trim();
 
-    /*
-     * Decimal(12,2) validation.
+    /**
+     * Decimal(12,2)-style validation.
      *
-     * Allows:
-     * 1
-     * 1.5
-     * 1.50
-     * 9999999999.99
+     * Allowed:
      *
-     * Rejects:
-     * 0
-     * negative values
-     * more than two decimals
-     * scientific notation
+     *   1
+     *   1.5
+     *   1.50
+     *   9999999999.99
+     *
+     * Rejected:
+     *
+     *   0
+     *   negative values
+     *   more than two decimal places
+     *   scientific notation
      */
-
     if (
-      !/^\d+(\.\d{1,2})?$/.test(
-        price
-      )
+      !/^\d+(\.\d{1,2})?$/.test(price)
     ) {
       return res.status(400).json({
         error:
@@ -224,9 +223,7 @@ router.post(
       });
     }
 
-    if (
-      Number(price) <= 0
-    ) {
+    if (Number(price) <= 0) {
       return res.status(400).json({
         error:
           "Listing price must be greater than zero.",
@@ -243,8 +240,7 @@ router.post(
 
       if (!listing) {
         return res.status(404).json({
-          error:
-            "Parcel not found",
+          error: "Parcel not found",
         });
       }
 
@@ -253,24 +249,17 @@ router.post(
         action: "list",
         listing: {
           ...listing,
-
-          price:
-            listing.price.toString(),
+          price: listing.price.toString(),
         },
       });
-
     } catch (error) {
       console.error(
         "List parcel error:",
         error
       );
 
-      if (
-        error instanceof Error
-      ) {
-        switch (
-          error.message
-        ) {
+      if (error instanceof Error) {
+        switch (error.message) {
           case "PARCEL_NOT_OWNED":
             return res.status(403).json({
               error:
@@ -285,20 +274,17 @@ router.post(
 
           case "INVALID_PARCEL_PRICE":
             return res.status(400).json({
-              error:
-                "Invalid parcel price.",
+              error: "Invalid parcel price.",
             });
         }
       }
 
       return res.status(500).json({
-        error:
-          "Failed to list parcel",
+        error: "Failed to list parcel",
       });
     }
   }
 );
-
 
 /**
  * =========================================================
@@ -306,8 +292,9 @@ router.post(
  * =========================================================
  *
  * POST /api/marketplace/parcels/:id/release
+ *
+ * Authentication required.
  */
-
 router.post(
   "/parcels/:id/release",
   authenticateToken,
@@ -315,11 +302,8 @@ router.post(
     req: AuthenticatedRequest,
     res: Response
   ) => {
-    const parcelId =
-      req.params.id;
-
-    const userId =
-      req.user?.id;
+    const parcelId = req.params.id;
+    const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({
@@ -329,8 +313,7 @@ router.post(
 
     if (!parcelId) {
       return res.status(400).json({
-        error:
-          "Parcel ID is required",
+        error: "Parcel ID is required",
       });
     }
 
@@ -343,8 +326,7 @@ router.post(
 
       if (!parcel) {
         return res.status(404).json({
-          error:
-            "Reservation not found",
+          error: "Reservation not found",
         });
       }
 
@@ -353,7 +335,6 @@ router.post(
         action: "release",
         parcel,
       });
-
     } catch (error) {
       console.error(
         "Release reservation error:",
@@ -362,12 +343,11 @@ router.post(
 
       return res.status(500).json({
         error:
-          "Failed to release reservation",
+          "Failed to release parcel reservation",
       });
     }
   }
 );
-
 
 /**
  * =========================================================
@@ -375,8 +355,11 @@ router.post(
  * =========================================================
  *
  * GET /api/marketplace/listings
+ *
+ * Authentication is intentionally not required.
+ *
+ * Marketplace listings can be publicly browsed.
  */
-
 router.get(
   "/listings",
   async (
@@ -388,26 +371,25 @@ router.get(
         await getActiveParcelListings();
 
       return res.status(200).json({
-  listings: listings.map(
-    (listing) => ({
-      ...listing,
+        listings: listings.map(
+          (listing) => ({
+            ...listing,
 
-      price:
-        listing.price.toString(),
+            price:
+              listing.price.toString(),
 
-      parcel: {
-        ...listing.parcel,
+            parcel: {
+              ...listing.parcel,
 
-        price:
-          listing.parcel.price !== null
-            ? listing.parcel.price.toString()
-            : null,
-      },
-    })
-  ),
-});
-
-
+              price:
+                listing.parcel.price !==
+                null
+                  ? listing.parcel.price.toString()
+                  : null,
+            },
+          })
+        ),
+      });
     } catch (error) {
       console.error(
         "Get marketplace listings error:",
@@ -421,6 +403,5 @@ router.get(
     }
   }
 );
-
 
 export default router;
