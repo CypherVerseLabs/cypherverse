@@ -42,6 +42,7 @@ import type {
 import {
   useMarketplace,
 } from "../marketplace";
+
 import LandmarkLayer from "./LandmarkLayer";
 
 
@@ -63,22 +64,6 @@ interface WorldBounds {
  * =========================================================
  * WORLD CONFIGURATION
  * =========================================================
- *
- * These bounds define the initial parcel region loaded from
- * the backend.
- *
- * IMPORTANT:
- *
- * The backend /api/parcels endpoint now accepts:
- *
- *   minX
- *   maxX
- *   minY
- *   maxY
- *
- * so only parcels inside this region are requested.
- *
- * Change these values as the playable world expands.
  */
 
 const WORLD_BOUNDS: WorldBounds = {
@@ -88,35 +73,10 @@ const WORLD_BOUNDS: WorldBounds = {
   maxY: 2384,
 };
 
+
 /**
  * =========================================================
  * CYPHERVERSE
- * =========================================================
- *
- * Parent owner of the parcel world.
- *
- * Responsibilities:
- *
- *   - Load parcels for the current world bounds
- *   - Track selected parcel
- *   - Run marketplace actions
- *   - Update visible parcel state immediately
- *   - Keep ParcelLayer and ParcelDirectory synchronized
- *
- * Architecture:
- *
- *   useParcels(bounds)
- *        ↓
- *   CypherVerse
- *        ↓
- *   ParcelLayer / ParcelDirectory
- *
- *   useMarketplace()
- *        ↓
- *   marketplace service
- *        ↓
- *   authenticated API
- *
  * =========================================================
  */
 
@@ -126,11 +86,6 @@ export default function CypherVerse() {
    * =======================================================
    * WORLD BOUNDS
    * =======================================================
-   *
-   * Memoized so the object identity remains stable.
-   *
-   * This prevents useParcels() from unnecessarily reloading
-   * because of a newly-created options object on every render.
    */
 
   const worldBounds =
@@ -144,8 +99,6 @@ export default function CypherVerse() {
    * =======================================================
    * PARCEL DATA
    * =======================================================
-   *
-   * Only parcels inside the configured bounds are requested.
    */
 
   const {
@@ -174,11 +127,6 @@ export default function CypherVerse() {
    * =======================================================
    * DISPLAYED PARCELS
    * =======================================================
-   *
-   * Local displayed state allows successful marketplace
-   * operations to update the world immediately.
-   *
-   * The backend remains authoritative.
    */
 
   const [
@@ -191,96 +139,149 @@ export default function CypherVerse() {
    * =======================================================
    * SYNC SERVER PARCELS
    * =======================================================
-   *
-   * Whenever useParcels() receives a new bounded result,
-   * replace the displayed parcel collection.
    */
 
   useEffect(() => {
+
     setParcels(
       fetchedParcels
     );
+
   }, [
     fetchedParcels,
   ]);
 
 
-/**
- * =======================================================
- * SELECTED PARCEL
- * =======================================================
- */
+  /**
+   * =======================================================
+   * SELECTED PARCEL
+   * =======================================================
+   */
 
-const [
-  selectedParcelId,
-  setSelectedParcelId,
-] = useState<string | null>(
-  null
-);
-
-const selectedParcel =
-  useMemo(
-    () =>
-      parcels.find(
-        parcel =>
-          parcel.id ===
-          selectedParcelId
-      ) ?? null,
-    [
-      parcels,
-      selectedParcelId,
-    ]
+  const [
+    selectedParcelId,
+    setSelectedParcelId,
+  ] = useState<string | null>(
+    null
   );
 
-const selectedParcelProject =
-  selectedParcel?.project ?? null;
 
-const [
-  loadedParcelProject,
-  setLoadedParcelProject,
-] = useState<Project | null>(null);
+  const selectedParcel =
+    useMemo(
+      () =>
+        parcels.find(
+          parcel =>
+            parcel.id ===
+            selectedParcelId
+        ) ?? null,
+      [
+        parcels,
+        selectedParcelId,
+      ]
+    );
 
-useEffect(() => {
-  let cancelled = false;
 
-  setLoadedParcelProject(null);
+  const selectedParcelProject =
+    selectedParcel?.project ?? null;
 
-  const slug =
-    selectedParcelProject?.slug ?? null;
 
-  if (!slug) {
+  /**
+   * =======================================================
+   * LOADED PARCEL PROJECT
+   * =======================================================
+   */
+
+  const [
+    loadedParcelProject,
+    setLoadedParcelProject,
+  ] = useState<Project | null>(
+    null
+  );
+
+
+  useEffect(() => {
+
+    let cancelled = false;
+
+    setLoadedParcelProject(
+      null
+    );
+
+
+    const slug =
+      selectedParcelProject?.slug ??
+      null;
+
+
+    if (!slug) {
+
+      return () => {
+
+        cancelled = true;
+
+      };
+
+    }
+
+
+    void fetchPublicProject(
+      slug
+    )
+      .then((project) => {
+
+        if (!cancelled) {
+
+          setLoadedParcelProject(
+            project
+          );
+
+        }
+
+      })
+      .catch((error) => {
+
+        if (!cancelled) {
+
+          console.error(
+            "Failed to load parcel project scene:",
+            error
+          );
+
+        }
+
+      });
+
+
     return () => {
+
       cancelled = true;
+
     };
-  }
 
-  void fetchPublicProject(slug)
-    .then((project) => {
-      if (!cancelled) {
-        setLoadedParcelProject(project);
-      }
-    })
-    .catch((error) => {
-      if (!cancelled) {
-        console.error(
-          "Failed to load parcel project scene:",
-          error
-        );
-      }
-    });
-
-  return () => {
-    cancelled = true;
-  };
-}, [selectedParcelProject?.slug]);
-
-
+  }, [
+    selectedParcelProject?.slug,
+  ]);
 
 
   /**
    * =======================================================
    * MARKETPLACE
    * =======================================================
+   *
+   * The hook owns the complete purchase operation:
+   *
+   *   buyParcel(parcel)
+   *       ↓
+   *   createOrder()
+   *       ↓
+   *   createPayment()
+   *       ↓
+   *   confirmTestPayment()
+   *
+   * CypherVerse only consumes the higher-level operation.
+   *
+   * marketplace.ts remains responsible for individual
+   * API calls.
    */
 
   const {
@@ -289,10 +290,12 @@ useEffect(() => {
     actionError,
 
     buyParcel,
+
     reserveParcel,
     listParcel,
 
     clearAction,
+
   } = useMarketplace();
 
 
@@ -304,13 +307,16 @@ useEffect(() => {
 
   const handleParcelSelect =
     useCallback(
-      (parcel: Parcel) => {
+      (
+        parcel: Parcel
+      ) => {
 
         setSelectedParcelId(
           parcel.id
         );
 
         clearAction();
+
       },
       [
         clearAction,
@@ -320,53 +326,15 @@ useEffect(() => {
 
   /**
    * =======================================================
-   * UPDATE DISPLAYED PARCEL
-   * =======================================================
-   *
-   * Updates the local parcel immediately after a successful
-   * marketplace operation.
-   *
-   * The next refresh() then replaces it with authoritative
-   * backend state.
-   */
-
-  const updateDisplayedParcel =
-    useCallback(
-      (
-        updatedParcel: Parcel
-      ) => {
-
-        setParcels(
-          currentParcels =>
-            currentParcels.map(
-              parcel =>
-                parcel.id ===
-                updatedParcel.id
-                  ? updatedParcel
-                  : parcel
-            )
-        );
-      },
-      []
-    );
-
-
-    /**
-   * =======================================================
    * BUY PARCEL
    * =======================================================
    *
-   * buyParcel() performs the complete TEST purchase flow:
+   * IMPORTANT:
    *
-   *   order
-   *      ↓
-   *   payment
-   *      ↓
-   *   test confirmation
-   *      ↓
-   *   backend purchase completion
+   * Do NOT create the order/payment here.
    *
-   * Ownership remains backend-authoritative.
+   * useMarketplace().buyParcel() is the higher-level
+   * marketplace operation.
    */
 
   const handleBuyParcel =
@@ -376,7 +344,16 @@ useEffect(() => {
       ) => {
 
         if (actionParcelId) {
+
           return;
+
+        }
+
+
+        if (!parcel?.id) {
+
+          return;
+
         }
 
 
@@ -387,26 +364,22 @@ useEffect(() => {
 
 
         if (!result.success) {
+
           return;
+
         }
 
 
         /**
-         * The backend has completed the purchase.
-         *
-         * Do not manually mutate ownership here.
-         *
-         * Reload the bounded parcel collection so the
-         * displayed world reflects authoritative backend
-         * state.
+         * Reload authoritative parcel state after the
+         * backend completes the purchase.
          */
 
         await refresh();
 
 
         /**
-         * Keep the purchased parcel selected if it still
-         * exists in the refreshed world.
+         * Keep the purchased parcel selected.
          */
 
         setSelectedParcelId(
@@ -422,8 +395,6 @@ useEffect(() => {
     );
 
 
-
-
   /**
    * =======================================================
    * RESERVE PARCEL
@@ -437,7 +408,9 @@ useEffect(() => {
       ) => {
 
         if (actionParcelId) {
+
           return;
+
         }
 
 
@@ -448,27 +421,36 @@ useEffect(() => {
 
 
         if (!result.success) {
-          return;
-        }
 
-
-        if (!result.parcel) {
           return;
+
         }
 
 
         /**
-         * Immediately update the visible parcel.
+         * Update the selected parcel from the backend
+         * response when available.
          */
 
-        updateDisplayedParcel(
-          result.parcel
-        );
+        if (result.parcel) {
+
+          setParcels(
+            currentParcels =>
+              currentParcels.map(
+                currentParcel =>
+                  currentParcel.id ===
+                  result.parcel!.id
+                    ? result.parcel!
+                    : currentParcel
+              )
+          );
 
 
-        setSelectedParcelId(
-          result.parcel.id
-        );
+          setSelectedParcelId(
+            result.parcel.id
+          );
+
+        }
 
 
         /**
@@ -482,7 +464,6 @@ useEffect(() => {
         actionParcelId,
         reserveParcel,
         refresh,
-        updateDisplayedParcel,
       ]
     );
 
@@ -491,18 +472,6 @@ useEffect(() => {
    * =======================================================
    * LIST PARCEL
    * =======================================================
-   *
-   * useMarketplace().listParcel() expects the price as a
-   * decimal string.
-   *
-   * Parcel.price may arrive as:
-   *
-   *   string
-   *   number
-   *   null
-   *   undefined
-   *
-   * Normalize it before passing it to the marketplace hook.
    */
 
   const handleListParcel =
@@ -512,7 +481,9 @@ useEffect(() => {
       ) => {
 
         if (actionParcelId) {
+
           return;
+
         }
 
 
@@ -524,7 +495,9 @@ useEffect(() => {
           rawPrice === null ||
           rawPrice === undefined
         ) {
+
           return;
+
         }
 
 
@@ -535,9 +508,8 @@ useEffect(() => {
 
 
         /**
-         * Backend remains authoritative, but validate
-         * locally so obviously invalid requests never leave
-         * the browser.
+         * Client-side validation prevents obviously invalid
+         * requests. The backend remains authoritative.
          */
 
         if (
@@ -546,7 +518,9 @@ useEffect(() => {
           ) ||
           Number(price) <= 0
         ) {
+
           return;
+
         }
 
 
@@ -558,27 +532,36 @@ useEffect(() => {
 
 
         if (!result.success) {
-          return;
-        }
 
-
-        if (!result.parcel) {
           return;
+
         }
 
 
         /**
-         * Immediately update visible state.
+         * Update visible state immediately when the backend
+         * returns the updated parcel.
          */
 
-        updateDisplayedParcel(
-          result.parcel
-        );
+        if (result.parcel) {
+
+          setParcels(
+            currentParcels =>
+              currentParcels.map(
+                currentParcel =>
+                  currentParcel.id ===
+                  result.parcel!.id
+                    ? result.parcel!
+                    : currentParcel
+              )
+          );
 
 
-        setSelectedParcelId(
-          result.parcel.id
-        );
+          setSelectedParcelId(
+            result.parcel.id
+          );
+
+        }
 
 
         /**
@@ -592,7 +575,6 @@ useEffect(() => {
         actionParcelId,
         listParcel,
         refresh,
-        updateDisplayedParcel,
       ]
     );
 
@@ -601,9 +583,6 @@ useEffect(() => {
    * =======================================================
    * PARCEL ACTION TYPE
    * =======================================================
-   *
-   * Only the actions supported by ParcelLayer and
-   * ParcelDirectory are passed through.
    */
 
   const parcelActionType =
@@ -623,7 +602,9 @@ useEffect(() => {
   useEffect(() => {
 
     if (!error) {
+
       return;
+
     }
 
 
@@ -641,18 +622,14 @@ useEffect(() => {
    * =======================================================
    * CLEAR INVALID SELECTION
    * =======================================================
-   *
-   * If a bounded reload no longer contains the selected
-   * parcel, clear the selection.
-   *
-   * This matters later when the world uses dynamically
-   * changing bounds.
    */
 
   useEffect(() => {
 
     if (!selectedParcelId) {
+
       return;
+
     }
 
 
@@ -665,11 +642,13 @@ useEffect(() => {
 
 
     if (!stillLoaded) {
+
       setSelectedParcelId(
         null
       );
 
       clearAction();
+
     }
 
   }, [
@@ -711,12 +690,15 @@ useEffect(() => {
 
       {loadedParcelProject?.scene && (
         <EditorProvider
-          initialScene={loadedParcelProject.scene}
+          initialScene={
+            loadedParcelProject.scene
+          }
           editorActive={false}
         >
           <Scene />
         </EditorProvider>
       )}
+
 
       {/* ===================================================
           WORLD
@@ -767,112 +749,136 @@ useEffect(() => {
       {/* ===================================================
           PHYSICAL PARCEL WORLD
           =================================================== */}
-<group position-y={-0.0}>
 
-          {/* WORLD NAME */}
-        
-        
-      <ParcelLayer
-  parcels={parcels}
-  tileSize={16}
-  origin={[0, 0, 0]}
-  interactive={true}
+      <group position-y={-0.0}>
 
-  selectedParcelId={
-    selectedParcelId
-  }
+        <ParcelLayer
+          parcels={parcels}
+          tileSize={16}
+          origin={[
+            0,
+            0,
+            0,
+          ]}
+          interactive={true}
 
-  onParcelSelect={({
-    parcel,
-  }) => {
-    handleParcelSelect(
-      parcel
-    );
-  }}
+          selectedParcelId={
+            selectedParcelId
+          }
 
-  onParcelClose={() => {
-    setSelectedParcelId(null);
-  }}
+          onParcelSelect={({
+            parcel,
+          }) => {
 
-  onBuy={
-    handleBuyParcel
-  }
+            handleParcelSelect(
+              parcel
+            );
 
-  onReserve={
-    handleReserveParcel
-  }
+          }}
 
-  onList={
-    handleListParcel
-  }
+          onParcelClose={() => {
 
-  actionParcelId={
-    actionParcelId
-  }
+            setSelectedParcelId(
+              null
+            );
 
-  actionType={
-    parcelActionType
-  }
+          }}
 
-  actionError={
-    actionError
-  }
-/>
+          onBuy={
+            handleBuyParcel
+          }
 
-<ParcelLayer
-  parcels={parcels}
-  tileSize={16}
-  origin={[0, 0, 0]}
-  interactive={true}
+          onReserve={
+            handleReserveParcel
+          }
 
-  selectedParcelId={
-    selectedParcelId
-  }
+          onList={
+            handleListParcel
+          }
 
-  onParcelSelect={({
-    parcel,
-  }) => {
-    handleParcelSelect(
-      parcel
-    );
-  }}
+          actionParcelId={
+            actionParcelId
+          }
 
-  onParcelClose={() => {
-    setSelectedParcelId(null);
-  }}
+          actionType={
+            parcelActionType
+          }
 
-  onBuy={
-    handleBuyParcel
-  }
+          actionError={
+            actionError
+          }
+        />
 
-  onReserve={
-    handleReserveParcel
-  }
 
-  onList={
-    handleListParcel
-  }
+        <ParcelLayer
+          parcels={parcels}
+          tileSize={16}
+          origin={[
+            0,
+            0,
+            0,
+          ]}
+          interactive={true}
 
-  actionParcelId={
-    actionParcelId
-  }
+          selectedParcelId={
+            selectedParcelId
+          }
 
-  actionType={
-    parcelActionType
-  }
+          onParcelSelect={({
+            parcel,
+          }) => {
 
-  actionError={
-    actionError
-  }
-/>
+            handleParcelSelect(
+              parcel
+            );
 
-<LandmarkLayer
-  parcels={parcels}
-  tileSize={16}
-  origin={[0, 0, 0]}
-/>
+          }}
 
-</group>
+          onParcelClose={() => {
+
+            setSelectedParcelId(
+              null
+            );
+
+          }}
+
+          onBuy={
+            handleBuyParcel
+          }
+
+          onReserve={
+            handleReserveParcel
+          }
+
+          onList={
+            handleListParcel
+          }
+
+          actionParcelId={
+            actionParcelId
+          }
+
+          actionType={
+            parcelActionType
+          }
+
+          actionError={
+            actionError
+          }
+        />
+
+
+        <LandmarkLayer
+          parcels={parcels}
+          tileSize={16}
+          origin={[
+            0,
+            0,
+            0,
+          ]}
+        />
+
+      </group>
 
 
       {/* ===================================================
@@ -929,11 +935,6 @@ useEffect(() => {
 
       {/* ===================================================
           LOADING
-          ===================================================
-          
-          Loading state is intentionally silent here.
-          ParcelLayer/Directory can continue rendering the
-          previous state while a refresh is in progress.
           =================================================== */}
 
       {loading && null}

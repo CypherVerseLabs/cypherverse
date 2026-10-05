@@ -1,6 +1,7 @@
 import type {
   Parcel,
-} from "../parcels/types";
+} from "../parcels/types.js";
+
 
 
 /**
@@ -29,10 +30,12 @@ export type PaymentsMode =
   | "staging"
   | "production";
 
+
 export type MarketplaceCurrency =
   | "USD"
   | "ETH"
   | "CYPH";
+
 
 export type MarketplacePaymentMethod =
   | "USD_PROVIDER"
@@ -67,58 +70,6 @@ export type MarketplacePurchaseStatus =
   | "failed"
   | "cancelled"
   | "abandoned";
-
-
-/**
- * =========================================================
- * PURCHASE OPTIONS
- * =========================================================
- *
- * These values control the TEST purchase flow.
- *
- * IMPORTANT:
- *
- * No price is accepted from the client.
- *
- * The backend calculates the authoritative amount.
- */
-
-export interface MarketplacePurchaseOptions {
-
-  /**
-   * Idempotency key for this purchase attempt.
-   */
-
-  idempotencyKey?: string;
-
-
-  /**
-   * Fake sandbox payment method.
-   *
-   * Examples:
-   *
-   *   test_success
-   *   test_declined
-   *   test_cancelled
-   *   test_timeout
-   *   test_provider_error
-   */
-
-  paymentMethodId?: string;
-
-
-  /**
-   * Optional deterministic sandbox result.
-   *
-   * The backend must validate this value and must never
-   * treat arbitrary client input as proof of payment.
-   *
-   * Prefer selecting a test payment method instead.
-   */
-
-  testPaymentResult?:
-    | TestPaymentResult;
-}
 
 
 /**
@@ -162,20 +113,30 @@ export interface MarketplacePurchase {
     string | null;
 }
 
+
+/**
+ * =========================================================
+ * MARKETPLACE ORDER
+ * =========================================================
+ */
+
 export interface MarketplaceOrder {
+
   id: string;
 
   userId: string;
 
   productId: string;
 
-  listingId: string | null;
+  listingId:
+    string | null;
 
   quantity: number;
 
   amount: string;
 
-  currency: MarketplaceCurrency;
+  currency:
+    MarketplaceCurrency;
 
   status: string;
 
@@ -184,7 +145,15 @@ export interface MarketplaceOrder {
   updatedAt: string;
 }
 
+
+/**
+ * =========================================================
+ * MARKETPLACE PAYMENT
+ * =========================================================
+ */
+
 export interface MarketplacePayment {
+
   id: string;
 
   orderId: string;
@@ -193,17 +162,22 @@ export interface MarketplacePayment {
 
   amount: string;
 
-  currency: MarketplaceCurrency;
+  currency:
+    MarketplaceCurrency;
 
-  method: MarketplacePaymentMethod;
+  method:
+    MarketplacePaymentMethod;
 
-  externalTransactionId?: string | null;
+  externalTransactionId?:
+    string | null;
 
-  network?: string | null;
+  network?:
+    string | null;
 
   status: string;
 
-  environment?: PaymentsMode;
+  environment?:
+    PaymentsMode;
 
   createdAt: string;
 
@@ -218,23 +192,27 @@ export interface MarketplacePayment {
  */
 
 export type MarketplaceSuccess = {
+
   success: true;
 
-  action: MarketplaceAction;
+  action:
+    MarketplaceAction;
 
-  parcel?: Parcel;
+  parcel?:
+    Parcel;
 
-  listing?: unknown;
+  listing?:
+    unknown;
 
-  order?: MarketplaceOrder;
+  order?:
+    MarketplaceOrder;
 
-  payment?: MarketplacePayment;
+  payment?:
+    MarketplacePayment;
 
-  purchase?: MarketplacePurchase;
+  purchase?:
+    MarketplacePurchase;
 };
-
-
-
 
 
 /**
@@ -247,7 +225,8 @@ export type MarketplaceFailure = {
 
   success: false;
 
-  action: MarketplaceAction;
+  action:
+    MarketplaceAction;
 
   error: string;
 
@@ -271,13 +250,27 @@ export type MarketplaceResult =
  * =========================================================
  * MARKETPLACE SERVICE
  * =========================================================
+ *
+ * IMPORTANT:
+ *
+ * There is intentionally NO buyParcel() method here.
+ *
+ * Purchase completion uses the explicit marketplace flow:
+ *
+ *   createOrder()
+ *       ↓
+ *   createPayment()
+ *       ↓
+ *   confirmTestPayment()
+ *
+ * Ownership must only be granted by the backend payment
+ * confirmation flow.
  */
 
 export interface MarketplaceService {
 
-  buyParcel(
-    parcel: Parcel,
-    options?: MarketplacePurchaseOptions
+  createOrder(
+    parcel: Parcel
   ): Promise<MarketplaceResult>;
 
   createPayment(

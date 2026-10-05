@@ -6,10 +6,11 @@ export {
   useMarketplaceService,
 } from "./marketplace";
 
+
 export type {
   MarketplaceAction,
   MarketplaceResult,
   MarketplaceSuccess,
   MarketplaceFailure,
   MarketplaceService,
-} from "./types";
+} from "./types.js";

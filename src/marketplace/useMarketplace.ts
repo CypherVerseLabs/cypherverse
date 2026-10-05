@@ -9,7 +9,6 @@ import type {
 
 import type {
   MarketplaceAction,
-  MarketplacePurchaseOptions,
   MarketplaceResult,
 } from "./types";
 
@@ -27,13 +26,19 @@ import {
  *
  * The backend remains authoritative.
  *
- * TEST PAYMENT FLOW:
+ * PURCHASE FLOW:
  *
  *   buyParcel()
+ *       ↓
+ *   createOrder()
  *       ↓
  *   createPayment()
  *       ↓
  *   confirmTestPayment()
+ *
+ * The marketplace service owns the individual API calls.
+ * This hook owns the higher-level purchase orchestration.
+
  *
  * =========================================================
  */
@@ -126,33 +131,6 @@ export default function useMarketplace() {
     },
     []
   );
-
-
-  /**
-   * =======================================================
-   * IDEMPOTENCY KEY
-   * =======================================================
-   */
-
-  const createIdempotencyKey =
-    useCallback(
-      (
-        parcelId: string
-      ): string => {
-
-        const randomPart =
-          typeof crypto !== "undefined" &&
-          typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2)}`;
-
-        return `parcel-buy-${parcelId}-${randomPart}`;
-
-      },
-      []
-    );
 
 
   /**
@@ -262,34 +240,28 @@ export default function useMarketplace() {
     ]
   );
 
-
-  /**
+    /**
    * =======================================================
-   * BUY PARCEL
+   * CREATE MARKETPLACE ORDER
    * =======================================================
    *
-   * Complete TEST purchase flow:
+   * Creates the marketplace order for a parcel.
    *
-   *   1. Create server-authoritative order
-   *   2. Create payment from the order
-   *   3. Confirm the test payment
+   * POST /api/marketplace/orders
    *
-   * The backend remains authoritative for:
+   * The marketplace service performs the API call.
+   * The backend determines the authoritative:
    *
-   *   - user
-   *   - parcel
+   *   - buyer
    *   - listing
+   *   - seller
    *   - price
-   *   - payment
-   *   - ownership
-   *
-   * Creating the order alone does NOT transfer ownership.
+   *   - currency
    */
 
-  const buyParcel = useCallback(
+  const createOrder = useCallback(
     async (
-      parcel: Parcel,
-      options?: MarketplacePurchaseOptions
+      parcel: Parcel
     ): Promise<MarketplaceResult> => {
 
       if (!parcel?.id) {
@@ -317,151 +289,22 @@ export default function useMarketplace() {
       }
 
 
-      const idempotencyKey =
-        options?.idempotencyKey ??
-        createIdempotencyKey(
-          parcel.id
-        );
-
-
       return runAction(
         parcel.id,
         "buy",
-        async () => {
-
-          /**
-           * -------------------------------------------------
-           * STEP 1
-           * Create server-authoritative marketplace order.
-           * -------------------------------------------------
-           */
-
-          const orderResult =
-            await marketplace.buyParcel(
-              parcel,
-              {
-                ...options,
-                idempotencyKey,
-              }
-            );
-
-
-          if (!orderResult.success) {
-            return orderResult;
-          }
-
-
-          if (!orderResult.order) {
-
-            return {
-              success: false,
-
-              action: "buy",
-
-              error:
-                "Marketplace order was created but no order was returned.",
-            };
-
-          }
-
-
-          /**
-           * -------------------------------------------------
-           * STEP 2
-           * Create payment for the order.
-           *
-           * The backend determines the payment amount from
-           * the authoritative order.
-           * -------------------------------------------------
-           */
-
-          const paymentResult =
-            await marketplace.createPayment(
-              orderResult.order.id
-            );
-
-
-          if (!paymentResult.success) {
-            return paymentResult;
-          }
-
-
-          if (!paymentResult.payment) {
-
-            return {
-              success: false,
-
-              action: "buy",
-
-              error:
-                "Marketplace payment was created but no payment was returned.",
-            };
-
-          }
-
-
-          /**
-           * -------------------------------------------------
-           * STEP 3
-           * Confirm TEST payment.
-           *
-           * The backend performs the actual payment
-           * completion and ownership/entitlement logic.
-           * -------------------------------------------------
-           */
-
-          const confirmationResult =
-            await marketplace.confirmTestPayment(
-              paymentResult.payment.id
-            );
-
-
-          if (!confirmationResult.success) {
-            return confirmationResult;
-          }
-
-
-          /**
-           * -------------------------------------------------
-           * Return the final backend result.
-           *
-           * Preserve the order/payment information in case
-           * the confirmation endpoint does not return all
-           * fields.
-           * -------------------------------------------------
-           */
-
-          return {
-            success: true,
-
-            action: "buy",
-
-            order:
-              confirmationResult.order ??
-              orderResult.order,
-
-            payment:
-              confirmationResult.payment ??
-              paymentResult.payment,
-
-            purchase:
-              confirmationResult.purchase,
-
-            parcel:
-              confirmationResult.parcel,
-
-          };
-
-        }
+        () =>
+          marketplace.createOrder(
+            parcel
+          )
       );
 
     },
     [
-      createIdempotencyKey,
       marketplace,
       runAction,
     ]
   );
+
 
 
   /**
@@ -472,6 +315,9 @@ export default function useMarketplace() {
    * Creates a payment for an existing marketplace order.
    *
    * POST /api/marketplace/orders/:orderId/payment
+   *
+   * The backend determines the authoritative amount from
+   * the marketplace order.
    */
 
   const createPayment = useCallback(
@@ -514,6 +360,145 @@ export default function useMarketplace() {
     ]
   );
 
+  /**
+   * =======================================================
+   * BUY PARCEL
+   * =======================================================
+   *
+   * Higher-level marketplace purchase operation.
+   *
+   * Flow:
+   *
+   *   createOrder()
+   *       ↓
+   *   createPayment()
+   *       ↓
+   *   confirmTestPayment()
+   *
+   * marketplace.ts remains responsible for individual API
+   * calls. This hook coordinates the complete purchase.
+   */
+
+  const buyParcel = useCallback(
+    async (
+      parcel: Parcel
+    ): Promise<MarketplaceResult> => {
+
+      if (!parcel?.id) {
+
+        const result:
+          MarketplaceResult = {
+
+          success: false,
+
+          action: "buy",
+
+          error:
+            "Parcel ID is required.",
+
+        };
+
+        setActionError(
+          result.error
+        );
+
+        return result;
+
+      }
+
+
+      return runAction(
+        parcel.id,
+        "buy",
+        async () => {
+
+          /**
+           * STEP 1
+           * Create the marketplace order.
+           */
+
+          const orderResult =
+            await marketplace.createOrder(
+              parcel
+            );
+
+
+          if (!orderResult.success) {
+
+            return orderResult;
+
+          }
+
+
+          if (!orderResult.order?.id) {
+
+            return {
+              success: false,
+
+              action: "buy",
+
+              error:
+                "Marketplace order was created but no order ID was returned.",
+            };
+
+          }
+
+
+          /**
+           * STEP 2
+           * Create the payment for that order.
+           */
+
+          const paymentResult =
+            await marketplace.createPayment(
+              orderResult.order.id
+            );
+
+
+          if (!paymentResult.success) {
+
+            return paymentResult;
+
+          }
+
+
+          if (!paymentResult.payment?.id) {
+
+            return {
+              success: false,
+
+              action: "buy",
+
+              error:
+                "Marketplace payment was created but no payment ID was returned.",
+            };
+
+          }
+
+
+          /**
+           * STEP 3
+           * Confirm the test payment.
+           *
+           * The backend performs the authoritative
+           * ownership/entitlement operation.
+           */
+
+          return marketplace.confirmTestPayment(
+            paymentResult.payment.id
+          );
+
+        }
+      );
+
+    },
+    [
+      marketplace,
+      runAction,
+    ]
+  );
+
+
 
   /**
    * =======================================================
@@ -525,7 +510,7 @@ export default function useMarketplace() {
    * POST /api/marketplace/test/payments/:paymentId/confirm
    *
    * The backend decides whether the payment succeeds and
-   * grants ownership.
+   * performs the ownership/entitlement logic.
    */
 
   const confirmTestPayment = useCallback(
@@ -866,34 +851,44 @@ export default function useMarketplace() {
    * =======================================================
    * PUBLIC API
    * =======================================================
+   *
+   * NOTE:
+   *
+   * buyParcel() has intentionally been removed.
+   *
+   * Purchase completion now goes through the explicit
+   * order/payment flow:
+   *
+   *   marketplace order
+   *       ↓
+   *   createPayment()
+   *       ↓
+   *   confirmTestPayment()
+   *
+   * =======================================================
    */
 
-  return {
+      return {
+  actionParcelId,
+  actionType,
+  actionError,
 
-    actionParcelId,
+  buyParcel,
 
-    actionType,
+  createOrder,
+  createPayment,
+  confirmTestPayment,
+  failTestPayment,
+  cancelTestPayment,
 
-    actionError,
+  reserveParcel,
+  listParcel,
+  releaseParcel,
 
-    buyParcel,
+  clearAction,
+};
 
-    createPayment,
 
-    confirmTestPayment,
 
-    failTestPayment,
-
-    cancelTestPayment,
-
-    reserveParcel,
-
-    listParcel,
-
-    releaseParcel,
-
-    clearAction,
-
-  };
 
 }

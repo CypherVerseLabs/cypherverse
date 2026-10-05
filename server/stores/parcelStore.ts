@@ -17,6 +17,8 @@ import { prisma } from "../lib/prisma.js";
  * - Parcel ownership is controlled server-side.
  * - Clients should never be trusted to provide ownerId.
  * - Marketplace state is represented by ParcelStatus.
+ * - Marketplace purchases are handled by the payment/order flow.
+ * - This store does NOT expose a direct buyParcel() operation.
  */
 
 /**
@@ -185,11 +187,15 @@ export async function getParcels(options?: {
     where.y = {};
 
     if (options.minY !== undefined) {
-      where.y.gte = options.minY;
-    }
+      where.y = {};
 
-    if (options.maxY !== undefined) {
-      where.y.lte = options.maxY;
+      if (options.minY !== undefined) {
+        where.y.gte = options.minY;
+      }
+
+      if (options.maxY !== undefined) {
+        where.y.lte = options.maxY;
+      }
     }
   }
 
@@ -313,13 +319,20 @@ export async function createParcel(data: {
  * =========================================================
  * UPDATE PARCEL
  * =========================================================
+ *
+ * IMPORTANT:
+ * ownerId is intentionally NOT accepted here.
+ *
+ * Ownership changes must happen through an explicit
+ * server-side ownership flow so that authorization,
+ * payment/order validation, and ownership history cannot
+ * be bypassed.
  */
 
 export async function updateParcel(
   parcelId: string,
   data: {
     status?: ParcelStatus;
-    ownerId?: string | null;
     price?: ParcelPrice | null;
     name?: string | null;
     description?: string | null;
@@ -358,12 +371,6 @@ export async function updateParcel(
                 : new Prisma.Decimal(
                     data.price
                   ),
-          }
-        : {}),
-
-      ...(data.ownerId !== undefined
-        ? {
-            ownerId: data.ownerId,
           }
         : {}),
 
@@ -448,6 +455,13 @@ export async function getParcelsByOwnerId(
  *
  * This uses a transaction and verifies the parcel is still
  * available before assigning ownership.
+ *
+ * NOTE:
+ * This is NOT a marketplace purchase.
+ *
+ * If the application requires ParcelOwnershipHistory for
+ * claims as well, the history record should be created in
+ * the same transaction here.
  */
 
 export async function claimParcel(
@@ -537,6 +551,7 @@ export async function createParcelListing(
       /**
        * CITY LANDMARKS ARE NEVER LISTABLE.
        */
+
       if (
         parcel.type ===
         ParcelType.CITY_LANDMARK
@@ -727,172 +742,6 @@ export async function getActiveParcelListings() {
       },
     },
   });
-}
-
-/**
- * =========================================================
- * BUY PARCEL
- * =========================================================
- *
- * Purchases an actively listed parcel.
- *
- * Server-side rules:
- * - User must be authenticated.
- * - Parcel must exist.
- * - CITY_LANDMARK cannot be purchased.
- * - Parcel must currently be for sale.
- * - An active listing must exist.
- * - Buyer cannot buy their own parcel.
- *
- * The parcel ownership transfer and listing deactivation
- * happen inside the same database transaction.
- */
-
-export async function buyParcel(
-  parcelId: string,
-  buyerId: string
-) {
-  return prisma.$transaction(
-    async (tx) => {
-      const parcel =
-        await tx.parcel.findUnique({
-          where: {
-            id: parcelId,
-          },
-
-          include: {
-            listings: {
-              where: {
-                active: true,
-              },
-
-              orderBy: {
-                createdAt: "desc",
-              },
-
-              take: 1,
-            },
-          },
-        });
-
-      if (!parcel) {
-        return null;
-      }
-
-      /**
-       * CITY LANDMARKS ARE NEVER FOR SALE.
-       */
-
-      if (
-        parcel.type ===
-        ParcelType.CITY_LANDMARK
-      ) {
-        throw new Error(
-          "CITY_LANDMARK_NOT_FOR_SALE"
-        );
-      }
-
-      if (
-        parcel.status !==
-        PrismaParcelStatus.for_sale
-      ) {
-        throw new Error(
-          "PARCEL_NOT_FOR_SALE"
-        );
-      }
-
-      if (
-        parcel.ownerId === buyerId
-      ) {
-        throw new Error(
-          "CANNOT_BUY_OWN_PARCEL"
-        );
-      }
-
-      const listing =
-        parcel.listings[0];
-
-      if (!listing) {
-        throw new Error(
-          "ACTIVE_LISTING_NOT_FOUND"
-        );
-      }
-      if (
-        listing.sellerId === buyerId
-      ) {
-        throw new Error(
-          "CANNOT_BUY_OWN_PARCEL"
-        );
-      }
-/*
- * Transfer ownership.
- */
-
-await tx.parcel.update({
-  where: {
-    id: parcelId,
-  },
-
-  data: {
-    ownerId: buyerId,
-    status: PrismaParcelStatus.owned,
-    price: null,
-  },
-});
-
-/*
- * Close the listing.
- */
-
-await tx.parcelListing.update({
-  where: {
-    id: listing.id,
-  },
-
-  data: {
-    active: false,
-  },
-});
-
-
-      /**
-       * Return the authoritative parcel state.
-       */
-
-      return tx.parcel.findUnique({
-        where: {
-          id: parcelId,
-        },
-
-        include: {
-          owner: {
-            select: {
-              id: true,
-              address: true,
-              username: true,
-            },
-          },
-
-          listings: {
-            where: {
-              active: true,
-            },
-          },
-
-          project: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              template: true,
-              slug: true,
-              publishedAt: true,
-            },
-          },
-        },
-      });
-    }
-  );
 }
 
 /**

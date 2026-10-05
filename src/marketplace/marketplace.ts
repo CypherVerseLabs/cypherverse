@@ -3,7 +3,6 @@ import type {
 } from "../parcels/types";
 
 import type {
-  MarketplacePurchaseOptions,
   MarketplaceResult,
   MarketplaceService,
 } from "./types";
@@ -12,6 +11,7 @@ import {
   useAuthContext,
 } from "../ideas/context/AuthContext";
 
+
 /**
  * =========================================================
  * CYPHERVERSE MARKETPLACE SERVICE
@@ -19,13 +19,15 @@ import {
  *
  * Frontend service for the CyBuilder marketplace API.
  *
- * All marketplace requests use authFetch().
- *
  * Purchase flow:
  *
- *   1. POST /api/marketplace/orders
+ *   1. Marketplace order is created by the order flow.
  *   2. POST /api/marketplace/orders/:orderId/payment
  *   3. POST /api/marketplace/test/payments/:paymentId/confirm
+ *
+ * IMPORTANT:
+ *
+ * The legacy buyParcel() service method has been removed.
  *
  * The backend remains authoritative for:
  *
@@ -36,6 +38,7 @@ import {
  *   - payment
  *   - ownership
  */
+
 
 /**
  * =========================================================
@@ -52,22 +55,28 @@ async function readResponse(
       "content-type"
     ) || "";
 
+
   if (
     contentType.includes(
       "application/json"
     )
   ) {
+
     return response.json();
+
   }
+
 
   const text =
     await response.text();
+
 
   return {
     error:
       text ||
       `Request failed with status ${response.status}`,
   };
+
 }
 
 
@@ -88,56 +97,43 @@ export function useMarketplaceService(): MarketplaceService {
 
     /**
      * =======================================================
-     * BUY PARCEL
+     * CREATE MARKETPLACE ORDER
      * =======================================================
-     *
-     * Creates a server-authoritative marketplace order.
      *
      * POST /api/marketplace/orders
      *
-     * IMPORTANT:
+     * The backend determines:
      *
-     * No price is sent by the client.
+     *   - authenticated user
+     *   - active listing
+     *   - seller
+     *   - price
+     *   - currency
      *
-     * The backend determines the authoritative listing price.
+     * The client only identifies the parcel.
      */
 
-    async buyParcel(
-      parcel: Parcel,
-      options?: MarketplacePurchaseOptions
+    async createOrder(
+      parcel: Parcel
     ): Promise<MarketplaceResult> {
 
       if (!parcel?.id) {
 
         return {
           success: false,
+
           action: "buy",
+
           error:
             "Parcel ID is required.",
         };
 
       }
 
-
-      /**
-       * -----------------------------------------------------
-       * Generate / use idempotency key
-       * -----------------------------------------------------
-       */
-
-      const idempotencyKey =
-        options?.idempotencyKey ??
-        (
-          typeof crypto !== "undefined" &&
-          typeof crypto.randomUUID === "function"
-            ? crypto.randomUUID()
-            : `${Date.now()}-${Math.random()
-                .toString(36)
-                .slice(2)}`
-        );
-
-
       try {
+
+        const idempotencyKey =
+          crypto.randomUUID();
 
         const response =
           await authFetch(
@@ -161,17 +157,16 @@ export function useMarketplaceService(): MarketplaceService {
             }
           );
 
-
         const data =
           await readResponse(
             response
           );
 
-
         if (!response.ok) {
 
           return {
             success: false,
+
             action: "buy",
 
             error:
@@ -182,11 +177,11 @@ export function useMarketplaceService(): MarketplaceService {
 
         }
 
-
         if (!data?.order) {
 
           return {
             success: false,
+
             action: "buy",
 
             error:
@@ -195,9 +190,9 @@ export function useMarketplaceService(): MarketplaceService {
 
         }
 
-
         return {
           success: true,
+
           action: "buy",
 
           order:
@@ -211,9 +206,9 @@ export function useMarketplaceService(): MarketplaceService {
           error
         );
 
-
         return {
           success: false,
+
           action: "buy",
 
           error:
@@ -227,739 +222,707 @@ export function useMarketplaceService(): MarketplaceService {
     },
 
 
-    /**
-     * =======================================================
-     * CREATE MARKETPLACE PAYMENT
-     * =======================================================
-     *
-     * POST /api/marketplace/orders/:orderId/payment
-     *
-     * The backend calculates the authoritative payment amount.
-     *
-     * The client does NOT provide an amount.
-     */
 
-    async createPayment(
-      orderId: string
-    ): Promise<MarketplaceResult> {
+  /**
+   * =======================================================
+   * CREATE MARKETPLACE PAYMENT
+   * =======================================================
+   *
+   * POST /api/marketplace/orders/:orderId/payment
+   *
+   * The backend calculates the authoritative payment
+   * amount from the existing marketplace order.
+   *
+   * The client does NOT provide an amount.
+   */
+  async createPayment(
+    orderId: string
+  ): Promise<MarketplaceResult> {
 
-      if (!orderId) {
+    if (!orderId) {
 
-        return {
-          success: false,
-          action: "buy",
-          error:
-            "Order ID is required.",
-        };
+      return {
+        success: false,
 
-      }
+        action: "buy",
 
+        error: "Order ID is required.",
+      };
 
-      try {
-
-        const response =
-          await authFetch(
-            `/api/marketplace/orders/${orderId}/payment`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+    }
 
 
-        const data =
-          await readResponse(
-            response
-          );
+    try {
 
+      const response = await authFetch(
+        `/api/marketplace/orders/${orderId}/payment`,
+        {
+          method: "POST",
 
-        if (!response.ok) {
-
-          return {
-            success: false,
-            action: "buy",
-
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to create marketplace payment (${response.status}).`,
-          };
-
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
 
-        if (!data?.payment) {
+      const data = await readResponse(
+        response
+      );
 
-          return {
-            success: false,
-            action: "buy",
 
-            error:
-              "Marketplace payment was created but no payment was returned.",
-          };
+      if (!response.ok) {
 
+        return {
+          success: false,
+
+          action: "buy",
+
+          error: data?.message ||
+            data?.error ||
+            `Failed to create marketplace payment (${response.status}).`,
+        };
+
+      }
+
+
+      if (!data?.payment) {
+
+        return {
+          success: false,
+
+          action: "buy",
+
+          error: "Marketplace payment was created but no payment was returned.",
+        };
+
+      }
+
+
+      return {
+        success: true,
+
+        action: "buy",
+
+        payment: data.payment,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Create payment error:",
+        error
+      );
+
+
+      return {
+        success: false,
+
+        action: "buy",
+
+        error: error instanceof Error
+          ? error.message
+          : "Failed to create marketplace payment.",
+      };
+
+    }
+
+  },
+
+
+  /**
+   * =======================================================
+   * TEST PAYMENT SUCCESS
+   * =======================================================
+   *
+   * POST
+   * /api/marketplace/test/payments/:paymentId/confirm
+   *
+   * TEST/SANDBOX ONLY.
+   *
+   * The backend performs the actual confirmation and
+   * entitlement/ownership logic.
+   */
+  async confirmTestPayment(
+    paymentId: string
+  ): Promise<MarketplaceResult> {
+
+    if (!paymentId) {
+
+      return {
+        success: false,
+
+        action: "buy",
+
+        error: "Payment ID is required.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/test/payments/${paymentId}/confirm`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
 
-        return {
-          success: true,
-          action: "buy",
+      const data = await readResponse(
+        response
+      );
 
-          payment:
-            data.payment,
-        };
 
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Create payment error:",
-          error
-        );
-
+      if (!response.ok) {
 
         return {
           success: false,
+
           action: "buy",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to create marketplace payment.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * TEST PAYMENT SUCCESS
-     * =======================================================
-     *
-     * POST
-     * /api/marketplace/test/payments/:paymentId/confirm
-     *
-     * TEST/SANDBOX ONLY.
-     *
-     * The backend performs the actual confirmation and
-     * entitlement/ownership logic.
-     */
-
-    async confirmTestPayment(
-      paymentId: string
-    ): Promise<MarketplaceResult> {
-
-      if (!paymentId) {
-
-        return {
-          success: false,
-          action: "buy",
-          error:
-            "Payment ID is required.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to confirm test payment (${response.status}).`,
         };
 
       }
 
 
-      try {
+      return {
+        success: true,
 
-        const response =
-          await authFetch(
-            `/api/marketplace/test/payments/${paymentId}/confirm`,
-            {
-              method: "POST",
+        action: "buy",
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+        order: data?.order,
+
+        purchase: data?.purchase,
+
+        parcel: data?.parcel,
+
+        payment: data?.payment,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Confirm test payment error:",
+        error
+      );
 
 
-        const data =
-          await readResponse(
-            response
-          );
+      return {
+        success: false,
+
+        action: "buy",
+
+        error: error instanceof Error
+          ? error.message
+          : "Failed to confirm test payment.",
+      };
+
+    }
+
+  },
 
 
-        if (!response.ok) {
+  /**
+   * =======================================================
+   * TEST PAYMENT FAILURE
+   * =======================================================
+   *
+   * POST
+   * /api/marketplace/test/payments/:paymentId/fail
+   *
+   * TEST/SANDBOX ONLY.
+   */
+  async failTestPayment(
+    paymentId: string
+  ): Promise<MarketplaceResult> {
 
-          return {
-            success: false,
-            action: "buy",
+    if (!paymentId) {
 
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to confirm test payment (${response.status}).`,
-          };
+      return {
+        success: false,
 
+        action: "buy",
+
+        error: "Payment ID is required.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/test/payments/${paymentId}/fail`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
 
-        return {
-          success: true,
-          action: "buy",
+      const data = await readResponse(
+        response
+      );
 
-          order:
-            data?.order,
 
-          purchase:
-            data?.purchase,
-
-          parcel:
-            data?.parcel,
-
-          payment:
-            data?.payment,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Confirm test payment error:",
-          error
-        );
-
+      if (!response.ok) {
 
         return {
           success: false,
+
           action: "buy",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to confirm test payment.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * TEST PAYMENT FAILURE
-     * =======================================================
-     *
-     * POST
-     * /api/marketplace/test/payments/:paymentId/fail
-     */
-
-    async failTestPayment(
-      paymentId: string
-    ): Promise<MarketplaceResult> {
-
-      if (!paymentId) {
-
-        return {
-          success: false,
-          action: "buy",
-          error:
-            "Payment ID is required.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to fail test payment (${response.status}).`,
         };
 
       }
 
 
-      try {
+      return {
+        success: true,
 
-        const response =
-          await authFetch(
-            `/api/marketplace/test/payments/${paymentId}/fail`,
-            {
-              method: "POST",
+        action: "buy",
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+        order: data?.order,
+
+        purchase: data?.purchase,
+
+        parcel: data?.parcel,
+
+        payment: data?.payment,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Fail test payment error:",
+        error
+      );
 
 
-        const data =
-          await readResponse(
-            response
-          );
+      return {
+        success: false,
+
+        action: "buy",
+
+        error: error instanceof Error
+          ? error.message
+          : "Failed to fail test payment.",
+      };
+
+    }
+
+  },
 
 
-        if (!response.ok) {
+  /**
+   * =======================================================
+   * TEST PAYMENT CANCELLATION
+   * =======================================================
+   *
+   * POST
+   * /api/marketplace/test/payments/:paymentId/cancel
+   *
+   * TEST/SANDBOX ONLY.
+   */
+  async cancelTestPayment(
+    paymentId: string
+  ): Promise<MarketplaceResult> {
 
-          return {
-            success: false,
-            action: "buy",
+    if (!paymentId) {
 
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to fail test payment (${response.status}).`,
-          };
+      return {
+        success: false,
 
+        action: "buy",
+
+        error: "Payment ID is required.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/test/payments/${paymentId}/cancel`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
 
-        return {
-          success: true,
-          action: "buy",
+      const data = await readResponse(
+        response
+      );
 
-          order:
-            data?.order,
 
-          purchase:
-            data?.purchase,
-
-          parcel:
-            data?.parcel,
-
-          payment:
-            data?.payment,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Fail test payment error:",
-          error
-        );
-
+      if (!response.ok) {
 
         return {
           success: false,
+
           action: "buy",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to fail test payment.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * TEST PAYMENT CANCELLATION
-     * =======================================================
-     *
-     * POST
-     * /api/marketplace/test/payments/:paymentId/cancel
-     */
-
-    async cancelTestPayment(
-      paymentId: string
-    ): Promise<MarketplaceResult> {
-
-      if (!paymentId) {
-
-        return {
-          success: false,
-          action: "buy",
-          error:
-            "Payment ID is required.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to cancel test payment (${response.status}).`,
         };
 
       }
 
 
-      try {
+      return {
+        success: true,
 
-        const response =
-          await authFetch(
-            `/api/marketplace/test/payments/${paymentId}/cancel`,
-            {
-              method: "POST",
+        action: "buy",
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+        order: data?.order,
+
+        purchase: data?.purchase,
+
+        parcel: data?.parcel,
+
+        payment: data?.payment,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Cancel test payment error:",
+        error
+      );
 
 
-        const data =
-          await readResponse(
-            response
-          );
+      return {
+        success: false,
+
+        action: "buy",
+
+        error: error instanceof Error
+          ? error.message
+          : "Failed to cancel test payment.",
+      };
+
+    }
+
+  },
 
 
-        if (!response.ok) {
+  /**
+   * =======================================================
+   * RESERVE PARCEL
+   * =======================================================
+   *
+   * POST /api/marketplace/parcels/:id/reserve
+   */
+  async reserveParcel(
+    parcel: Parcel
+  ): Promise<MarketplaceResult> {
 
-          return {
-            success: false,
-            action: "buy",
+    if (!parcel?.id) {
 
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to cancel test payment (${response.status}).`,
-          };
+      return {
+        success: false,
 
+        action: "reserve",
+
+        error: "Parcel ID is required.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/parcels/${parcel.id}/reserve`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
 
-        return {
-          success: true,
-          action: "buy",
+      const data = await readResponse(
+        response
+      );
 
-          order:
-            data?.order,
 
-          purchase:
-            data?.purchase,
-
-          parcel:
-            data?.parcel,
-
-          payment:
-            data?.payment,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Cancel test payment error:",
-          error
-        );
-
+      if (!response.ok) {
 
         return {
           success: false,
-          action: "buy",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to cancel test payment.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * RESERVE PARCEL
-     * =======================================================
-     *
-     * POST /api/marketplace/parcels/:id/reserve
-     */
-
-    async reserveParcel(
-      parcel: Parcel
-    ): Promise<MarketplaceResult> {
-
-      if (!parcel?.id) {
-
-        return {
-          success: false,
-          action: "reserve",
-          error:
-            "Parcel ID is required.",
-        };
-
-      }
-
-
-      try {
-
-        const response =
-          await authFetch(
-            `/api/marketplace/parcels/${parcel.id}/reserve`,
-            {
-              method: "POST",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
-
-
-        const data =
-          await readResponse(
-            response
-          );
-
-
-        if (!response.ok) {
-
-          return {
-            success: false,
-            action: "reserve",
-
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to reserve parcel (${response.status}).`,
-          };
-
-        }
-
-
-        return {
-          success: true,
           action: "reserve",
 
-          parcel:
-            data?.parcel,
-
-          listing:
-            data?.listing,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Reserve error:",
-          error
-        );
-
-
-        return {
-          success: false,
-          action: "reserve",
-
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to reserve parcel.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * RELEASE PARCEL RESERVATION
-     * =======================================================
-     *
-     * POST /api/marketplace/parcels/:id/release
-     */
-
-    async releaseParcel(
-      parcel: Parcel
-    ): Promise<MarketplaceResult> {
-
-      if (!parcel?.id) {
-
-        return {
-          success: false,
-          action: "release",
-          error:
-            "Parcel ID is required.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to reserve parcel (${response.status}).`,
         };
 
       }
 
 
-      try {
+      return {
+        success: true,
 
-        const response =
-          await authFetch(
-            `/api/marketplace/parcels/${parcel.id}/release`,
-            {
-              method: "POST",
+        action: "reserve",
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+        parcel: data?.parcel,
 
+        listing: data?.listing,
+      };
 
-        const data =
-          await readResponse(
-            response
-          );
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Reserve error:",
+        error
+      );
 
 
-        if (!response.ok) {
+      return {
+        success: false,
 
-          return {
-            success: false,
-            action: "release",
+        action: "reserve",
 
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to release reservation (${response.status}).`,
-          };
+        error: error instanceof Error
+          ? error.message
+          : "Failed to reserve parcel.",
+      };
 
+    }
+
+  },
+
+
+  /**
+   * =======================================================
+   * RELEASE PARCEL RESERVATION
+   * =======================================================
+   *
+   * POST /api/marketplace/parcels/:id/release
+   */
+  async releaseParcel(
+    parcel: Parcel
+  ): Promise<MarketplaceResult> {
+
+    if (!parcel?.id) {
+
+      return {
+        success: false,
+
+        action: "release",
+
+        error: "Parcel ID is required.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/parcels/${parcel.id}/release`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
         }
+      );
 
+
+      const data = await readResponse(
+        response
+      );
+
+
+      if (!response.ok) {
 
         return {
-          success: true,
+          success: false,
+
           action: "release",
 
-          parcel:
-            data?.parcel,
-
-          listing:
-            data?.listing,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] Release error:",
-          error
-        );
-
-
-        return {
-          success: false,
-          action: "release",
-
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to release reservation.",
-        };
-
-      }
-
-    },
-
-
-    /**
-     * =======================================================
-     * LIST PARCEL
-     * =======================================================
-     *
-     * POST /api/marketplace/parcels/:id/list
-     */
-
-    async listParcel(
-      parcel: Parcel,
-      price: string
-    ): Promise<MarketplaceResult> {
-
-      if (!parcel?.id) {
-
-        return {
-          success: false,
-          action: "list",
-          error:
-            "Parcel ID is required.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to release reservation (${response.status}).`,
         };
 
       }
 
 
-      const normalizedPrice =
-        price.trim();
+      return {
+        success: true,
+
+        action: "release",
+
+        parcel: data?.parcel,
+
+        listing: data?.listing,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] Release error:",
+        error
+      );
 
 
-      if (
-        !/^\d+(\.\d{1,2})?$/.test(
-          normalizedPrice
-        ) ||
-        Number(normalizedPrice) <= 0
-      ) {
+      return {
+        success: false,
 
-        return {
-          success: false,
-          action: "list",
+        action: "release",
 
-          error:
-            "Listing price must be a positive amount with at most two decimal places.",
-        };
+        error: error instanceof Error
+          ? error.message
+          : "Failed to release reservation.",
+      };
 
-      }
+    }
+
+  },
 
 
-      try {
+  /**
+   * =======================================================
+   * LIST PARCEL
+   * =======================================================
+   *
+   * POST /api/marketplace/parcels/:id/list
+   */
+  async listParcel(
+    parcel: Parcel,
+    price: string
+  ): Promise<MarketplaceResult> {
 
-        const response =
-          await authFetch(
-            `/api/marketplace/parcels/${parcel.id}/list`,
-            {
-              method: "POST",
+    if (!parcel?.id) {
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
+      return {
+        success: false,
 
-              body:
-                JSON.stringify({
-                  price:
-                    normalizedPrice,
-                }),
-            }
-          );
+        action: "list",
 
+        error: "Parcel ID is required.",
+      };
 
-        const data =
-          await readResponse(
-            response
-          );
+    }
 
 
-        if (!response.ok) {
+    const normalizedPrice = price.trim();
 
-          return {
-            success: false,
-            action: "list",
 
-            error:
-              data?.message ||
-              data?.error ||
-              `Failed to list parcel (${response.status}).`,
-          };
+    if (!/^\d+(\.\d{1,2})?$/.test(
+      normalizedPrice
+    ) ||
+      Number(normalizedPrice) <= 0) {
 
+      return {
+        success: false,
+
+        action: "list",
+
+        error: "Listing price must be a positive amount with at most two decimal places.",
+      };
+
+    }
+
+
+    try {
+
+      const response = await authFetch(
+        `/api/marketplace/parcels/${parcel.id}/list`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({
+            price: normalizedPrice,
+          }),
         }
+      );
 
 
-        return {
-          success: true,
-          action: "list",
+      const data = await readResponse(
+        response
+      );
 
-          parcel:
-            data?.parcel,
 
-          listing:
-            data?.listing,
-        };
-
-      } catch (error) {
-
-        console.error(
-          "[Marketplace] List error:",
-          error
-        );
-
+      if (!response.ok) {
 
         return {
           success: false,
+
           action: "list",
 
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to list parcel.",
+          error: data?.message ||
+            data?.error ||
+            `Failed to list parcel (${response.status}).`,
         };
 
       }
 
-    },
 
-  };
+      return {
+        success: true,
+
+        action: "list",
+
+        parcel: data?.parcel,
+
+        listing: data?.listing,
+      };
+
+    } catch (error) {
+
+      console.error(
+        "[Marketplace] List error:",
+        error
+      );
+
+
+      return {
+        success: false,
+
+        action: "list",
+
+        error: error instanceof Error
+          ? error.message
+          : "Failed to list parcel.",
+      };
+
+    }
+
+  },
+  
+};
 
 }
