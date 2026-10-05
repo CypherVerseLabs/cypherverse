@@ -553,8 +553,9 @@ export async function processMarketplacePaymentEvent(
     assertTestPaymentAllowed();
   }
 
-  return prisma.$transaction(
-    async (tx) => {
+  return runMarketplaceTransaction(
+  async (tx) => {
+
       /**
        * ---------------------------------------------------
        * DUPLICATE EVENT CHECK
@@ -1076,17 +1077,13 @@ export async function processMarketplacePaymentEvent(
       }
 
       throw new MarketplaceError(
-        "UNSUPPORTED_PAYMENT_STATUS",
-        "Unsupported payment status."
-      );
-    },
-
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+  "UNSUPPORTED_PAYMENT_STATUS",
+  "Unsupported payment status."
+);
     }
   );
 }
+
 
 /**
  * =========================================================
