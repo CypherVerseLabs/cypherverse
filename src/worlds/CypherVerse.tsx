@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -10,6 +11,11 @@ import {
   LostWorld,
   Fog,
 } from "cyengine";
+
+import {
+  useFrame,
+  useThree,
+} from "@react-three/fiber";
 
 import CloudySky from "ideas/CloudySky";
 import Ground from "ideas/Ground";
@@ -44,20 +50,7 @@ import {
 } from "../marketplace";
 
 import LandmarkLayer from "./LandmarkLayer";
-
-
-/**
- * =========================================================
- * TYPES
- * =========================================================
- */
-
-interface WorldBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
+import WorldInfrastructure from "parcels/WorldInfrastructure";
 
 
 /**
@@ -66,12 +59,147 @@ interface WorldBounds {
  * =========================================================
  */
 
-const WORLD_BOUNDS: WorldBounds = {
-  minX: 0,
-  maxX: 2384,
-  minY: 0,
-  maxY: 2384,
-};
+const CHUNK_SIZE = 512;
+
+
+/**
+ * =========================================================
+ * CHUNK STREAMER
+ * =========================================================
+ *
+ * This component must live inside StandardReality because
+ * useThree/useFrame require the React Three Fiber context.
+ *
+ * It watches the player camera and asks useParcels() to load
+ * the chunk containing the player.
+ *
+ * =========================================================
+ */
+
+interface ParcelChunkStreamerProps {
+  loadChunk: (
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number
+  ) => void | Promise<void>;
+}
+
+
+function ParcelChunkStreamer({
+  loadChunk,
+}: ParcelChunkStreamerProps) {
+
+  const camera =
+    useThree(
+      (state) =>
+        state.camera
+    );
+
+
+  const lastChunkRef =
+    useRef<string | null>(
+      null
+    );
+
+
+  const lastLoadRef =
+    useRef(0);
+
+
+  useFrame(() => {
+
+    const now =
+      performance.now();
+
+
+    /**
+     * Avoid repeatedly checking/loading chunks every frame.
+     */
+
+    if (
+      now -
+        lastLoadRef.current <
+      150
+    ) {
+      return;
+    }
+
+
+    lastLoadRef.current =
+      now;
+
+
+    const worldX =
+      camera.position.x;
+
+
+    const worldZ =
+      camera.position.z;
+
+
+    const chunkX =
+      Math.floor(
+        worldX /
+        CHUNK_SIZE
+      );
+
+
+    const chunkY =
+      Math.floor(
+        worldZ /
+        CHUNK_SIZE
+      );
+
+
+    const minX =
+      chunkX *
+      CHUNK_SIZE;
+
+
+    const maxX =
+      minX +
+      CHUNK_SIZE;
+
+
+    const minY =
+      chunkY *
+      CHUNK_SIZE;
+
+
+    const maxY =
+      minY +
+      CHUNK_SIZE;
+
+
+    const chunkKey =
+      `${chunkX}:${chunkY}`;
+
+
+    if (
+      lastChunkRef.current ===
+      chunkKey
+    ) {
+      return;
+    }
+
+
+    lastChunkRef.current =
+      chunkKey;
+
+
+    void loadChunk(
+      minX,
+      maxX,
+      minY,
+      maxY
+    );
+
+  });
+
+
+  return null;
+}
 
 
 /**
@@ -84,42 +212,33 @@ export default function CypherVerse() {
 
   /**
    * =======================================================
-   * WORLD BOUNDS
-   * =======================================================
-   */
-
-  const worldBounds =
-    useMemo<WorldBounds>(
-      () => WORLD_BOUNDS,
-      []
-    );
-
-
-  /**
-   * =======================================================
    * PARCEL DATA
    * =======================================================
    */
 
   const {
-    parcels: fetchedParcels,
-    loading,
-    error,
-    refresh,
-  } = useParcels({
+  parcels: fetchedParcels,
+  loading,
+  error,
+  refresh,
+  loadChunk,
+} = useParcels({
+
+
     enabled: true,
 
-    minX:
-      worldBounds.minX,
+    /**
+     * Initial world chunk.
+     *
+     * The chunk streamer will load additional chunks when
+     * the player moves into them.
+     */
 
-    maxX:
-      worldBounds.maxX,
+    minX: 0,
+    maxX: CHUNK_SIZE,
+    minY: 0,
+    maxY: CHUNK_SIZE,
 
-    minY:
-      worldBounds.minY,
-
-    maxY:
-      worldBounds.maxY,
   });
 
 
@@ -134,12 +253,6 @@ export default function CypherVerse() {
     setParcels,
   ] = useState<Parcel[]>([]);
 
-
-  /**
-   * =======================================================
-   * SYNC SERVER PARCELS
-   * =======================================================
-   */
 
   useEffect(() => {
 
@@ -182,7 +295,8 @@ export default function CypherVerse() {
 
 
   const selectedParcelProject =
-    selectedParcel?.project ?? null;
+    selectedParcel?.project ??
+    null;
 
 
   /**
@@ -202,6 +316,7 @@ export default function CypherVerse() {
   useEffect(() => {
 
     let cancelled = false;
+
 
     setLoadedParcelProject(
       null
@@ -227,29 +342,33 @@ export default function CypherVerse() {
     void fetchPublicProject(
       slug
     )
-      .then((project) => {
+      .then(
+        (project) => {
 
-        if (!cancelled) {
+          if (!cancelled) {
 
-          setLoadedParcelProject(
-            project
-          );
+            setLoadedParcelProject(
+              project
+            );
 
-        }
-
-      })
-      .catch((error) => {
-
-        if (!cancelled) {
-
-          console.error(
-            "Failed to load parcel project scene:",
-            error
-          );
+          }
 
         }
+      )
+      .catch(
+        (projectError) => {
 
-      });
+          if (!cancelled) {
+
+            console.error(
+              "Failed to load parcel project scene:",
+              projectError
+            );
+
+          }
+
+        }
+      );
 
 
     return () => {
@@ -267,21 +386,6 @@ export default function CypherVerse() {
    * =======================================================
    * MARKETPLACE
    * =======================================================
-   *
-   * The hook owns the complete purchase operation:
-   *
-   *   buyParcel(parcel)
-   *       ↓
-   *   createOrder()
-   *       ↓
-   *   createPayment()
-   *       ↓
-   *   confirmTestPayment()
-   *
-   * CypherVerse only consumes the higher-level operation.
-   *
-   * marketplace.ts remains responsible for individual
-   * API calls.
    */
 
   const {
@@ -290,7 +394,6 @@ export default function CypherVerse() {
     actionError,
 
     buyParcel,
-
     reserveParcel,
     listParcel,
 
@@ -315,6 +418,7 @@ export default function CypherVerse() {
           parcel.id
         );
 
+
         clearAction();
 
       },
@@ -328,13 +432,6 @@ export default function CypherVerse() {
    * =======================================================
    * BUY PARCEL
    * =======================================================
-   *
-   * IMPORTANT:
-   *
-   * Do NOT create the order/payment here.
-   *
-   * useMarketplace().buyParcel() is the higher-level
-   * marketplace operation.
    */
 
   const handleBuyParcel =
@@ -344,16 +441,12 @@ export default function CypherVerse() {
       ) => {
 
         if (actionParcelId) {
-
           return;
-
         }
 
 
         if (!parcel?.id) {
-
           return;
-
         }
 
 
@@ -364,23 +457,12 @@ export default function CypherVerse() {
 
 
         if (!result.success) {
-
           return;
-
         }
 
 
-        /**
-         * Reload authoritative parcel state after the
-         * backend completes the purchase.
-         */
-
         await refresh();
 
-
-        /**
-         * Keep the purchased parcel selected.
-         */
 
         setSelectedParcelId(
           parcel.id
@@ -408,9 +490,7 @@ export default function CypherVerse() {
       ) => {
 
         if (actionParcelId) {
-
           return;
-
         }
 
 
@@ -421,16 +501,9 @@ export default function CypherVerse() {
 
 
         if (!result.success) {
-
           return;
-
         }
 
-
-        /**
-         * Update the selected parcel from the backend
-         * response when available.
-         */
 
         if (result.parcel) {
 
@@ -452,10 +525,6 @@ export default function CypherVerse() {
 
         }
 
-
-        /**
-         * Reload authoritative bounded state.
-         */
 
         await refresh();
 
@@ -481,9 +550,7 @@ export default function CypherVerse() {
       ) => {
 
         if (actionParcelId) {
-
           return;
-
         }
 
 
@@ -495,9 +562,7 @@ export default function CypherVerse() {
           rawPrice === null ||
           rawPrice === undefined
         ) {
-
           return;
-
         }
 
 
@@ -506,11 +571,6 @@ export default function CypherVerse() {
             rawPrice
           ).trim();
 
-
-        /**
-         * Client-side validation prevents obviously invalid
-         * requests. The backend remains authoritative.
-         */
 
         if (
           !/^\d+(\.\d{1,2})?$/.test(
@@ -532,16 +592,9 @@ export default function CypherVerse() {
 
 
         if (!result.success) {
-
           return;
-
         }
 
-
-        /**
-         * Update visible state immediately when the backend
-         * returns the updated parcel.
-         */
 
         if (result.parcel) {
 
@@ -563,10 +616,6 @@ export default function CypherVerse() {
 
         }
 
-
-        /**
-         * Reload authoritative bounded state.
-         */
 
         await refresh();
 
@@ -595,16 +644,14 @@ export default function CypherVerse() {
 
   /**
    * =======================================================
-   * PARCEL API ERROR
+   * ERROR
    * =======================================================
    */
 
   useEffect(() => {
 
     if (!error) {
-
       return;
-
     }
 
 
@@ -627,9 +674,7 @@ export default function CypherVerse() {
   useEffect(() => {
 
     if (!selectedParcelId) {
-
       return;
-
     }
 
 
@@ -647,6 +692,7 @@ export default function CypherVerse() {
         null
       );
 
+
       clearAction();
 
     }
@@ -658,6 +704,7 @@ export default function CypherVerse() {
   ]);
 
 
+  
   /**
    * =======================================================
    * WORLD
@@ -685,18 +732,34 @@ export default function CypherVerse() {
     >
 
       {/* ===================================================
-          PUBLISHED PROJECT ON SELECTED PARCEL
+          CAMERA CHUNK STREAMER
+          =================================================== */}
+
+      <ParcelChunkStreamer
+        loadChunk={
+          loadChunk
+        }
+      />
+
+
+      {/* ===================================================
+          PUBLISHED PROJECT
           =================================================== */}
 
       {loadedParcelProject?.scene && (
+
         <EditorProvider
           initialScene={
             loadedParcelProject.scene
           }
+
           editorActive={false}
         >
+
           <Scene />
+
         </EditorProvider>
+
       )}
 
 
@@ -750,17 +813,113 @@ export default function CypherVerse() {
           PHYSICAL PARCEL WORLD
           =================================================== */}
 
-      <group position-y={-0.0}>
+      <group
+        position-y={0}
+      >
+
+        <group position-y={0}>
+
+  <WorldInfrastructure
+    parcels={parcels}
+    tileSize={16}
+    origin={[
+      0,
+      0,
+      0,
+    ]}
+  />
+
+  <ParcelLayer
+    parcels={parcels}
+    tileSize={16}
+    origin={[
+      0,
+      0,
+      0,
+    ]}
+    interactive={true}
+
+    selectedParcelId={
+      selectedParcelId
+    }
+
+    onParcelSelect={({
+      parcel,
+    }) => {
+
+      handleParcelSelect(
+        parcel
+      );
+
+    }}
+
+    onParcelClose={() => {
+
+      setSelectedParcelId(
+        null
+      );
+
+    }}
+
+    onBuy={
+      handleBuyParcel
+    }
+
+    onReserve={
+      handleReserveParcel
+    }
+
+    onList={
+      handleListParcel
+    }
+
+    actionParcelId={
+      actionParcelId
+    }
+
+    actionType={
+      parcelActionType
+    }
+
+    actionError={
+      actionError
+    }
+
+    
+  />
+
+  <LandmarkLayer
+    parcels={parcels}
+    tileSize={16}
+    origin={[
+      0,
+      0,
+      0,
+    ]}
+  />
+
+</group>
+
 
         <ParcelLayer
-          parcels={parcels}
-          tileSize={16}
+
+          parcels={
+            parcels
+          }
+
+          tileSize={
+            16
+          }
+
           origin={[
             0,
             0,
             0,
           ]}
-          interactive={true}
+
+          interactive={
+            true
+          }
 
           selectedParcelId={
             selectedParcelId
@@ -807,75 +966,26 @@ export default function CypherVerse() {
           actionError={
             actionError
           }
-        />
 
-
-        <ParcelLayer
-          parcels={parcels}
-          tileSize={16}
-          origin={[
-            0,
-            0,
-            0,
-          ]}
-          interactive={true}
-
-          selectedParcelId={
-            selectedParcelId
-          }
-
-          onParcelSelect={({
-            parcel,
-          }) => {
-
-            handleParcelSelect(
-              parcel
-            );
-
-          }}
-
-          onParcelClose={() => {
-
-            setSelectedParcelId(
-              null
-            );
-
-          }}
-
-          onBuy={
-            handleBuyParcel
-          }
-
-          onReserve={
-            handleReserveParcel
-          }
-
-          onList={
-            handleListParcel
-          }
-
-          actionParcelId={
-            actionParcelId
-          }
-
-          actionType={
-            parcelActionType
-          }
-
-          actionError={
-            actionError
-          }
         />
 
 
         <LandmarkLayer
-          parcels={parcels}
-          tileSize={16}
+
+          parcels={
+            parcels
+          }
+
+          tileSize={
+            16
+          }
+
           origin={[
             0,
             0,
             0,
           ]}
+
         />
 
       </group>

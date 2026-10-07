@@ -161,43 +161,40 @@ export async function getParcels(options?: {
 }) {
   const where: Prisma.ParcelWhereInput = {};
 
-  if (options?.status !== undefined) {
-    where.status = options.status;
+if (options?.status !== undefined) {
+  where.status = options.status;
+}
+
+if (
+  options?.minX !== undefined ||
+  options?.maxX !== undefined
+) {
+  where.x = {};
+
+  if (options.minX !== undefined) {
+    where.x.gte = options.minX;
   }
 
-  if (
-    options?.minX !== undefined ||
-    options?.maxX !== undefined
-  ) {
-    where.x = {};
+  if (options.maxX !== undefined) {
+    where.x.lte = options.maxX;
+  }
+}
 
-    if (options.minX !== undefined) {
-      where.x.gte = options.minX;
-    }
+if (
+  options?.minY !== undefined ||
+  options?.maxY !== undefined
+) {
+  where.y = {};
 
-    if (options.maxX !== undefined) {
-      where.x.lte = options.maxX;
-    }
+  if (options.minY !== undefined) {
+    where.y.gte = options.minY;
   }
 
-  if (
-    options?.minY !== undefined ||
-    options?.maxY !== undefined
-  ) {
-    where.y = {};
-
-    if (options.minY !== undefined) {
-      where.y = {};
-
-      if (options.minY !== undefined) {
-        where.y.gte = options.minY;
-      }
-
-      if (options.maxY !== undefined) {
-        where.y.lte = options.maxY;
-      }
-    }
+  if (options.maxY !== undefined) {
+    where.y.lte = options.maxY;
   }
+}
+
 
   return prisma.parcel.findMany({
     where,

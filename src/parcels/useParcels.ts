@@ -9,33 +9,24 @@ import type {
   Parcel,
 } from "./types";
 
+
 /**
  * =========================================================
- * USE PARCELS
+ * CONSTANTS
  * =========================================================
- *
- * Loads parcel data from:
- *
- *     GET /api/parcels
- *
- * Supports optional coordinate bounds so large worlds
- * do not need to load every parcel at once.
- *
- * Example:
- *
- *     useParcels({
- *       minX: -50,
- *       maxX: 50,
- *       minY: -50,
- *       maxY: 50,
- *     });
- *
- * This will be important for CypherVerse, where the
- * world may eventually contain a very large number of
- * parcels.
+ */
+
+const DEFAULT_CHUNK_SIZE = 512;
+
+
+/**
+ * =========================================================
+ * TYPES
+ * =========================================================
  */
 
 export interface UseParcelsOptions {
+
   enabled?: boolean;
 
   minX?: number;
@@ -43,9 +34,13 @@ export interface UseParcelsOptions {
 
   minY?: number;
   maxY?: number;
+
+  chunkSize?: number;
 }
 
+
 export interface UseParcelsResult {
+
   parcels: Parcel[];
 
   loading: boolean;
@@ -53,189 +48,579 @@ export interface UseParcelsResult {
   error: string | null;
 
   refresh: () => Promise<void>;
+
+  loadChunk: (
+    minX: number,
+    maxX: number,
+    minY: number,
+    maxY: number
+  ) => Promise<void>;
 }
+
+
+/**
+ * =========================================================
+ * USE PARCELS
+ * =========================================================
+ */
 
 export function useParcels(
   options: UseParcelsOptions = {}
 ): UseParcelsResult {
+
   const {
     enabled = true,
+
     minX,
     maxX,
+
     minY,
     maxY,
+
+    chunkSize =
+      DEFAULT_CHUNK_SIZE,
+
   } = options;
 
-  const [parcels, setParcels] =
-    useState<Parcel[]>([]);
 
-  const [loading, setLoading] =
-    useState(false);
+  const [
+    parcels,
+    setParcels,
+  ] = useState<Parcel[]>([]);
 
-  const [error, setError] =
-    useState<string | null>(null);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(null);
+
 
   /**
-   * Track the current request so an older request
-   * cannot overwrite a newer one.
+   * =======================================================
+   * LOADED CHUNKS
+   * =======================================================
    */
-  const abortControllerRef =
-    useRef<AbortController | null>(
-      null
+
+  const loadedChunksRef =
+    useRef<Set<string>>(
+      new Set()
     );
 
-  const refresh =
-    useCallback(async () => {
-      if (!enabled) {
-        return;
-      }
 
-      /**
-       * Cancel any previous request.
-       */
-      abortControllerRef.current?.abort();
+  /**
+   * =======================================================
+   * LOADING CHUNKS
+   * =======================================================
+   */
 
-      const controller =
-        new AbortController();
+  const loadingChunksRef =
+    useRef<Set<string>>(
+      new Set()
+    );
 
-      abortControllerRef.current =
-        controller;
 
-      try {
+  /**
+   * =======================================================
+   * ABORT CONTROLLERS
+   * =======================================================
+   */
+
+  const controllersRef =
+    useRef<
+      Map<
+        string,
+        AbortController
+      >
+    >(
+      new Map()
+    );
+
+
+  /**
+   * =======================================================
+   * LOAD CHUNK
+   * =======================================================
+   */
+
+  const loadChunk =
+    useCallback(
+      async (
+        chunkMinX: number,
+        chunkMaxX: number,
+        chunkMinY: number,
+        chunkMaxY: number
+      ) => {
+
+        if (!enabled) {
+          return;
+        }
+
+
+        /**
+         * Normalize the chunk bounds.
+         */
+
+        const normalizedMinX =
+          Math.min(
+            chunkMinX,
+            chunkMaxX
+          );
+
+
+        const normalizedMaxX =
+          Math.max(
+            chunkMinX,
+            chunkMaxX
+          );
+
+
+        const normalizedMinY =
+          Math.min(
+            chunkMinY,
+            chunkMaxY
+          );
+
+
+        const normalizedMaxY =
+          Math.max(
+            chunkMinY,
+            chunkMaxY
+          );
+
+
+        const chunkKey =
+          [
+            normalizedMinX,
+            normalizedMaxX,
+            normalizedMinY,
+            normalizedMaxY,
+          ].join(":");
+
+
+        /**
+         * Already loaded.
+         */
+
+        if (
+          loadedChunksRef.current.has(
+            chunkKey
+          )
+        ) {
+
+          return;
+
+        }
+
+
+        /**
+         * Already loading.
+         */
+
+        if (
+          loadingChunksRef.current.has(
+            chunkKey
+          )
+        ) {
+
+          return;
+
+        }
+
+
+        loadingChunksRef.current.add(
+          chunkKey
+        );
+
+
+        const controller =
+          new AbortController();
+
+
+        controllersRef.current.set(
+          chunkKey,
+          controller
+        );
+
+
         setLoading(true);
         setError(null);
 
-        const params =
-          new URLSearchParams();
 
-        if (minX !== undefined) {
+        try {
+
+          const params =
+            new URLSearchParams();
+
+
           params.set(
             "minX",
-            String(minX)
+            String(
+              normalizedMinX
+            )
           );
-        }
 
-        if (maxX !== undefined) {
+
           params.set(
             "maxX",
-            String(maxX)
+            String(
+              normalizedMaxX
+            )
           );
-        }
 
-        if (minY !== undefined) {
+
           params.set(
             "minY",
-            String(minY)
+            String(
+              normalizedMinY
+            )
           );
-        }
 
-        if (maxY !== undefined) {
+
           params.set(
             "maxY",
-            String(maxY)
+            String(
+              normalizedMaxY
+            )
           );
-        }
 
-        const query =
-          params.toString();
 
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL ||
-         "http://localhost:5000";
+          const apiUrl =
+            process.env
+              .NEXT_PUBLIC_API_URL ||
+            "http://localhost:5000";
 
-        const response =
-          await fetch(
-            `${apiUrl}/api/parcels${
-              query
-                ? `?${query}`
-                : ""
-            }`,
-            {
-              credentials:
-                "include",
 
-              signal:
-                controller.signal,
+          const response =
+            await fetch(
+              `${apiUrl}/api/parcels?${params.toString()}`,
+              {
+                credentials:
+                  "include",
+
+                signal:
+                  controller.signal,
+              }
+            );
+
+
+          if (!response.ok) {
+
+            throw new Error(
+              `Failed to load parcels (${response.status})`
+            );
+
+          }
+
+
+          const data =
+            await response.json();
+
+
+          /**
+           * =================================================
+           * API RESPONSE
+           * =================================================
+           *
+           * Expected:
+           *
+           * {
+           *   parcels: [...]
+           * }
+           */
+
+          if (
+            !data ||
+            !Array.isArray(
+              data.parcels
+            )
+          ) {
+
+            throw new Error(
+              "Invalid parcel response"
+            );
+
+          }
+
+
+          const incomingParcels =
+            data.parcels as Parcel[];
+
+
+          /**
+           * =================================================
+           * MERGE
+           * =================================================
+           *
+           * Never replace the complete world.
+           *
+           * The newly loaded chunk is merged into the
+           * existing parcel collection.
+           *
+           * Same ID = authoritative newer parcel.
+           */
+
+          setParcels(
+            currentParcels => {
+
+              const byId =
+                new Map<
+                  string,
+                  Parcel
+                >();
+
+
+              for (
+                const parcel
+                of currentParcels
+              ) {
+
+                byId.set(
+                  parcel.id,
+                  parcel
+                );
+
+              }
+
+
+              for (
+                const parcel
+                of incomingParcels
+              ) {
+
+                byId.set(
+                  parcel.id,
+                  parcel
+                );
+
+              }
+
+
+              return Array.from(
+                byId.values()
+              );
+
             }
           );
 
 
-        if (!response.ok) {
-          throw new Error(
-            `Failed to load parcels (${response.status})`
+          /**
+           * Mark chunk as successfully loaded only
+           * after the request succeeded.
+           */
+
+          loadedChunksRef.current.add(
+            chunkKey
           );
+
+        } catch (requestError) {
+
+          if (
+            requestError instanceof
+              DOMException &&
+            requestError.name ===
+              "AbortError"
+          ) {
+
+            return;
+
+          }
+
+
+          console.error(
+            "Load parcel chunk error:",
+            requestError
+          );
+
+
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Failed to load parcels"
+          );
+
+        } finally {
+
+          loadingChunksRef.current.delete(
+            chunkKey
+          );
+
+
+          controllersRef.current.delete(
+            chunkKey
+          );
+
+
+          setLoading(
+            loadingChunksRef.current.size >
+              0
+          );
+
         }
 
-        const data =
-          await response.json();
+      },
+      [
+        enabled,
+      ]
+    );
 
-        if (
-          !data ||
-          !Array.isArray(
-            data.parcels
-          )
-        ) {
-          throw new Error(
-            "Invalid parcel response"
-          );
-        }
 
-        setParcels(
-          data.parcels
-        );
-      } catch (error) {
-        /**
-         * Abort errors are expected when a newer
-         * request replaces the current request.
-         */
-        if (
-          error instanceof DOMException &&
-          error.name === "AbortError"
-        ) {
+  /**
+   * =======================================================
+   * REFRESH
+   * =======================================================
+   *
+   * Completely resets the streamed world.
+   *
+   * Use this when:
+   *
+   * - the world needs a full reload
+   * - the user changes world
+   * - the initial bounds change
+   *
+   * Do NOT use this merely because a marketplace action
+   * completed.
+   */
+
+  const refresh =
+    useCallback(
+      async () => {
+
+        if (!enabled) {
           return;
         }
 
-        console.error(
-          "Load parcels error:",
-          error
+
+        /**
+         * Cancel active requests.
+         */
+
+        for (
+          const controller
+          of controllersRef
+            .current
+            .values()
+        ) {
+
+          controller.abort();
+
+        }
+
+
+        controllersRef.current.clear();
+
+        loadingChunksRef.current.clear();
+
+
+        /**
+         * Reset streamed state.
+         */
+
+        loadedChunksRef.current.clear();
+
+        setParcels([]);
+
+        setError(null);
+
+
+        const startMinX =
+          minX ??
+          0;
+
+
+        const startMaxX =
+          maxX ??
+          (
+            startMinX +
+            chunkSize
+          );
+
+
+        const startMinY =
+          minY ??
+          0;
+
+
+        const startMaxY =
+          maxY ??
+          (
+            startMinY +
+            chunkSize
+          );
+
+
+        await loadChunk(
+          startMinX,
+          startMaxX,
+          startMinY,
+          startMaxY
         );
 
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load parcels"
-        );
-      } finally {
-        /**
-         * Only the current request should change
-         * the loading state.
-         */
-        if (
-          !controller.signal.aborted
-        ) {
-          setLoading(false);
-        }
-      }
-    }, [
-      enabled,
-      minX,
-      maxX,
-      minY,
-      maxY,
-    ]);
+      },
+      [
+        enabled,
+        minX,
+        maxX,
+        minY,
+        maxY,
+        chunkSize,
+        loadChunk,
+      ]
+    );
+
+
+  /**
+   * =======================================================
+   * INITIAL LOAD
+   * =======================================================
+   */
 
   useEffect(() => {
+
     void refresh();
 
+
     return () => {
-      abortControllerRef.current?.abort();
+
+      for (
+        const controller
+        of controllersRef
+          .current
+          .values()
+      ) {
+
+        controller.abort();
+
+      }
+
+
+      controllersRef.current.clear();
+
+      loadingChunksRef.current.clear();
+
     };
-  }, [refresh]);
+
+  }, [
+    refresh,
+  ]);
+
+
+  /**
+   * =======================================================
+   * RETURN
+   * =======================================================
+   */
 
   return {
     parcels,
     loading,
     error,
     refresh,
+    loadChunk,
   };
 }

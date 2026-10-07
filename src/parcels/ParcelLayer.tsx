@@ -23,9 +23,53 @@ import {
 import ParcelTile from "./ParcelTile";
 import ParcelPanel from "./ParcelPanel";
 
+
+/**
+ * =========================================================
+ * CONFIGURATION
+ * =========================================================
+ */
+
 const DEFAULT_RENDER_DISTANCE = 256;
 
 const CAMERA_UPDATE_INTERVAL = 150;
+
+const LOAD_CHUNK_SIZE = 512;
+
+/**
+ * Start loading the next chunk before the player actually
+ * reaches the edge.
+ */
+const LOAD_MARGIN = 256;
+
+
+/**
+ * =========================================================
+ * OPTIONAL DYNAMIC LOADER
+ * =========================================================
+ *
+ * ParcelLayer can receive a callback from CypherVerse.
+ */
+
+interface ExtendedParcelLayerProps
+  extends ParcelLayerProps {
+
+  onRequestBounds?: (
+    bounds: {
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+    }
+  ) => void;
+}
+
+
+/**
+ * =========================================================
+ * COMPONENT
+ * =========================================================
+ */
 
 export default function ParcelLayer({
   parcels = [],
@@ -42,13 +86,15 @@ export default function ParcelLayer({
   actionParcelId,
   actionType,
   actionError,
-}: ParcelLayerProps) {
+  onRequestBounds,
+}: ExtendedParcelLayerProps) {
 
   const camera =
     useThree(
       (state) =>
         state.camera
     );
+
 
   const [
     internalSelectedId,
@@ -57,10 +103,12 @@ export default function ParcelLayer({
     null
   );
 
+
   const activeSelectedId =
     selectedParcelId !== undefined
       ? selectedParcelId
       : internalSelectedId;
+
 
   const selectedParcel =
     useMemo(() => {
@@ -68,6 +116,7 @@ export default function ParcelLayer({
       if (!activeSelectedId) {
         return null;
       }
+
 
       return (
         parcels.find(
@@ -82,13 +131,107 @@ export default function ParcelLayer({
       activeSelectedId,
     ]);
 
+
   const [
     nearbyParcels,
     setNearbyParcels,
   ] = useState<Parcel[]>([]);
 
+
   const lastCameraUpdate =
     useRef(0);
+
+
+  /**
+   * Prevent repeatedly requesting the same chunk.
+   */
+  const requestedChunksRef =
+    useRef<
+      Set<string>
+    >(
+      new Set()
+    );
+
+
+  /**
+   * =======================================================
+   * REQUEST WORLD CHUNK
+   * =======================================================
+   */
+
+  const requestChunk =
+    useCallback(
+      (
+        chunkX: number,
+        chunkY: number
+      ) => {
+
+        if (!onRequestBounds) {
+          return;
+        }
+
+
+        const minX =
+          Math.floor(
+            chunkX /
+              LOAD_CHUNK_SIZE
+          ) *
+          LOAD_CHUNK_SIZE;
+
+
+        const minY =
+          Math.floor(
+            chunkY /
+              LOAD_CHUNK_SIZE
+          ) *
+          LOAD_CHUNK_SIZE;
+
+
+        const maxX =
+          minX +
+          LOAD_CHUNK_SIZE;
+
+
+        const maxY =
+          minY +
+          LOAD_CHUNK_SIZE;
+
+
+        const key =
+          [
+            minX,
+            maxX,
+            minY,
+            maxY,
+          ].join(":");
+
+
+        if (
+          requestedChunksRef.current.has(
+            key
+          )
+        ) {
+          return;
+        }
+
+
+        requestedChunksRef.current.add(
+          key
+        );
+
+
+        onRequestBounds({
+          minX,
+          maxX,
+          minY,
+          maxY,
+        });
+
+      },
+      [
+        onRequestBounds,
+      ]
+    );
 
 
   /**
@@ -103,62 +246,89 @@ export default function ParcelLayer({
       if (
         parcels.length === 0
       ) {
+
         setNearbyParcels([]);
+
         return;
+
       }
+
 
       const cameraX =
         camera.position.x;
 
+
       const cameraZ =
         camera.position.z;
+
 
       const distance =
         DEFAULT_RENDER_DISTANCE;
 
+
       const minWorldX =
-        cameraX - distance;
+        cameraX -
+        distance;
+
 
       const maxWorldX =
-        cameraX + distance;
+        cameraX +
+        distance;
+
 
       const minWorldZ =
-        cameraZ - distance;
+        cameraZ -
+        distance;
+
 
       const maxWorldZ =
-        cameraZ + distance;
+        cameraZ +
+        distance;
+
 
       const minParcelX =
         Math.floor(
-          (minWorldX -
-            origin[0]) /
-            tileSize
+          (
+            minWorldX -
+            origin[0]
+          ) /
+          tileSize
         ) *
         tileSize;
+
 
       const maxParcelX =
         Math.ceil(
-          (maxWorldX -
-            origin[0]) /
-            tileSize
+          (
+            maxWorldX -
+            origin[0]
+          ) /
+          tileSize
         ) *
         tileSize;
+
 
       const minParcelY =
         Math.floor(
-          (minWorldZ -
-            origin[2]) /
-            tileSize
+          (
+            minWorldZ -
+            origin[2]
+          ) /
+          tileSize
         ) *
         tileSize;
 
+
       const maxParcelY =
         Math.ceil(
-          (maxWorldZ -
-            origin[2]) /
-            tileSize
+          (
+            maxWorldZ -
+            origin[2]
+          ) /
+          tileSize
         ) *
         tileSize;
+
 
       const visibleParcels =
         parcels.filter(
@@ -173,9 +343,9 @@ export default function ParcelLayer({
               maxParcelY
         );
 
+
       /**
-       * Keep the selected parcel rendered even when
-       * the player is far away from it.
+       * Keep selected parcel visible.
        */
 
       if (
@@ -189,6 +359,7 @@ export default function ParcelLayer({
               activeSelectedId
           );
 
+
         if (
           selected &&
           !visibleParcels.some(
@@ -197,14 +368,129 @@ export default function ParcelLayer({
               selected.id
           )
         ) {
+
           visibleParcels.push(
             selected
           );
+
         }
+
       }
+
 
       setNearbyParcels(
         visibleParcels
+      );
+
+
+      /**
+       * =====================================================
+       * DYNAMIC CHUNK LOADING
+       * =====================================================
+       *
+       * Ask for the chunk underneath the camera and the
+       * surrounding chunks.
+       */
+
+
+      const loadX =
+        cameraX -
+        origin[0];
+
+
+      const loadY =
+        cameraZ -
+        origin[2];
+
+
+      const chunkX =
+        Math.floor(
+          loadX /
+            LOAD_CHUNK_SIZE
+        ) *
+        LOAD_CHUNK_SIZE;
+
+
+      const chunkY =
+        Math.floor(
+          loadY /
+            LOAD_CHUNK_SIZE
+        ) *
+        LOAD_CHUNK_SIZE;
+
+
+      /**
+       * Current chunk.
+       */
+      requestChunk(
+        chunkX,
+        chunkY
+      );
+
+
+      /**
+       * Neighboring chunks.
+       */
+      requestChunk(
+        chunkX -
+          LOAD_CHUNK_SIZE,
+        chunkY
+      );
+
+
+      requestChunk(
+        chunkX +
+          LOAD_CHUNK_SIZE,
+        chunkY
+      );
+
+
+      requestChunk(
+        chunkX,
+        chunkY -
+          LOAD_CHUNK_SIZE
+      );
+
+
+      requestChunk(
+        chunkX,
+        chunkY +
+          LOAD_CHUNK_SIZE
+      );
+
+
+      /**
+       * Diagonal chunks.
+       */
+      requestChunk(
+        chunkX -
+          LOAD_CHUNK_SIZE,
+        chunkY -
+          LOAD_CHUNK_SIZE
+      );
+
+
+      requestChunk(
+        chunkX +
+          LOAD_CHUNK_SIZE,
+        chunkY -
+          LOAD_CHUNK_SIZE
+      );
+
+
+      requestChunk(
+        chunkX -
+          LOAD_CHUNK_SIZE,
+        chunkY +
+          LOAD_CHUNK_SIZE
+      );
+
+
+      requestChunk(
+        chunkX +
+          LOAD_CHUNK_SIZE,
+        chunkY +
+          LOAD_CHUNK_SIZE
       );
 
     }, [
@@ -213,6 +499,7 @@ export default function ParcelLayer({
       tileSize,
       origin,
       activeSelectedId,
+      requestChunk,
     ]);
 
 
@@ -243,8 +530,10 @@ export default function ParcelLayer({
       return;
     }
 
+
     const now =
       performance.now();
+
 
     if (
       now -
@@ -254,8 +543,10 @@ export default function ParcelLayer({
       return;
     }
 
+
     lastCameraUpdate.current =
       now;
+
 
     calculateNearby();
 
@@ -276,9 +567,11 @@ export default function ParcelLayer({
           return;
         }
 
+
         setInternalSelectedId(
           parcel.id
         );
+
 
         onParcelSelect?.({
           parcel,
@@ -289,8 +582,7 @@ export default function ParcelLayer({
       [
         interactive,
         onParcelSelect,
-      ]
-    );
+      ]);
 
 
   /**
@@ -305,6 +597,7 @@ export default function ParcelLayer({
       setInternalSelectedId(
         null
       );
+
 
       onParcelClose?.();
 
@@ -328,7 +621,7 @@ export default function ParcelLayer({
    * =======================================================
    * RENDER
    * =======================================================
-   */
+ */
 
   return (
     <>
@@ -346,6 +639,7 @@ export default function ParcelLayer({
                 tileSize,
                 origin
               );
+
 
             return (
               <ParcelTile

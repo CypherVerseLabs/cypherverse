@@ -376,17 +376,19 @@ export default function ParcelPanel({
           =================================================== */}
 
       <InfoRow
-        label="Estate"
-        value={
-          parcel.estateId ??
-          "—"
-        }
-        position={[
-          0,
-          0.82,
-          0,
-        ]}
-      />
+  label="Estate"
+  value={
+    parcel.estateId != null
+      ? String(parcel.estateId)
+      : "—"
+  }
+  position={[
+    0,
+    0.82,
+    0,
+  ]}
+/>
+
 
 
       {/* ===================================================

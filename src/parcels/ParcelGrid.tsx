@@ -12,32 +12,21 @@ import type {
  * Presentation component for rendering a collection of
  * parcels in the 3D world.
  *
- * ParcelGrid does NOT:
- *
- * - fetch parcel data
- * - modify parcel state
- * - reserve parcels
- * - purchase parcels
- * - manage the selected parcel
- *
- * Those responsibilities belong to ParcelLayer and the
- * parcel API/system.
- *
- * Coordinate system:
+ * Database coordinates are already world coordinates:
  *
  *   parcel.x -> world X
  *   parcel.y -> world Z
  *
+ * A parcel is therefore NOT multiplied by parcelSize.
+ *
  * Example:
  *
- *   parcel = {
- *     x: 10,
- *     y: 4
- *   }
+ *   x = 512
+ *   y = 256
  *
  * becomes:
  *
- *   [10 * tileSize, height, 4 * tileSize]
+ *   [512, height, 256]
  *
  * =========================================================
  */
@@ -47,6 +36,8 @@ export interface ParcelGridProps {
 
   /**
    * Physical size of one parcel in world units.
+   *
+   * Your current world uses 16 x 16 parcels.
    */
   parcelSize?: number;
 
@@ -64,17 +55,13 @@ export interface ParcelGridProps {
 
   /**
    * Optional selected parcel.
-   *
-   * This allows ParcelLayer to visually highlight
-   * the parcel selected from either the 3D world or
-   * the map.
    */
   selectedParcelId?: string | null;
 }
 
 export default function ParcelGrid({
   parcels,
-  parcelSize = 2,
+  parcelSize = 16,
   height = 0,
   onParcelClick,
   selectedParcelId = null,
@@ -84,7 +71,7 @@ export default function ParcelGrid({
       name="parcel-grid"
       position={[
         0,
-        height,
+        0,
         0,
       ]}
     >
@@ -94,6 +81,7 @@ export default function ParcelGrid({
             key={parcel.id}
             parcel={parcel}
             parcelSize={parcelSize}
+            height={height}
             selected={
               parcel.id ===
               selectedParcelId
@@ -108,15 +96,10 @@ export default function ParcelGrid({
   );
 }
 
+
 /**
  * =========================================================
  * PARCEL TILE
- * =========================================================
- *
- * Kept in this file for now.
- *
- * We can move this into ParcelTile.tsx once the basic
- * parcel system is wired up.
  * =========================================================
  */
 
@@ -125,6 +108,8 @@ interface ParcelTileProps {
 
   parcelSize: number;
 
+  height: number;
+
   selected: boolean;
 
   onClick?: (
@@ -132,12 +117,15 @@ interface ParcelTileProps {
   ) => void;
 }
 
+
 function ParcelTile({
   parcel,
   parcelSize,
+  height,
   selected,
   onClick,
 }: ParcelTileProps) {
+
   /**
    * Parcel color is based on marketplace status.
    *
@@ -149,62 +137,92 @@ function ParcelTile({
       parcel.status
     );
 
+
   /**
-   * Convert parcel coordinates into 3D coordinates.
+   * =======================================================
+   * WORLD POSITION
+   * =======================================================
    *
-   * Database:
+   * IMPORTANT:
    *
-   *   x
-   *   y
+   * Your database already stores coordinates in world units.
    *
-   * World:
+   * Therefore:
    *
-   *   X
-   *   Y
-   *   Z
+   *   parcel.x -> X
+   *   parcel.y -> Z
+   *
+   * Do NOT do:
+   *
+   *   parcel.x * parcelSize
+   *
+   * because that would turn:
+   *
+   *   512
+   *
+   * into:
+   *
+   *   8192
+   *
+   * =======================================================
    */
+
   const position: [
     number,
     number,
     number
   ] = [
-    parcel.x * parcelSize,
-    parcel.top ?? 0,
-    parcel.y * parcelSize,
+    parcel.x,
+    parcel.top ?? height,
+    parcel.y,
   ];
 
-  /**
-   * Keep a small gap between neighboring parcels.
-   */
-  const surfaceSize =
-    parcelSize * 0.95;
 
   /**
-   * Selected parcels get a brighter surface.
+   * =======================================================
+   * SURFACE
+   * =======================================================
+   *
+   * A 16 x 16 parcel gets a small visual gap.
+   *
+   * This makes individual parcels readable without making
+   * the world look like a giant spreadsheet.
    */
+
+  const surfaceSize =
+    parcelSize * 0.96;
+
+
   const opacity =
     selected
       ? 1
       : 0.85;
+
 
   return (
     <group
       name={`parcel-${parcel.id}`}
       position={position}
       onClick={(event) => {
+
         event.stopPropagation();
 
-        onClick?.(parcel);
+        onClick?.(
+          parcel
+        );
+
       }}
     >
-      {/* ===================================================
+
+      {/* =================================================
           PARCEL SURFACE
-          =================================================== */}
+          ================================================= */}
 
       <mesh
         receiveShadow
         castShadow={false}
       >
+
         <boxGeometry
           args={[
             surfaceSize,
@@ -228,13 +246,16 @@ function ParcelTile({
               : 0
           }
         />
+
       </mesh>
 
-      {/* ===================================================
+
+      {/* =================================================
           SELECTION BORDER
-          =================================================== */}
+          ================================================= */}
 
       {selected && (
+
         <mesh
           position={[
             0,
@@ -242,6 +263,7 @@ function ParcelTile({
             0,
           ]}
         >
+
           <boxGeometry
             args={[
               surfaceSize * 1.02,
@@ -256,14 +278,18 @@ function ParcelTile({
             transparent
             opacity={0.9}
           />
+
         </mesh>
+
       )}
 
-      {/* ===================================================
+
+      {/* =================================================
           PARCEL NAME
-          =================================================== */}
+          ================================================= */}
 
       {parcel.name && (
+
         <Words
           position={[
             0,
@@ -274,10 +300,13 @@ function ParcelTile({
         >
           {parcel.name}
         </Words>
+
       )}
+
     </group>
   );
 }
+
 
 /**
  * =========================================================
@@ -288,7 +317,9 @@ function ParcelTile({
 function getParcelStatusColor(
   status: Parcel["status"]
 ): string {
+
   switch (status) {
+
     case "available":
       return "#555555";
 

@@ -5,8 +5,7 @@
  *
  * Shared types for the CypherVerse parcel system.
  *
- * These types are intentionally independent from React
- * components so they can be used by:
+ * Used by:
  *
  *   - API clients
  *   - marketplace services
@@ -49,13 +48,6 @@ export type ParcelActionType =
 /**
  * =========================================================
  * PARCEL PROJECT
- * =========================================================
- *
- * Project information attached to a parcel.
- *
- * This mirrors the project information exposed by the
- * backend parcel API.
- *
  * =========================================================
  */
 
@@ -106,7 +98,6 @@ export interface ParcelProject {
    */
 
   publishedAt?: string | null;
-
 }
 
 
@@ -120,16 +111,9 @@ export interface Parcel {
 
   /**
    * =======================================================
-   * WORLD POSITION
+   * IDENTITY
    * =======================================================
    */
-
-  /**
-   * Top/world height value.
-   */
-
-  top: number;
-
 
   /**
    * Unique parcel identifier.
@@ -139,17 +123,40 @@ export interface Parcel {
 
 
   /**
-   * Logical world-grid X coordinate.
+   * =======================================================
+   * WORLD POSITION
+   * =======================================================
+   *
+   * The database stores parcel coordinates directly in
+   * world units:
+   *
+   *   0
+   *   16
+   *   32
+   *   48
+   *   ...
+   *
+   * ParcelLayer maps:
+   *
+   *   x -> THREE X
+   *   y -> THREE Z
+   *
+   * =======================================================
    */
 
   x: number;
 
+  y: number;
+
 
   /**
-   * Logical world-grid Y coordinate.
+   * Optional vertical/top value.
+   *
+   * The current parcel API does not appear to require this
+   * field, so it is optional.
    */
 
-  y: number;
+  top?: number | null;
 
 
   /**
@@ -174,9 +181,12 @@ export interface Parcel {
 
   /**
    * Estate/group identifier.
+   *
+   * The API may return this as a number or string depending
+   * on the backend/database representation.
    */
 
-  estateId?: string | null;
+  estateId?: string | number | null;
 
 
   /**
@@ -226,9 +236,6 @@ export interface Parcel {
    * =======================================================
    *
    * Optional project built on this parcel.
-   *
-   * The backend may return null when the parcel has no
-   * associated project.
    */
 
   project?: ParcelProject | null;
@@ -351,6 +358,12 @@ export interface ParcelLayerProps {
 
   /**
    * Physical size of one parcel tile.
+   *
+   * NOTE:
+   *
+   * Parcel coordinates are already stored in world units.
+   * parcelToWorldPosition() therefore maps x/y directly
+   * into the world.
    */
 
   tileSize?: number;
@@ -415,10 +428,6 @@ export interface ParcelLayerProps {
 
   /**
    * Called when the selected parcel panel is closed.
-   *
-   * The parent owns selectedParcelId, so ParcelLayer
-   * notifies the parent instead of mutating parent state
-   * directly.
    */
 
   onParcelClose?: () => void;
@@ -428,8 +437,6 @@ export interface ParcelLayerProps {
    * =======================================================
    * MARKETPLACE CALLBACKS
    * =======================================================
-   *
-   * These callbacks are supplied by the parent.
    *
    * ParcelLayer does not own marketplace business logic.
    */
@@ -469,5 +476,3 @@ export interface ParcelLayerProps {
     | string
     | null;
 }
-
-
