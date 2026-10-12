@@ -44,13 +44,17 @@ export function worldToParcelCoordinates(
   x: number;
   y: number;
 } {
-  return {
-    x: Math.floor(
-      worldX - origin[0]
-    ),
+  const GRID_SIZE = 16;
 
-    y: Math.floor(
-      worldZ - origin[2]
-    ),
+  return {
+    x:
+      Math.round(
+        (worldX - origin[0]) / GRID_SIZE
+      ) * GRID_SIZE,
+
+    y:
+      Math.round(
+        (worldZ - origin[2]) / GRID_SIZE
+      ) * GRID_SIZE,
   };
 }

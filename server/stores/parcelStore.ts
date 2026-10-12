@@ -145,11 +145,10 @@ export async function getParcelByEstateId(
  * GET PARCELS
  * =========================================================
  *
- * Used by the parcel/world browser.
+ * Lightweight parcel query for the CypherVerse world.
  *
- * Optional filters:
- * - status
- * - coordinates
+ * Supports coordinate-based chunk loading so the client
+ * does not need to download every parcel at once.
  */
 
 export async function getParcels(options?: {
@@ -161,62 +160,50 @@ export async function getParcels(options?: {
 }) {
   const where: Prisma.ParcelWhereInput = {};
 
-if (options?.status !== undefined) {
-  where.status = options.status;
-}
-
-if (
-  options?.minX !== undefined ||
-  options?.maxX !== undefined
-) {
-  where.x = {};
-
-  if (options.minX !== undefined) {
-    where.x.gte = options.minX;
+  if (options?.status !== undefined) {
+    where.status = options.status;
   }
 
-  if (options.maxX !== undefined) {
-    where.x.lte = options.maxX;
-  }
-}
+  const xFilter: Prisma.IntFilter = {};
+  const yFilter: Prisma.IntFilter = {};
 
-if (
-  options?.minY !== undefined ||
-  options?.maxY !== undefined
-) {
-  where.y = {};
-
-  if (options.minY !== undefined) {
-    where.y.gte = options.minY;
+  if (options?.minX !== undefined) {
+    xFilter.gte = options.minX;
   }
 
-  if (options.maxY !== undefined) {
-    where.y.lte = options.maxY;
+  if (options?.maxX !== undefined) {
+    xFilter.lte = options.maxX;
   }
-}
 
+  if (options?.minY !== undefined) {
+    yFilter.gte = options.minY;
+  }
+
+  if (options?.maxY !== undefined) {
+    yFilter.lte = options.maxY;
+  }
+
+  if (
+    options?.minX !== undefined ||
+    options?.maxX !== undefined
+  ) {
+    where.x = xFilter;
+  }
+
+  if (
+    options?.minY !== undefined ||
+    options?.maxY !== undefined
+  ) {
+    where.y = yFilter;
+  }
 
   return prisma.parcel.findMany({
     where,
 
     orderBy: [
-      {
-        y: "asc",
-      },
-      {
-        x: "asc",
-      },
+      { y: "asc" },
+      { x: "asc" },
     ],
-
-    /**
-     * =====================================================
-     * WORLD PAYLOAD
-     * =====================================================
-     *
-     * Keep this query lightweight.
-     *
-     * Do NOT include owner/listings/project here.
-     */
 
     select: {
       id: true,

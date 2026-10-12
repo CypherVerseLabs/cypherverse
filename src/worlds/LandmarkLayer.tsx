@@ -1,33 +1,17 @@
-import {
-  useMemo,
-} from "react";
+import { useMemo } from "react";
 
-import {
-  Text,
-} from "@react-three/drei";
+import { Text } from "@react-three/drei";
 
-import type {
-  Parcel,
-} from "../parcels/types";
+import type { Parcel } from "../parcels/types";
 
-import {
-  parcelToWorldPosition,
-} from "../parcels/parcelCoordinates";
+import { parcelToWorldPosition } from "../parcels/parcelCoordinates";
 
-import {
-  CITY_LANDMARKS,
-} from "./CityLandmarks";
+import { CITY_LANDMARKS } from "./CityLandmarks";
 
 interface LandmarkLayerProps {
   parcels: Parcel[];
-
   tileSize?: number;
-
-  origin?: [
-    number,
-    number,
-    number
-  ];
+  origin?: [number, number, number];
 }
 
 /**
@@ -35,20 +19,18 @@ interface LandmarkLayerProps {
  * LANDMARK LAYER
  * =========================================================
  *
- * Renders the major named locations of CypherVerse.
+ * Renders named CypherVerse landmarks at their configured
+ * database parcel coordinates.
  *
- * Landmarks are NOT separate parcels.
+ * Landmarks are visual objects, not separate parcels.
  *
- * Instead, each landmark points at an existing parcel
- * using its x/y coordinate.
+ * This component does not:
+ * - Create or modify parcels.
+ * - Change ownership or availability.
+ * - Reserve land.
+ * - Execute marketplace actions.
  *
- * This means the backend remains authoritative for:
- *
- *   - estate ID
- *   - ownership
- *   - parcel status
- *   - project
- *
+ * Existing parcel coordinates remain authoritative.
  * =========================================================
  */
 
@@ -57,258 +39,116 @@ export default function LandmarkLayer({
   tileSize = 16,
   origin = [0, 0, 0],
 }: LandmarkLayerProps) {
-
   /**
-   * =======================================================
-   * RESOLVE LANDMARK PARCELS
-   * =======================================================
+   * Resolve existing parcels without requiring them to be
+   * loaded before a landmark can be displayed.
    */
-
-  const resolvedLandmarks =
-    useMemo(() => {
-
-      return CITY_LANDMARKS.map(
-        (landmark) => {
-
-          const parcel =
-            parcels.find(
-              (candidate) =>
-                candidate.x ===
-                  landmark.x &&
-                candidate.y ===
-                  landmark.y
-            );
-
-          return {
-            landmark,
-            parcel,
-          };
-        }
+  const resolvedLandmarks = useMemo(() => {
+    return CITY_LANDMARKS.map((landmark) => {
+      const parcel = parcels.find(
+        (candidate) =>
+          candidate.x === landmark.x &&
+          candidate.y === landmark.y
       );
 
-    }, [
-      parcels,
-    ]);
-
-
-  /**
-   * =======================================================
-   * RENDER
-   * =======================================================
-   */
+      return {
+        landmark,
+        parcel,
+      };
+    });
+  }, [parcels]);
 
   return (
-    <group
-      name="city-landmarks"
-    >
+    <group name="city-landmarks">
+      {resolvedLandmarks.map(({ landmark, parcel }) => {
+        const isGenesis =
+          landmark.estateId === "landmark-genesis";
 
-      {resolvedLandmarks.map(
-        ({
-          landmark,
-          parcel,
-        }) => {
+        const [worldX, worldY, worldZ] =
+          parcelToWorldPosition(
+            landmark.x,
+            landmark.y,
+            tileSize,
+            origin
+          );
 
-          /**
-           * Genesis is the central landmark and receives
-           * the larger beacon treatment.
-           */
+        const height = isGenesis ? 10 : 6;
 
-          const isGenesis =
-            landmark.estateId ===
-            "landmark-genesis";
-
-          /**
-           * The landmark can still be positioned even
-           * when its parcel hasn't been loaded yet.
-           */
-
-          const position =
-            parcelToWorldPosition(
-              landmark.x,
-              landmark.y,
-              tileSize,
-              origin
-            );
-
-          const [
-            worldX,
-            worldY,
-            worldZ,
-          ] = position;
-
-          const height =
-            isGenesis
-              ? 10
-              : 6;
-
-
-          return (
-            <group
-              key={`${landmark.x}-${landmark.y}-${landmark.name}`}
-              position={[
-                worldX,
-                worldY,
-                worldZ,
-              ]}
+        return (
+          <group
+            key={`${landmark.x}-${landmark.y}-${landmark.name}`}
+            position={[worldX, worldY, worldZ]}
+          >
+            {/* Landmark base */}
+            <mesh
+              position={[0, 0.35, 0]}
+              raycast={() => null}
             >
-
-              {/* =================================================
-                  LANDMARK BASE
-                  ================================================= */}
-
-              <mesh
-                position={[
-                  0,
-                  0.35,
-                  0,
-                ]}
-              >
-
-                <cylinderGeometry
-                  args={[
-                    2.5,
-                    2.5,
-                    0.7,
-                    32,
-                  ]}
-                />
-
-                <meshStandardMaterial
-                  color={
-                    isGenesis
-                      ? "#ffd166"
-                      : "#38bdf8"
-                  }
-
-                  emissive={
-                    isGenesis
-                      ? "#ff9f1c"
-                      : "#0369a1"
-                  }
-
-                  emissiveIntensity={1.5}
-                />
-
-              </mesh>
-
-
-              {/* =================================================
-                  LANDMARK BEACON
-                  ================================================= */}
-
-              <mesh
-                position={[
-                  0,
-                  height / 2,
-                  0,
-                ]}
-              >
-
-                <cylinderGeometry
-                  args={[
-                    0.35,
-                    0.8,
-                    height,
-                    16,
-                  ]}
-                />
-
-                <meshStandardMaterial
-                  color={
-                    isGenesis
-                      ? "#fff3b0"
-                      : "#7dd3fc"
-                  }
-
-                  emissive={
-                    isGenesis
-                      ? "#f59e0b"
-                      : "#0ea5e9"
-                  }
-
-                  emissiveIntensity={2}
-                />
-
-              </mesh>
-
-
-              {/* =================================================
-                  LANDMARK LIGHT
-                  ================================================= */}
-
-              <pointLight
-                position={[
-                  0,
-                  height,
-                  0,
-                ]}
-                color={
-                  isGenesis
-                    ? "#ffd166"
-                    : "#38bdf8"
-                }
-                intensity={
-                  isGenesis
-                    ? 25
-                    : 10
-                }
-                distance={40}
+              <cylinderGeometry
+                args={[2.5, 2.5, 0.7, 32]}
               />
 
+              <meshStandardMaterial
+                color={isGenesis ? "#ffd166" : "#38bdf8"}
+                emissive={isGenesis ? "#ff9f1c" : "#0369a1"}
+                emissiveIntensity={1.5}
+              />
+            </mesh>
 
-              {/* =================================================
-                  LANDMARK NAME
-                  ================================================= */}
+            {/* Landmark beacon */}
+            <mesh
+              position={[0, height / 2, 0]}
+              raycast={() => null}
+            >
+              <cylinderGeometry
+                args={[0.35, 0.8, height, 16]}
+              />
 
+              <meshStandardMaterial
+                color={isGenesis ? "#fff3b0" : "#7dd3fc"}
+                emissive={isGenesis ? "#f59e0b" : "#0ea5e9"}
+                emissiveIntensity={2}
+              />
+            </mesh>
+
+            {/* Landmark light */}
+            <pointLight
+              position={[0, height, 0]}
+              color={isGenesis ? "#ffd166" : "#38bdf8"}
+              intensity={isGenesis ? 25 : 10}
+              distance={40}
+            />
+
+            {/* Landmark name */}
+            <Text
+              position={[0, height + 2, 0]}
+              fontSize={isGenesis ? 2 : 1.5}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.08}
+              outlineColor="#000000"
+              raycast={() => null}
+            >
+              {landmark.name}
+            </Text>
+
+            {/* Existing parcel reference; debug label only */}
+            {parcel && (
               <Text
-                position={[
-                  0,
-                  height + 2,
-                  0,
-                ]}
-                fontSize={
-                  isGenesis
-                    ? 2
-                    : 1.5
-                }
-                color="#ffffff"
+                position={[0, height + 0.5, 0]}
+                fontSize={0.45}
+                color="#a5f3fc"
                 anchorX="center"
                 anchorY="middle"
-                outlineWidth={0.08}
-                outlineColor="#000000"
                 raycast={() => null}
               >
-                {landmark.name}
+                {`Parcel ${parcel.id}`}
               </Text>
-
-
-              {/* =================================================
-                  DEBUG / PARCEL CONNECTION
-                  ================================================= */}
-
-              {parcel && (
-                <Text
-                  position={[
-                    0,
-                    height + 0.5,
-                    0,
-                  ]}
-                  fontSize={0.45}
-                  color="#a5f3fc"
-                  anchorX="center"
-                  anchorY="middle"
-                  raycast={() => null}
-                >
-                  {`Parcel ${parcel.id}`}
-                </Text>
-              )}
-
-            </group>
-          );
-        }
-      )}
-
+            )}
+          </group>
+        );
+      })}
     </group>
   );
 }
-
