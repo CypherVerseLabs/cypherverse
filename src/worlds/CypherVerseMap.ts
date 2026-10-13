@@ -34,7 +34,7 @@
 
 export const PARCEL_SIZE = 16;
 
-export const CURRENT_WORLD_SIZE = 2400;
+export const CURRENT_WORLD_SIZE = 4800;
 
 export const CURRENT_WORLD_MAX =
   CURRENT_WORLD_SIZE - PARCEL_SIZE;
@@ -57,6 +57,20 @@ export const WORLD_CENTER = {
   x: CURRENT_WORLD_SIZE / 2,
   z: CURRENT_WORLD_SIZE / 2,
 } as const;
+
+/**
+ * Convert existing positive-world coordinates into a
+ * Genesis-centered coordinate system.
+ *
+ * Existing Genesis: (1200, 1200)
+ * Centered Genesis: (0, 0)
+ */
+export function toCenteredWorld(point: WorldPoint): WorldPoint {
+  return {
+    x: point.x - WORLD_CENTER.x,
+    z: point.z - WORLD_CENTER.z,
+  };
+}
 
 /**
  * Grid-alignment metadata.

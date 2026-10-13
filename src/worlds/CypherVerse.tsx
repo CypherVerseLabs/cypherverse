@@ -52,6 +52,10 @@ import {
 import LandmarkLayer from "./LandmarkLayer";
 import CypherVerseMapLayer from "./CypherVerseMapLayer";
 
+import {
+  CITY_CENTER,
+} from "../parcels/parcelCoordinates";
+
 /**
  * =========================================================
  * WORLD CONFIGURATION
@@ -472,7 +476,7 @@ export default function CypherVerse() {
         },
       }}
       playerProps={{
-        flying: false,
+        flying: true,
       }}
     >
       {/* CAMERA CHUNK STREAMER */}
@@ -518,24 +522,27 @@ export default function CypherVerse() {
 
       <group position-y={0}>
         <ParcelLayer
-          parcels={parcels}
-          tileSize={16}
-          origin={[0, 0, 0]}
-          interactive={true}
-          selectedParcelId={selectedParcelId}
-          onParcelSelect={({ parcel }) => {
-            handleParcelSelect(parcel);
-          }}
-          onParcelClose={() => {
-            setSelectedParcelId(null);
-          }}
-          onBuy={handleBuyParcel}
-          onReserve={handleReserveParcel}
-          onList={handleListParcel}
-          actionParcelId={actionParcelId}
-          actionType={parcelActionType}
-          actionError={actionError}
-        />
+  parcels={parcels}
+  tileSize={16}
+  origin={[-CITY_CENTER, 0, -CITY_CENTER]}
+  interactive={true}
+  selectedParcelId={selectedParcelId}
+  onParcelSelect={({ parcel }) => {
+    handleParcelSelect(parcel);
+  }}
+  onParcelClose={() => {
+    setSelectedParcelId(null);
+  }}
+  onBuy={handleBuyParcel}
+  onReserve={handleReserveParcel}
+  onList={handleListParcel}
+  actionParcelId={actionParcelId}
+  actionType={parcelActionType}
+  actionError={actionError}
+  onRequestBounds={({ minX, maxX, minY, maxY }) => {
+    void loadChunk(minX, maxX, minY, maxY);
+  }}
+/>
 
         <CypherVerseMapLayer
           showLabels={true}

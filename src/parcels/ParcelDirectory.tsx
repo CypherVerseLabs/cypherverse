@@ -16,6 +16,10 @@ import type {
   ParcelActionType,
 } from "./types";
 
+import {
+  getDistrictAt,
+} from "../worlds/districts";
+
 
 /**
  * =========================================================
@@ -227,6 +231,14 @@ function ParcelRow({
       parcel.status
     );
 
+  const district = getDistrictAt(
+  parcel.x,
+  parcel.y,
+);
+
+const districtName =
+  district?.name ?? "Unassigned District";  
+
   const actionRunning =
     actionParcelId ===
       parcel.id &&
@@ -288,6 +300,21 @@ function ParcelRow({
       >
         {`X ${parcel.x}  Y ${parcel.y}`}
       </Text>
+
+      <Text
+          position={[
+            -1.05,
+            -0.17,
+            0,
+          ]}
+          fontSize={0.065}
+          color="#7dd3fc"
+          anchorX="left"
+          anchorY="middle"
+          maxWidth={1.7}
+        >
+          {`District: ${districtName}`}
+        </Text>
 
 
       {/* =========================================

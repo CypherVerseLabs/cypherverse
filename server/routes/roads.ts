@@ -4,7 +4,12 @@ const router = Router();
 
 const PARCEL_SIZE = 16;
 const GRID_SIZE = 150;
+
+const WORLD_MIN = 0;
 const WORLD_MAX = (GRID_SIZE - 1) * PARCEL_SIZE;
+
+const CITY_CENTER =
+  Math.floor((GRID_SIZE - 1) / 2) * PARCEL_SIZE;
 
 type RoadType =
   | "avenue"
@@ -32,7 +37,7 @@ function generateRoads(): Road[] {
 
   // =======================================================
   // MAJOR AVENUES
-  // Every 20 parcels
+  // Every 20 parcel indices
   // =======================================================
 
   const majorSpacing = 20;
@@ -50,7 +55,7 @@ function generateRoads(): Road[] {
       name: `Avenue ${grid}`,
       start: {
         x: position,
-        y: 0,
+        y: WORLD_MIN,
       },
       end: {
         x: position,
@@ -64,7 +69,7 @@ function generateRoads(): Road[] {
       type: "avenue",
       name: `Avenue ${grid}`,
       start: {
-        x: 0,
+        x: WORLD_MIN,
         y: position,
       },
       end: {
@@ -77,7 +82,7 @@ function generateRoads(): Road[] {
 
   // =======================================================
   // SECONDARY STREETS
-  // Every 5 parcels
+  // Every 5 parcel indices
   // =======================================================
 
   const streetSpacing = 5;
@@ -99,7 +104,7 @@ function generateRoads(): Road[] {
       name: `Street ${grid}`,
       start: {
         x: position,
-        y: 0,
+        y: WORLD_MIN,
       },
       end: {
         x: position,
@@ -113,7 +118,7 @@ function generateRoads(): Road[] {
       type: "street",
       name: `Street ${grid}`,
       start: {
-        x: 0,
+        x: WORLD_MIN,
         y: position,
       },
       end: {
@@ -126,21 +131,20 @@ function generateRoads(): Road[] {
 
   // =======================================================
   // CENTRAL BOULEVARD
+  // Crosses at the city center.
   // =======================================================
-
-  const center = WORLD_MAX / 2;
 
   roads.push({
     id: "central-boulevard-x",
     type: "avenue",
     name: "Central Boulevard",
     start: {
-      x: 0,
-      y: center,
+      x: WORLD_MIN,
+      y: CITY_CENTER,
     },
     end: {
       x: WORLD_MAX,
-      y: center,
+      y: CITY_CENTER,
     },
     width: 32,
   });
@@ -150,11 +154,11 @@ function generateRoads(): Road[] {
     type: "avenue",
     name: "Central Boulevard",
     start: {
-      x: center,
-      y: 0,
+      x: CITY_CENTER,
+      y: WORLD_MIN,
     },
     end: {
-      x: center,
+      x: CITY_CENTER,
       y: WORLD_MAX,
     },
     width: 32,
@@ -169,8 +173,8 @@ function generateRoads(): Road[] {
     type: "street",
     name: "Northeast Connector",
     start: {
-      x: 0,
-      y: 0,
+      x: WORLD_MIN,
+      y: WORLD_MIN,
     },
     end: {
       x: WORLD_MAX,
@@ -185,10 +189,10 @@ function generateRoads(): Road[] {
     name: "Southeast Connector",
     start: {
       x: WORLD_MAX,
-      y: 0,
+      y: WORLD_MIN,
     },
     end: {
-      x: 0,
+      x: WORLD_MIN,
       y: WORLD_MAX,
     },
     width: 14,
@@ -198,36 +202,38 @@ function generateRoads(): Road[] {
   // PLAZAS
   // =======================================================
 
+  const plazaOffset = WORLD_MAX * 0.3;
+
   const plazas = [
     {
       id: "central-plaza",
       name: "Central Plaza",
-      x: center,
-      y: center,
+      x: CITY_CENTER,
+      y: CITY_CENTER,
     },
     {
       id: "north-plaza",
       name: "North Plaza",
-      x: center,
-      y: WORLD_MAX * 0.2,
+      x: CITY_CENTER,
+      y: CITY_CENTER + plazaOffset,
     },
     {
       id: "south-plaza",
       name: "South Plaza",
-      x: center,
-      y: WORLD_MAX * 0.8,
+      x: CITY_CENTER,
+      y: CITY_CENTER - plazaOffset,
     },
     {
       id: "east-plaza",
       name: "East Plaza",
-      x: WORLD_MAX * 0.8,
-      y: center,
+      x: CITY_CENTER + plazaOffset,
+      y: CITY_CENTER,
     },
     {
       id: "west-plaza",
       name: "West Plaza",
-      x: WORLD_MAX * 0.2,
-      y: center,
+      x: CITY_CENTER - plazaOffset,
+      y: CITY_CENTER,
     },
   ];
 
@@ -237,11 +243,17 @@ function generateRoads(): Road[] {
       type: "plaza",
       name: plaza.name,
       start: {
-        x: plaza.x - 64,
+        x: Math.max(
+          WORLD_MIN,
+          plaza.x - 64,
+        ),
         y: plaza.y,
       },
       end: {
-        x: plaza.x + 64,
+        x: Math.min(
+          WORLD_MAX,
+          plaza.x + 64,
+        ),
         y: plaza.y,
       },
       width: 64,
@@ -257,12 +269,12 @@ function generateRoads(): Road[] {
     type: "path",
     name: "Central Walk",
     start: {
-      x: 0,
-      y: center,
+      x: WORLD_MIN,
+      y: CITY_CENTER,
     },
     end: {
       x: WORLD_MAX,
-      y: center,
+      y: CITY_CENTER,
     },
     width: 6,
   });
@@ -272,11 +284,11 @@ function generateRoads(): Road[] {
     type: "path",
     name: "Central Walk",
     start: {
-      x: center,
-      y: 0,
+      x: CITY_CENTER,
+      y: WORLD_MIN,
     },
     end: {
-      x: center,
+      x: CITY_CENTER,
       y: WORLD_MAX,
     },
     width: 6,
@@ -293,10 +305,7 @@ const roads = generateRoads();
 
 router.get(
   "/",
-  (
-    _req,
-    res: Response
-  ) => {
+  (_req, res: Response) => {
     return res.status(200).json({
       roads,
       count: roads.length,
@@ -304,11 +313,16 @@ router.get(
       world: {
         gridSize: GRID_SIZE,
         parcelSize: PARCEL_SIZE,
+        minX: WORLD_MIN,
+        maxX: WORLD_MAX,
+        minY: WORLD_MIN,
+        maxY: WORLD_MAX,
         width: WORLD_MAX,
         height: WORLD_MAX,
+        center: CITY_CENTER,
       },
     });
-  }
+  },
 );
 
 export default router;
