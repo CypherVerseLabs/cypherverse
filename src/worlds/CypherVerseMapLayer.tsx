@@ -13,33 +13,28 @@ import {
 
 /**
  * =========================================================
- * EXISTING CITY → CENTERED WORLD
+ * WORLD COORDINATE SYSTEM
  * =========================================================
  *
- * The existing map geometry is authored in a
- * 2400 × 2400 coordinate system.
+ * Database/world coordinates:
  *
- * Its center is therefore:
+ *     0 ... 4800
  *
- *     1200, 1200
+ * Genesis:
  *
- * The new 4800 world has its center at:
+ *     2400, 2400
  *
- *     2400, 2400 database coordinates
+ * Three.js:
  *
- * Three.js world coordinates are centered at:
+ *     Genesis = 0, 0
  *
- *     0, 0
+ * Therefore:
  *
- * Therefore the existing map only needs:
- *
- *     old coordinate - 1200
- *
- * No road or district geometry needs to be rewritten.
+ *     centered = world coordinate - 2400
  * =========================================================
  */
 
-const ORIGINAL_CITY_CENTER = 1200;
+const WORLD_CENTER = 2400;
 
 const ROAD_SURFACE_Y = 0.04;
 
@@ -65,13 +60,19 @@ function centerPoint(
   return {
     x:
       point.x -
-      ORIGINAL_CITY_CENTER,
+      WORLD_CENTER,
 
     z:
       point.z -
-      ORIGINAL_CITY_CENTER,
+      WORLD_CENTER,
   };
 }
+
+/**
+ * =========================================================
+ * ROAD SEGMENT
+ * =========================================================
+ */
 
 function RoadSegment({
   from,
@@ -84,13 +85,18 @@ function RoadSegment({
 }) {
   const geometry = useMemo(() => {
     const dx =
-      to.x - from.x;
+      to.x -
+      from.x;
 
     const dz =
-      to.z - from.z;
+      to.z -
+      from.z;
 
     const length =
-      Math.hypot(dx, dz);
+      Math.hypot(
+        dx,
+        dz,
+      );
 
     if (length <= 0) {
       return null;
@@ -98,11 +104,22 @@ function RoadSegment({
 
     return {
       length,
-      angle: Math.atan2(dz, dx),
+
+      angle:
+        Math.atan2(
+          dz,
+          dx,
+        ),
+
       centerX:
-        (from.x + to.x) / 2,
+        (from.x +
+          to.x) /
+        2,
+
       centerZ:
-        (from.z + to.z) / 2,
+        (from.z +
+          to.z) /
+        2,
     };
   }, [from, to]);
 
@@ -181,6 +198,12 @@ function RoadSegment({
   );
 }
 
+/**
+ * =========================================================
+ * ROAD
+ * =========================================================
+ */
+
 function Road({
   road,
 }: {
@@ -198,6 +221,13 @@ function Road({
     return null;
   }
 
+  const labelPoint =
+    points[
+      Math.floor(
+        points.length / 2,
+      )
+    ];
+
   return (
     <group
       name={`road-${road.id}`}
@@ -205,20 +235,61 @@ function Road({
       {points
         .slice(0, -1)
         .map(
-          (point, index) => (
+          (
+            point,
+            index,
+          ) => (
             <RoadSegment
               key={`${road.id}-${index}`}
               from={point}
               to={
-                points[index + 1]
+                points[
+                  index + 1
+                ]
               }
-              width={road.width}
+              width={
+                road.width
+              }
             />
           ),
         )}
+
+      {road.name && (
+        <Text
+          position={[
+            labelPoint.x,
+            road.kind ===
+            "PRIMARY"
+              ? 2.5
+              : 1.8,
+            labelPoint.z,
+          ]}
+          fontSize={
+            road.kind ===
+            "PRIMARY"
+              ? 3.2
+              : 2.2
+          }
+          color="#e2e8f0"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.08}
+          outlineColor="#0b1220"
+          renderOrder={5}
+          raycast={() => null}
+        >
+          {road.name}
+        </Text>
+      )}
     </group>
   );
 }
+
+/**
+ * =========================================================
+ * AREA
+ * =========================================================
+ */
 
 function Area({
   area,
@@ -227,32 +298,38 @@ function Area({
   area: WorldArea;
   showLabel: boolean;
 }) {
-  const center = useMemo(
-    () =>
-      centerPoint(
-        area.center,
-      ),
-    [area.center],
-  );
+  const center =
+    useMemo(
+      () =>
+        centerPoint(
+          area.center,
+        ),
+      [area.center],
+    );
 
   const isGenesis =
     area.id ===
     "genesis-core";
 
-  const color = isGenesis
-    ? GENESIS_COLOR
-    : area.kind === "PARK"
-      ? PARK_COLOR
-      : area.kind === "PLAZA"
-        ? PLAZA_COLOR
-        : DISTRICT_COLOR;
+  const color =
+    isGenesis
+      ? GENESIS_COLOR
+      : area.kind ===
+          "PARK"
+        ? PARK_COLOR
+        : area.kind ===
+            "PLAZA"
+          ? PLAZA_COLOR
+          : DISTRICT_COLOR;
 
   const opacity =
-    area.kind === "DISTRICT"
-      ? 0.16
-      : area.kind === "PARK"
-        ? 0.38
-        : 0.42;
+    area.kind ===
+    "DISTRICT"
+      ? 0.12
+      : area.kind ===
+          "PARK"
+        ? 0.32
+        : 0.38;
 
   return (
     <group
@@ -309,7 +386,9 @@ function Area({
             color="#f5d76e"
             emissive="#7a5b00"
             emissiveIntensity={0.5}
-            side={THREE.DoubleSide}
+            side={
+              THREE.DoubleSide
+            }
             depthWrite={false}
           />
         </mesh>
@@ -319,7 +398,12 @@ function Area({
         <Text
           position={[
             center.x,
-            isGenesis ? 3 : 2.5,
+            isGenesis
+              ? 4
+              : area.kind ===
+                  "DISTRICT"
+                ? 3.2
+                : 2.5,
             center.z,
           ]}
           fontSize={
@@ -349,6 +433,12 @@ function Area({
   );
 }
 
+/**
+ * =========================================================
+ * MAP LAYER
+ * =========================================================
+ */
+
 export default function CypherVerseMapLayer({
   showLabels = true,
 }: {
@@ -363,7 +453,9 @@ export default function CypherVerseMapLayer({
           <Area
             key={area.id}
             area={area}
-            showLabel={showLabels}
+            showLabel={
+              showLabels
+            }
           />
         ),
       )}

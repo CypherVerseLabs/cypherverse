@@ -746,7 +746,7 @@ export default function CypherVerse() {
           WORLD TERRAIN
           ================================================= */}
 
-      <Ground />
+      
 
 
       {loading && null}

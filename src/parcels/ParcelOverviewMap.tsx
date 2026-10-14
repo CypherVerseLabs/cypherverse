@@ -21,25 +21,30 @@ import {
  * MAP CONFIGURATION
  * =========================================================
  *
- * The visual city configuration is authored in the
- * original 2400 × 2400 coordinate system.
+ * The visual city now uses the full 4,800 × 4,800 world.
  *
- * The rendered parcel world is centered around DB 2400.
+ * Database/world coordinates:
  *
- * Therefore:
+ *     0 ... 4800
  *
- *     database parcel coordinate
- *             -
- *          1200
+ * Genesis:
  *
- * becomes the visual map coordinate.
+ *     2400, 2400
+ *
+ * Therefore database parcel coordinates are shifted by
+ * 2400 for the centered visual map.
+ *
+ * This is a visual conversion only.
+ *
+ * Parcel coordinates in the database are NOT changed.
+ * =========================================================
  */
 
-const MAP_SIZE = 2400;
+const MAP_SIZE = 4800;
 
 const PARCEL_SIZE = 16;
 
-const MAP_CENTER_OFFSET = 1200;
+const MAP_CENTER_OFFSET = 2400;
 
 
 /**
@@ -282,86 +287,108 @@ export default function ParcelOverviewMap({
 
 
     /**
-     * -----------------------------------------------------
-     * ROADS
-     * -----------------------------------------------------
-     */
+ * -----------------------------------------------------
+ * ROADS
+ * -----------------------------------------------------
+ */
 
-    for (
-      const road of
-        CYPHERVERSE_MAP.roads
-    ) {
+for (
+  const road of
+    CYPHERVERSE_MAP.roads
+) {
+  if (
+    road.points.length <
+    2
+  ) {
+    continue;
+  }
+
+  context.beginPath();
+
+  road.points.forEach(
+    (
+      point,
+      index,
+    ) => {
+      const x =
+        point.x *
+        scale;
+
+      const y =
+        point.z *
+        scale;
 
       if (
-        road.points.length <
-        2
+        index === 0
       ) {
-        continue;
+        context.moveTo(
+          x,
+          y,
+        );
+      } else {
+        context.lineTo(
+          x,
+          y,
+        );
       }
+    },
+  );
 
-      context.beginPath();
+  context.strokeStyle =
+    road.kind ===
+    "PRIMARY"
+      ? "#9f8a5b"
+      : "#334155";
 
-      road.points.forEach(
-        (
-          point,
-          index,
-        ) => {
+  context.lineWidth =
+    Math.max(
+      2,
+      road.width *
+        scale,
+    );
 
-          const x =
-            point.x * scale;
+  context.lineCap =
+    "round";
 
-          const y =
-            point.z * scale;
+  context.lineJoin =
+    "round";
 
-          if (
-            index === 0
-          ) {
-            context.moveTo(
-              x,
-              y,
-            );
-          }
-          else {
-            context.lineTo(
-              x,
-              y,
-            );
-          }
-        },
-      );
+  context.stroke();
 
-      context.strokeStyle =
-        "#263241";
+  /**
+   * Street name.
+   */
+  if (road.name) {
+    const label =
+      road.points[
+        Math.floor(
+          road.points.length /
+            2,
+        )
+      ];
 
-      context.lineWidth =
-        Math.max(
-          2,
-          road.width *
-            scale,
-        );
+    context.font =
+      road.kind ===
+      "PRIMARY"
+        ? "600 13px Arial"
+        : "500 10px Arial";
 
-      context.lineCap =
-        "round";
+    context.textAlign =
+      "center";
 
-      context.lineJoin =
-        "round";
+    context.textBaseline =
+      "middle";
 
-      context.stroke();
+    context.fillStyle =
+      "rgba(226,232,240,0.9)";
 
-      context.strokeStyle =
-        "#475569";
-
-      context.lineWidth =
-        Math.max(
-          0.5,
-          road.width *
-            scale *
-            0.08,
-        );
-
-      context.stroke();
-
-    }
+    context.fillText(
+      road.name,
+      label.x * scale,
+      label.z * scale,
+    );
+  }
+}
 
 
     /**
