@@ -3,11 +3,13 @@ import {
 } from "cyengine";
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import {
+  Html,
   Text,
 } from "@react-three/drei";
 
@@ -18,43 +20,36 @@ import type {
 
 import {
   getDistrictAt,
+  WORLD_DISTRICTS,
 } from "../worlds/districts";
+
+import ParcelOverviewMap from "./ParcelOverviewMap";
 
 
 /**
  * =========================================================
- * PARCEL DIRECTORY PROPS
+ * CONFIGURATION
+ * =========================================================
+ */
+
+const PAGE_SIZE = 8;
+
+
+/**
+ * =========================================================
+ * PROPS
  * =========================================================
  */
 
 interface ParcelDirectoryProps {
 
-  /**
-   * Parcels displayed by the directory.
-   */
-
   parcels?: Parcel[];
 
-
-  /**
-   * Currently selected parcel.
-   */
-
   selectedParcelId?: string | null;
-
-
-  /**
-   * Called when a parcel is selected.
-   */
 
   onSelect?: (
     parcel: Parcel
   ) => void;
-
-
-  /**
-   * Marketplace actions.
-   */
 
   onBuy?: (
     parcel: Parcel
@@ -65,20 +60,11 @@ interface ParcelDirectoryProps {
   ) => void | Promise<void>;
 
   onList?: (
-    parcel: Parcel
+    parcel: Parcel,
+    price?: string
   ) => void | Promise<void>;
 
-
-  /**
-   * Directory visibility.
-   */
-
   visible?: boolean;
-
-
-  /**
-   * 3D position.
-   */
 
   position?: [
     number,
@@ -86,28 +72,13 @@ interface ParcelDirectoryProps {
     number
   ];
 
-
-  /**
-   * 3D rotation.
-   */
-
   rotation?: [
     number,
     number,
     number
   ];
 
-
-  /**
-   * 3D scale.
-   */
-
   scale?: number;
-
-
-  /**
-   * Marketplace action currently running.
-   */
 
   actionParcelId?: string | null;
 
@@ -119,12 +90,12 @@ interface ParcelDirectoryProps {
 
 /**
  * =========================================================
- * STATUS COLOR
+ * STATUS
  * =========================================================
  */
 
 function getStatusColor(
-  status: Parcel["status"]
+  status: Parcel["status"],
 ): string {
 
   switch (status) {
@@ -147,14 +118,8 @@ function getStatusColor(
 }
 
 
-/**
- * =========================================================
- * STATUS LABEL
- * =========================================================
- */
-
 function getStatusLabel(
-  status: Parcel["status"]
+  status: Parcel["status"],
 ): string {
 
   switch (status) {
@@ -179,6 +144,303 @@ function getStatusLabel(
 
 /**
  * =========================================================
+ * FILTER BAR
+ * =========================================================
+ */
+
+function FilterBar({
+  search,
+  setSearch,
+  status,
+  setStatus,
+  district,
+  setDistrict,
+  coordinateX,
+  setCoordinateX,
+  coordinateY,
+  setCoordinateY,
+  minPrice,
+  setMinPrice,
+  maxPrice,
+  setMaxPrice,
+}: {
+  search: string;
+  setSearch: (
+    value: string
+  ) => void;
+
+  status:
+    | "all"
+    | Parcel["status"];
+
+  setStatus: (
+    value:
+      | "all"
+      | Parcel["status"]
+  ) => void;
+
+  district: string;
+
+  setDistrict: (
+    value: string
+  ) => void;
+
+  coordinateX: string;
+
+  setCoordinateX: (
+    value: string
+  ) => void;
+
+  coordinateY: string;
+
+  setCoordinateY: (
+    value: string
+  ) => void;
+
+  minPrice: string;
+
+  setMinPrice: (
+    value: string
+  ) => void;
+
+  maxPrice: string;
+
+  setMaxPrice: (
+    value: string
+  ) => void;
+}) {
+
+  return (
+    <Html
+      position={[
+        0,
+        0.82,
+        0,
+      ]}
+      center
+      distanceFactor={8}
+      zIndexRange={[
+        100,
+        0,
+      ]}
+    >
+
+      <div
+        style={{
+          width: "700px",
+          padding: "12px",
+          borderRadius: "10px",
+          background:
+            "rgba(10,14,24,0.96)",
+          border:
+            "1px solid rgba(148,163,184,0.35)",
+          boxShadow:
+            "0 12px 40px rgba(0,0,0,0.35)",
+          color: "#ffffff",
+          fontFamily:
+            "Arial, sans-serif",
+          boxSizing:
+            "border-box",
+          pointerEvents:
+            "auto",
+        }}
+        onPointerDown={(event) => {
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "2fr 1fr 1.4fr",
+            gap: "8px",
+            marginBottom: "8px",
+          }}
+        >
+
+          <input
+            name="parcel-search"
+            value={search}
+            onChange={(event) =>
+              setSearch(
+                event.currentTarget.value,
+              )
+            }
+            placeholder="Search name, estate or parcel ID"
+            style={inputStyle}
+          />
+
+          <select
+            name="parcel-status"
+            value={status}
+            onChange={(event) =>
+              setStatus(
+                event.currentTarget.value as
+                  | "all"
+                  | Parcel["status"],
+              )
+            }
+            style={inputStyle}
+          >
+
+            <option value="all">
+              All Status
+            </option>
+
+            <option value="available">
+              Available
+            </option>
+
+            <option value="for_sale">
+              For Sale
+            </option>
+
+            <option value="owned">
+              Owned
+            </option>
+
+            <option value="reserved">
+              Reserved
+            </option>
+
+          </select>
+
+          <select
+            name="parcel-district"
+            value={district}
+            onChange={(event) =>
+              setDistrict(
+                event.currentTarget.value,
+              )
+            }
+            style={inputStyle}
+          >
+
+            <option value="all">
+              All Districts
+            </option>
+
+            {WORLD_DISTRICTS.map(
+              (worldDistrict) => (
+                <option
+                  key={
+                    worldDistrict.id
+                  }
+                  value={
+                    worldDistrict.id
+                  }
+                >
+                  {
+                    worldDistrict.name
+                  }
+                </option>
+              ),
+            )}
+
+          </select>
+
+        </div>
+
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "1fr 1fr 1fr 1fr",
+            gap: "8px",
+          }}
+        >
+
+          <input
+            name="parcel-x"
+            type="number"
+            value={coordinateX}
+            onChange={(event) =>
+              setCoordinateX(
+                event.currentTarget.value,
+              )
+            }
+            placeholder="X"
+            style={inputStyle}
+          />
+
+          <input
+            name="parcel-y"
+            type="number"
+            value={coordinateY}
+            onChange={(event) =>
+              setCoordinateY(
+                event.currentTarget.value,
+              )
+            }
+            placeholder="Y"
+            style={inputStyle}
+          />
+
+          <input
+            name="parcel-min-price"
+            type="number"
+            min="0"
+            value={minPrice}
+            onChange={(event) =>
+              setMinPrice(
+                event.currentTarget.value,
+              )
+            }
+            placeholder="Min price"
+            style={inputStyle}
+          />
+
+          <input
+            name="parcel-max-price"
+            type="number"
+            min="0"
+            value={maxPrice}
+            onChange={(event) =>
+              setMaxPrice(
+                event.currentTarget.value,
+              )
+            }
+            placeholder="Max price"
+            style={inputStyle}
+          />
+
+        </div>
+
+      </div>
+
+    </Html>
+  );
+}
+
+
+const inputStyle = {
+  width: "100%",
+  boxSizing:
+    "border-box" as const,
+  padding:
+    "7px 9px",
+  borderRadius:
+    "6px",
+  border:
+    "1px solid #334155",
+  background:
+    "#111827",
+  color:
+    "#ffffff",
+  outline:
+    "none",
+  fontSize:
+    "12px",
+};
+
+
+/**
+ * =========================================================
  * PARCEL ROW
  * =========================================================
  */
@@ -189,7 +451,6 @@ function ParcelRow({
   onSelect,
   onBuy,
   onReserve,
-  onList,
   index,
   actionParcelId,
   actionType,
@@ -210,10 +471,6 @@ function ParcelRow({
     parcel: Parcel
   ) => void | Promise<void>;
 
-  onList?: (
-    parcel: Parcel
-  ) => void | Promise<void>;
-
   index: number;
 
   actionParcelId?: string | null;
@@ -223,21 +480,23 @@ function ParcelRow({
 
   const statusColor =
     getStatusColor(
-      parcel.status
+      parcel.status,
     );
 
   const statusLabel =
     getStatusLabel(
-      parcel.status
+      parcel.status,
     );
 
-  const district = getDistrictAt(
-  parcel.x,
-  parcel.y,
-);
+  const district =
+    getDistrictAt(
+      parcel.x,
+      parcel.y,
+    );
 
-const districtName =
-  district?.name ?? "Unassigned District";  
+  const districtName =
+    district?.name ??
+    "Unassigned District";
 
   const actionRunning =
     actionParcelId ===
@@ -245,12 +504,6 @@ const districtName =
     actionType !== null &&
     actionType !== undefined;
 
-
-  /**
-   * =======================================================
-   * RENDER
-   * =======================================================
-   */
 
   return (
     <group
@@ -260,10 +513,6 @@ const districtName =
         0,
       ]}
     >
-
-      {/* =========================================
-          PARCEL NAME
-          ========================================= */}
 
       <Text
         position={[
@@ -283,10 +532,6 @@ const districtName =
       </Text>
 
 
-      {/* =========================================
-          COORDINATES
-          ========================================= */}
-
       <Text
         position={[
           -1.05,
@@ -301,25 +546,22 @@ const districtName =
         {`X ${parcel.x}  Y ${parcel.y}`}
       </Text>
 
+
       <Text
-          position={[
-            -1.05,
-            -0.17,
-            0,
-          ]}
-          fontSize={0.065}
-          color="#7dd3fc"
-          anchorX="left"
-          anchorY="middle"
-          maxWidth={1.7}
-        >
-          {`District: ${districtName}`}
-        </Text>
+        position={[
+          -1.05,
+          -0.17,
+          0,
+        ]}
+        fontSize={0.065}
+        color="#7dd3fc"
+        anchorX="left"
+        anchorY="middle"
+        maxWidth={1.7}
+      >
+        {`District: ${districtName}`}
+      </Text>
 
-
-      {/* =========================================
-          PRICE
-          ========================================= */}
 
       {parcel.price !== null &&
         parcel.price !== undefined && (
@@ -341,10 +583,6 @@ const districtName =
         )}
 
 
-      {/* =========================================
-          STATUS
-          ========================================= */}
-
       <Text
         position={[
           0.30,
@@ -359,10 +597,6 @@ const districtName =
         {statusLabel}
       </Text>
 
-
-      {/* =========================================
-          VIEW
-          ========================================= */}
 
       <Button
         position={[
@@ -381,10 +615,6 @@ const districtName =
       </Button>
 
 
-      {/* =========================================
-          BUY
-          ========================================= */}
-
       {parcel.status ===
         "for_sale" &&
         onBuy && (
@@ -401,17 +631,14 @@ const districtName =
             }
           >
             {actionRunning &&
-            actionType === "buy"
+            actionType ===
+              "buy"
               ? "BUYING..."
               : "BUY"}
           </Button>
 
         )}
 
-
-      {/* =========================================
-          RESERVE
-          ========================================= */}
 
       {parcel.status ===
         "available" &&
@@ -429,7 +656,8 @@ const districtName =
             }
           >
             {actionRunning &&
-            actionType === "reserve"
+            actionType ===
+              "reserve"
               ? "RESERVING..."
               : "RESERVE"}
           </Button>
@@ -437,13 +665,8 @@ const districtName =
         )}
 
 
-      {/* =========================================
-          LIST
-          ========================================= */}
-
       {parcel.status ===
-        "owned" &&
-        onList && (
+        "owned" && (
 
           <Button
             position={[
@@ -453,13 +676,10 @@ const districtName =
             ]}
             fontSize={0.06}
             onClick={() =>
-              onList(parcel)
+              onSelect(parcel)
             }
           >
-            {actionRunning &&
-            actionType === "list"
-              ? "LISTING..."
-              : "LIST"}
+            SET PRICE
           </Button>
 
         )}
@@ -471,11 +691,12 @@ const districtName =
 
 /**
  * =========================================================
- * PARCEL DIRECTORY
+ * DIRECTORY
  * =========================================================
  */
 
 export default function ParcelDirectory({
+
   parcels = [],
 
   selectedParcelId = null,
@@ -512,18 +733,85 @@ export default function ParcelDirectory({
 
 }: ParcelDirectoryProps) {
 
+
   /**
    * =======================================================
-   * FILTER
+   * FILTER STATE
    * =======================================================
    */
 
   const [
-    filter,
-    setFilter,
+    search,
+    setSearch,
+  ] = useState("");
+
+  const [
+    status,
+    setStatus,
   ] = useState<
     "all" | Parcel["status"]
   >("all");
+
+  const [
+    district,
+    setDistrict,
+  ] = useState("all");
+
+  const [
+    coordinateX,
+    setCoordinateX,
+  ] = useState("");
+
+  const [
+    coordinateY,
+    setCoordinateY,
+  ] = useState("");
+
+  const [
+    minPrice,
+    setMinPrice,
+  ] = useState("");
+
+  const [
+    maxPrice,
+    setMaxPrice,
+  ] = useState("");
+
+
+  /**
+   * =======================================================
+   * PAGINATION
+   * =======================================================
+   */
+
+  const [
+    pageIndex,
+    setPageIndex,
+  ] = useState(0);
+
+
+  /**
+   * =======================================================
+   * MAP
+   * =======================================================
+   */
+
+  const [
+    showMap,
+    setShowMap,
+  ] = useState(false);
+
+
+  /**
+   * =======================================================
+   * LISTING PRICE
+   * =======================================================
+   */
+
+  const [
+    listingPrice,
+    setListingPrice,
+  ] = useState("");
 
 
   /**
@@ -536,47 +824,365 @@ export default function ParcelDirectory({
     useMemo(
       () => {
 
-        if (
-          filter === "all"
-        ) {
-          return parcels;
-        }
+        const normalizedSearch =
+          search
+            .trim()
+            .toLowerCase();
+
+        const parsedX =
+          coordinateX.trim() === ""
+            ? null
+            : Number(
+                coordinateX,
+              );
+
+        const parsedY =
+          coordinateY.trim() === ""
+            ? null
+            : Number(
+                coordinateY,
+              );
+
+        const parsedMinPrice =
+          minPrice.trim() === ""
+            ? null
+            : Number(
+                minPrice,
+              );
+
+        const parsedMaxPrice =
+          maxPrice.trim() === ""
+            ? null
+            : Number(
+                maxPrice,
+              );
 
         return parcels.filter(
-          (parcel) =>
-            parcel.status ===
-            filter
+          (parcel) => {
+
+            /**
+             * SEARCH
+             */
+
+            if (
+              normalizedSearch
+            ) {
+
+              const searchFields = [
+                parcel.id,
+                parcel.name ?? "",
+                parcel.estateId != null
+                  ? String(
+                      parcel.estateId,
+                    )
+                  : "",
+                parcel.description ?? "",
+              ];
+
+              const matchesSearch =
+                searchFields.some(
+                  (field) =>
+                    field
+                      .toLowerCase()
+                      .includes(
+                        normalizedSearch,
+                      ),
+                );
+
+              if (
+                !matchesSearch
+              ) {
+                return false;
+              }
+            }
+
+
+            /**
+             * STATUS
+             */
+
+            if (
+              status !== "all" &&
+              parcel.status !==
+                status
+            ) {
+              return false;
+            }
+
+
+            /**
+             * DISTRICT
+             */
+
+            if (
+              district !== "all"
+            ) {
+
+              const parcelDistrict =
+                getDistrictAt(
+                  parcel.x,
+                  parcel.y,
+                );
+
+              if (
+                parcelDistrict?.id !==
+                district
+              ) {
+                return false;
+              }
+            }
+
+
+            /**
+             * X COORDINATE
+             */
+
+            if (
+              parsedX !== null &&
+              parcel.x !== parsedX
+            ) {
+              return false;
+            }
+
+
+            /**
+             * Y COORDINATE
+             */
+
+            if (
+              parsedY !== null &&
+              parcel.y !== parsedY
+            ) {
+              return false;
+            }
+
+
+            /**
+             * PRICE
+             */
+
+            if (
+              parsedMinPrice !== null
+            ) {
+
+              if (
+                parcel.price ===
+                  null ||
+                parcel.price ===
+                  undefined ||
+                parcel.price <
+                  parsedMinPrice
+              ) {
+                return false;
+              }
+            }
+
+            if (
+              parsedMaxPrice !== null
+            ) {
+
+              if (
+                parcel.price ===
+                  null ||
+                parcel.price ===
+                  undefined ||
+                parcel.price >
+                  parsedMaxPrice
+              ) {
+                return false;
+              }
+            }
+
+            return true;
+          },
         );
 
       },
       [
         parcels,
-        filter,
-      ]
+        search,
+        status,
+        district,
+        coordinateX,
+        coordinateY,
+        minPrice,
+        maxPrice,
+      ],
     );
+
+
+  /**
+   * =======================================================
+   * PAGED PARCELS
+   * =======================================================
+   */
+
+  const pageCount =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredParcels.length /
+          PAGE_SIZE,
+      ),
+    );
+
+  useEffect(() => {
+    setPageIndex(0);
+  }, [
+    search,
+    status,
+    district,
+    coordinateX,
+    coordinateY,
+    minPrice,
+    maxPrice,
+  ]);
+
+  useEffect(() => {
+
+    if (
+      pageIndex >= pageCount
+    ) {
+      setPageIndex(
+        pageCount - 1,
+      );
+    }
+
+  }, [
+    pageIndex,
+    pageCount,
+  ]);
+
+  const pagedParcels =
+    filteredParcels.slice(
+      pageIndex *
+        PAGE_SIZE,
+      (pageIndex + 1) *
+        PAGE_SIZE,
+    );
+
+
+  /**
+   * =======================================================
+   * SELECTED OWNED PARCEL
+   * =======================================================
+   */
+
+  const selectedOwnedParcel =
+    useMemo(
+      () => {
+
+        if (
+          !selectedParcelId
+        ) {
+          return null;
+        }
+
+        const parcel =
+          parcels.find(
+            (item) =>
+              item.id ===
+              selectedParcelId,
+          );
+
+        if (
+          !parcel ||
+          parcel.status !==
+            "owned"
+        ) {
+          return null;
+        }
+
+        return parcel;
+
+      },
+      [
+        parcels,
+        selectedParcelId,
+      ],
+    );
+
+
+  /**
+   * =======================================================
+   * INITIALIZE LIST PRICE
+   * =======================================================
+   */
+
+  useEffect(() => {
+
+    if (
+      !selectedOwnedParcel
+    ) {
+
+      setListingPrice("");
+
+      return;
+    }
+
+    setListingPrice(
+      selectedOwnedParcel.price !==
+        null &&
+      selectedOwnedParcel.price !==
+        undefined
+        ? String(
+            selectedOwnedParcel.price,
+          )
+        : "",
+    );
+
+  }, [
+    selectedOwnedParcel?.id,
+    selectedOwnedParcel?.price,
+  ]);
+
+
+  /**
+   * =======================================================
+   * LIST SELECTED PARCEL
+   * =======================================================
+   */
+
+  const handleListSelected =
+    () => {
+
+      if (
+        !selectedOwnedParcel ||
+        !onList ||
+        actionParcelId
+      ) {
+        return;
+      }
+
+      void onList(
+        selectedOwnedParcel,
+        listingPrice,
+      );
+    };
 
 
   /**
    * =======================================================
    * SELECT
    * =======================================================
- */
+   */
 
-  const handleSelect = (
-    parcel: Parcel
-  ) => {
+  const handleSelect =
+    (
+      parcel: Parcel,
+    ) => {
 
-    onSelect?.(
-      parcel
-    );
-  };
+      onSelect?.(
+        parcel,
+      );
+    };
 
 
   /**
    * =======================================================
    * HIDDEN
    * =======================================================
- */
+   */
 
   if (!visible) {
     return null;
@@ -587,18 +1193,19 @@ export default function ParcelDirectory({
    * =======================================================
    * RENDER
    * =======================================================
- */
+   */
 
   return (
+
     <group
       position={position}
       rotation={rotation}
       scale={scale}
     >
 
-      {/* ===================================================
+      {/* =================================================
           TITLE
-          =================================================== */}
+          ================================================= */}
 
       <Text
         position={[
@@ -615,10 +1222,6 @@ export default function ParcelDirectory({
       </Text>
 
 
-      {/* ===================================================
-          SUBTITLE
-          =================================================== */}
-
       <Text
         position={[
           0,
@@ -630,93 +1233,87 @@ export default function ParcelDirectory({
         anchorX="center"
         anchorY="middle"
       >
-        Browse parcels in CypherVerse
+        Browse, filter and list CypherVerse parcels
       </Text>
 
 
-      {/* ===================================================
-          FILTER BUTTONS
-          =================================================== */}
+      {/* =================================================
+          FILTERS
+          ================================================= */}
 
-      <group
+      <FilterBar
+        search={
+          search
+        }
+        setSearch={
+          setSearch
+        }
+        status={
+          status
+        }
+        setStatus={
+          setStatus
+        }
+        district={
+          district
+        }
+        setDistrict={
+          setDistrict
+        }
+        coordinateX={
+          coordinateX
+        }
+        setCoordinateX={
+          setCoordinateX
+        }
+        coordinateY={
+          coordinateY
+        }
+        setCoordinateY={
+          setCoordinateY
+        }
+        minPrice={
+          minPrice
+        }
+        setMinPrice={
+          setMinPrice
+        }
+        maxPrice={
+          maxPrice
+        }
+        setMaxPrice={
+          setMaxPrice
+        }
+      />
+
+
+      {/* =================================================
+          MAP TOGGLE
+          ================================================= */}
+
+      <Button
         position={[
-          0,
-          0,
+          1.02,
+          0.42,
           0,
         ]}
+        fontSize={0.065}
+        onClick={() =>
+          setShowMap(
+            (current) =>
+              !current,
+          )
+        }
       >
-
-        <Button
-          position={[
-            -0.72,
-            0,
-            0,
-          ]}
-          fontSize={0.06}
-          onClick={() =>
-            setFilter("all")
-          }
-        >
-          ALL
-        </Button>
+        {showMap
+          ? "CLOSE MAP"
+          : "MAP"}
+      </Button>
 
 
-        <Button
-          position={[
-            -0.28,
-            0,
-            0,
-          ]}
-          fontSize={0.06}
-          onClick={() =>
-            setFilter(
-              "available"
-            )
-          }
-        >
-          AVAILABLE
-        </Button>
-
-
-        <Button
-          position={[
-            0.22,
-            0,
-            0,
-          ]}
-          fontSize={0.06}
-          onClick={() =>
-            setFilter(
-              "for_sale"
-            )
-          }
-        >
-          FOR SALE
-        </Button>
-
-
-        <Button
-          position={[
-            0.68,
-            0,
-            0,
-          ]}
-          fontSize={0.06}
-          onClick={() =>
-            setFilter(
-              "owned"
-            )
-          }
-        >
-          OWNED
-        </Button>
-
-      </group>
-
-
-      {/* ===================================================
+      {/* =================================================
           ACTION ERROR
-          =================================================== */}
+          ================================================= */}
 
       {actionError && (
 
@@ -738,48 +1335,206 @@ export default function ParcelDirectory({
       )}
 
 
-      {/* ===================================================
-          EMPTY STATE
-          =================================================== */}
+      {/* =================================================
+          LISTING PRICE
+          ================================================= */}
 
-      {filteredParcels.length ===
-        0 && (
+      {selectedOwnedParcel &&
+        onList &&
+        !showMap && (
 
-        <Text
-          position={[
-            0,
-            -0.55,
-            0,
-          ]}
-          fontSize={0.10}
-          color="#94a3b8"
-          anchorX="center"
-          anchorY="middle"
-        >
-          No parcels found.
-        </Text>
+          <Html
+            position={[
+              0,
+              -0.55,
+              0,
+            ]}
+            center
+            distanceFactor={8}
+            zIndexRange={[
+              100,
+              0,
+            ]}
+          >
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                background:
+                  "rgba(15,23,42,0.96)",
+                border:
+                  "1px solid rgba(148,163,184,0.35)",
+                color:
+                  "#ffffff",
+                fontFamily:
+                  "Arial, sans-serif",
+                pointerEvents:
+                  "auto",
+              }}
+              onPointerDown={(event) =>
+                event.stopPropagation()
+              }
+              onClick={(event) =>
+                event.stopPropagation()
+              }
+            >
+
+              <span
+                style={{
+                  fontSize: "12px",
+                  whiteSpace:
+                    "nowrap",
+                }}
+              >
+                List{" "}
+                {selectedOwnedParcel.name ||
+                  selectedOwnedParcel.estateId ||
+                  "parcel"}{" "}
+                for:
+              </span>
+
+              <input
+                name="listing-price"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={
+                  listingPrice
+                }
+                onChange={(event) =>
+                  setListingPrice(
+                    event.currentTarget.value,
+                  )
+                }
+                placeholder="Price in CV"
+                style={{
+                  width: "110px",
+                  padding:
+                    "6px 8px",
+                  borderRadius:
+                    "6px",
+                  border:
+                    "1px solid #334155",
+                  background:
+                    "#111827",
+                  color:
+                    "#ffffff",
+                }}
+              />
+
+              <button
+                type="button"
+                disabled={
+                  Boolean(
+                    actionParcelId,
+                  ) ||
+                  !listingPrice
+                }
+                onClick={
+                  handleListSelected
+                }
+                style={{
+                  padding:
+                    "6px 10px",
+                  border: "0",
+                  borderRadius:
+                    "6px",
+                  background:
+                    "#2563eb",
+                  color:
+                    "#ffffff",
+                  cursor:
+                    "pointer",
+                  fontWeight:
+                    600,
+                }}
+              >
+                {actionParcelId ===
+                  selectedOwnedParcel.id &&
+                actionType ===
+                  "list"
+                  ? "LISTING..."
+                  : "LIST FOR SALE"}
+              </button>
+
+            </div>
+
+          </Html>
+
+        )}
+
+
+      {/* =================================================
+          MAP
+          ================================================= */}
+
+      {showMap && (
+
+        <ParcelOverviewMap
+          parcels={
+            parcels
+          }
+          selectedParcelId={
+            selectedParcelId
+          }
+          onSelect={
+            handleSelect
+          }
+          onClose={() =>
+            setShowMap(false)
+          }
+        />
 
       )}
 
 
-      {/* ===================================================
+      {/* =================================================
+          EMPTY STATE
+          ================================================= */}
+
+      {!showMap &&
+        filteredParcels.length ===
+          0 && (
+
+          <Text
+            position={[
+              0,
+              -0.85,
+              0,
+            ]}
+            fontSize={0.10}
+            color="#94a3b8"
+            anchorX="center"
+            anchorY="middle"
+          >
+            No parcels found.
+          </Text>
+
+        )}
+
+
+      {/* =================================================
           PARCEL LIST
-          =================================================== */}
+          ================================================= */}
 
-      <group
-        position={[
-          0,
-          -0.55,
-          0,
-        ]}
-      >
+      {!showMap && (
 
-        {filteredParcels
-          .slice(0, 8)
-          .map(
+        <group
+          position={[
+            0,
+            -1.20,
+            0,
+          ]}
+        >
+
+          {pagedParcels.map(
             (
               parcel,
-              index
+              index,
             ) => (
 
               <ParcelRow
@@ -812,10 +1567,6 @@ export default function ParcelDirectory({
                   onReserve
                 }
 
-                onList={
-                  onList
-                }
-
                 actionParcelId={
                   actionParcelId
                 }
@@ -825,29 +1576,114 @@ export default function ParcelDirectory({
                 }
               />
 
-            )
+            ),
           )}
 
-      </group>
+        </group>
+
+      )}
 
 
-      {/* ===================================================
+      {/* =================================================
+          PAGINATION
+          ================================================= */}
+
+      {!showMap &&
+        filteredParcels.length >
+          PAGE_SIZE && (
+
+          <group
+            position={[
+              0,
+              -7.00,
+              0,
+            ]}
+          >
+
+            <Button
+              position={[
+                -0.55,
+                0,
+                0,
+              ]}
+              fontSize={0.065}
+              onClick={() =>
+                setPageIndex(
+                  (current) =>
+                    Math.max(
+                      0,
+                      current - 1,
+                    ),
+                )
+              }
+            >
+              PREVIOUS
+            </Button>
+
+
+            <Text
+              position={[
+                0,
+                0,
+                0,
+              ]}
+              fontSize={0.07}
+              color="#94a3b8"
+              anchorX="center"
+              anchorY="middle"
+            >
+              {`PAGE ${
+                pageIndex + 1
+              } / ${pageCount}`}
+            </Text>
+
+
+            <Button
+              position={[
+                0.55,
+                0,
+                0,
+              ]}
+              fontSize={0.065}
+              onClick={() =>
+                setPageIndex(
+                  (current) =>
+                    Math.min(
+                      pageCount - 1,
+                      current + 1,
+                    ),
+                )
+              }
+            >
+              NEXT
+            </Button>
+
+          </group>
+
+        )}
+
+
+      {/* =================================================
           COUNT
-          =================================================== */}
+          ================================================= */}
 
-      <Text
-        position={[
-          0,
-          -6.15,
-          0,
-        ]}
-        fontSize={0.07}
-        color="#64748b"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {`${filteredParcels.length} parcels`}
-      </Text>
+      {!showMap && (
+
+        <Text
+          position={[
+            0,
+            -7.55,
+            0,
+          ]}
+          fontSize={0.07}
+          color="#64748b"
+          anchorX="center"
+          anchorY="middle"
+        >
+          {`${filteredParcels.length} matching parcels · ${parcels.length} loaded`}
+        </Text>
+
+      )}
 
     </group>
   );

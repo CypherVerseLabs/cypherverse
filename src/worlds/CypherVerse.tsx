@@ -45,13 +45,12 @@ import {
   useMarketplace,
 } from "../marketplace";
 
-import LandmarkLayer from "./LandmarkLayer";
-
 import CypherVerseMapLayer from "./CypherVerseMapLayer";
 
 import {
   CITY_CENTER,
 } from "../parcels/parcelCoordinates";
+
 
 /**
  * =========================================================
@@ -60,6 +59,7 @@ import {
  */
 
 const CHUNK_SIZE = 512;
+
 
 /**
  * The player starts at the centered world position:
@@ -85,6 +85,7 @@ const INITIAL_WORLD_MAX =
   CITY_CENTER +
   CHUNK_SIZE / 2;
 
+
 /**
  * =========================================================
  * CYPHERVERSE
@@ -92,12 +93,11 @@ const INITIAL_WORLD_MAX =
  */
 
 export default function CypherVerse() {
+
   /**
    * =======================================================
    * PARCEL DATA
    * =======================================================
-   *
-   * IMPORTANT:
    *
    * These are DATABASE coordinates.
    *
@@ -114,16 +114,22 @@ export default function CypherVerse() {
   } = useParcels({
     enabled: true,
 
-    minX: INITIAL_WORLD_MIN,
+    minX:
+      INITIAL_WORLD_MIN,
 
-    maxX: INITIAL_WORLD_MAX,
+    maxX:
+      INITIAL_WORLD_MAX,
 
-    minY: INITIAL_WORLD_MIN,
+    minY:
+      INITIAL_WORLD_MIN,
 
-    maxY: INITIAL_WORLD_MAX,
+    maxY:
+      INITIAL_WORLD_MAX,
 
-    chunkSize: CHUNK_SIZE,
+    chunkSize:
+      CHUNK_SIZE,
   });
+
 
   /**
    * =======================================================
@@ -140,7 +146,10 @@ export default function CypherVerse() {
     setParcels(
       fetchedParcels,
     );
-  }, [fetchedParcels]);
+  }, [
+    fetchedParcels,
+  ]);
+
 
   /**
    * =======================================================
@@ -172,6 +181,7 @@ export default function CypherVerse() {
   const selectedParcelProject =
     selectedParcel?.project ??
     null;
+
 
   /**
    * =======================================================
@@ -225,6 +235,7 @@ export default function CypherVerse() {
     selectedParcelProject?.slug,
   ]);
 
+
   /**
    * =======================================================
    * MARKETPLACE
@@ -241,6 +252,7 @@ export default function CypherVerse() {
     clearAction,
   } = useMarketplace();
 
+
   /**
    * =======================================================
    * SELECT PARCEL
@@ -256,8 +268,11 @@ export default function CypherVerse() {
 
         clearAction();
       },
-      [clearAction],
+      [
+        clearAction,
+      ],
     );
+
 
   /**
    * =======================================================
@@ -267,7 +282,10 @@ export default function CypherVerse() {
 
   const handleBuyParcel =
     useCallback(
-      async (parcel: Parcel) => {
+      async (
+        parcel: Parcel,
+      ) => {
+
         if (
           actionParcelId ||
           !parcel?.id
@@ -297,6 +315,7 @@ export default function CypherVerse() {
       ],
     );
 
+
   /**
    * =======================================================
    * RESERVE PARCEL
@@ -305,7 +324,10 @@ export default function CypherVerse() {
 
   const handleReserveParcel =
     useCallback(
-      async (parcel: Parcel) => {
+      async (
+        parcel: Parcel,
+      ) => {
+
         if (actionParcelId) {
           return;
         }
@@ -320,6 +342,7 @@ export default function CypherVerse() {
         }
 
         if (result.parcel) {
+
           setParcels(
             (currentParcels) =>
               currentParcels.map(
@@ -345,40 +368,39 @@ export default function CypherVerse() {
       ],
     );
 
+
   /**
    * =======================================================
    * LIST PARCEL
    * =======================================================
+   *
+   * The optional requestedPrice is supplied by the
+   * directory/panel listing UI.
+   *
+   * If it is not supplied, preserve the existing behavior
+   * and use the parcel's current price.
    */
 
   const handleListParcel =
     useCallback(
-      async (parcel: Parcel) => {
+      async (
+        parcel: Parcel,
+        requestedPrice?: string,
+      ) => {
+
         if (actionParcelId) {
           return;
         }
 
-        const rawPrice =
-          parcel.price;
-
-        if (
-          rawPrice === null ||
-          rawPrice === undefined
-        ) {
-          return;
-        }
-
         const price =
-          String(rawPrice).trim();
-
-        if (
-          !/^\d+(\.\d{1,2})?$/.test(
-            price,
-          ) ||
-          Number(price) <= 0
-        ) {
-          return;
-        }
+          requestedPrice !== undefined
+            ? requestedPrice.trim()
+            : parcel.price !== null &&
+                parcel.price !== undefined
+              ? String(
+                  parcel.price,
+                ).trim()
+              : "";
 
         const result =
           await listParcel(
@@ -391,6 +413,7 @@ export default function CypherVerse() {
         }
 
         if (result.parcel) {
+
           setParcels(
             (currentParcels) =>
               currentParcels.map(
@@ -416,6 +439,7 @@ export default function CypherVerse() {
       ],
     );
 
+
   /**
    * =======================================================
    * PARCEL ACTION TYPE
@@ -429,6 +453,7 @@ export default function CypherVerse() {
       ? actionType
       : null;
 
+
   /**
    * =======================================================
    * ERROR
@@ -436,6 +461,7 @@ export default function CypherVerse() {
    */
 
   useEffect(() => {
+
     if (!error) {
       return;
     }
@@ -444,7 +470,11 @@ export default function CypherVerse() {
       "CypherVerse parcel loading error:",
       error,
     );
-  }, [error]);
+
+  }, [
+    error,
+  ]);
+
 
   /**
    * =======================================================
@@ -453,6 +483,7 @@ export default function CypherVerse() {
    */
 
   useEffect(() => {
+
     if (!selectedParcelId) {
       return;
     }
@@ -465,15 +496,20 @@ export default function CypherVerse() {
       );
 
     if (!stillLoaded) {
-      setSelectedParcelId(null);
+
+      setSelectedParcelId(
+        null,
+      );
 
       clearAction();
     }
+
   }, [
     parcels,
     selectedParcelId,
     clearAction,
   ]);
+
 
   /**
    * =======================================================
@@ -483,24 +519,29 @@ export default function CypherVerse() {
 
   return (
     <StandardReality
+
       environmentProps={{
         dev:
           process.env.NODE_ENV ===
           "development",
 
         canvasProps: {
-          frameloop: "demand",
+          frameloop:
+            "demand",
         },
       }}
+
       playerProps={{
         flying: true,
       }}
     >
+
       {/* =================================================
           PUBLISHED PROJECT
           ================================================= */}
 
       {loadedParcelProject?.scene && (
+
         <EditorProvider
           initialScene={
             loadedParcelProject.scene
@@ -509,7 +550,9 @@ export default function CypherVerse() {
         >
           <Scene />
         </EditorProvider>
+
       )}
+
 
       {/* =================================================
           WORLD ENVIRONMENT
@@ -527,12 +570,15 @@ export default function CypherVerse() {
           0.7,
           0.85,
           1,
+
           0.4,
           0.65,
           0.9,
+
           0.2,
           0.45,
           0.7,
+
           0.1,
           0.2,
           0.5,
@@ -547,29 +593,45 @@ export default function CypherVerse() {
 
       <ambientLight />
 
+
       {/* =================================================
           PHYSICAL PARCEL WORLD
           =================================================
-          
+
           Database coordinates are translated into centered
           Three.js coordinates by ParcelLayer through:
 
               origin = [-2400, 0, -2400]
           */}
 
-      <group position-y={0}>
+      <group
+        position-y={0}
+      >
+
         <ParcelLayer
-          parcels={parcels}
-          tileSize={16}
+
+          parcels={
+            parcels
+          }
+
+          tileSize={
+            16
+          }
+
           origin={[
             -CITY_CENTER,
             0,
             -CITY_CENTER,
           ]}
-          interactive={true}
+
+          interactive={
+            true
+          }
+
           selectedParcelId={
             selectedParcelId
           }
+
           onParcelSelect={({
             parcel,
           }) => {
@@ -577,74 +639,108 @@ export default function CypherVerse() {
               parcel,
             );
           }}
+
           onParcelClose={() => {
             setSelectedParcelId(
               null,
             );
           }}
-          onBuy={handleBuyParcel}
+
+          onBuy={
+            handleBuyParcel
+          }
+
           onReserve={
             handleReserveParcel
           }
-          onList={handleListParcel}
+
+          onList={
+            handleListParcel
+          }
+
           actionParcelId={
             actionParcelId
           }
+
           actionType={
             parcelActionType
           }
+
           actionError={
             actionError
           }
+
           onRequestBounds={({
             minX,
             maxX,
             minY,
             maxY,
           }) => {
+
             void loadChunk(
               minX,
               maxX,
               minY,
               maxY,
             );
+
           }}
         />
 
+
         <CypherVerseMapLayer
-          showLabels={true}
+          showLabels={
+            true
+          }
         />
 
-        
       </group>
 
+
       {/* =================================================
-          3D LAND DIRECTORY
+          LAND DIRECTORY
           ================================================= */}
 
       <ParcelDirectory
-        parcels={parcels}
+
+        parcels={
+          parcels
+        }
+
         selectedParcelId={
           selectedParcelId
         }
+
         onSelect={
           handleParcelSelect
         }
-        onBuy={handleBuyParcel}
+
+        onBuy={
+          handleBuyParcel
+        }
+
         onReserve={
           handleReserveParcel
         }
-        onList={handleListParcel}
+
+        onList={
+          handleListParcel
+        }
+
         actionParcelId={
           actionParcelId
         }
+
         actionType={
           parcelActionType
         }
+
         actionError={
           actionError
         }
+
       />
+
 
       {/* =================================================
           WORLD TERRAIN
@@ -652,7 +748,9 @@ export default function CypherVerse() {
 
       <Ground />
 
+
       {loading && null}
+
     </StandardReality>
   );
 }

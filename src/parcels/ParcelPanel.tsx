@@ -3,6 +3,12 @@ import {
 } from "cyengine";
 
 import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Html,
   Text,
 } from "@react-three/drei";
 
@@ -14,7 +20,7 @@ import type {
 
 /**
  * =========================================================
- * PARCEL PANEL PROPS
+ * PROPS
  * =========================================================
  */
 
@@ -35,7 +41,8 @@ interface ParcelPanelProps {
   ) => void | Promise<void>;
 
   onList?: (
-    parcel: Parcel
+    parcel: Parcel,
+    price?: string
   ) => void | Promise<void>;
 
   actionParcelId?:
@@ -59,7 +66,7 @@ interface ParcelPanelProps {
  */
 
 function formatPrice(
-  price?: number | null
+  price?: number | null,
 ): string {
 
   if (
@@ -75,12 +82,12 @@ function formatPrice(
 
 /**
  * =========================================================
- * STATUS LABEL
+ * STATUS
  * =========================================================
  */
 
 function formatStatus(
-  status: Parcel["status"]
+  status: Parcel["status"],
 ): string {
 
   switch (status) {
@@ -103,14 +110,8 @@ function formatStatus(
 }
 
 
-/**
- * =========================================================
- * STATUS COLOR
- * =========================================================
- */
-
 function getStatusColor(
-  status: Parcel["status"]
+  status: Parcel["status"],
 ): string {
 
   switch (status) {
@@ -142,7 +143,7 @@ function getStatusColor(
 function getActionLabel(
   actionType:
     | ParcelActionType
-    | null
+    | null,
 ): string {
 
   switch (actionType) {
@@ -194,6 +195,42 @@ export default function ParcelPanel({
 
   /**
    * =======================================================
+   * LISTING PRICE
+   * =======================================================
+   */
+
+  const [
+    listingPrice,
+    setListingPrice,
+  ] = useState("");
+
+
+  useEffect(() => {
+
+    if (!parcel) {
+      setListingPrice("");
+      return;
+    }
+
+    setListingPrice(
+      parcel.price !==
+        null &&
+      parcel.price !==
+        undefined
+        ? String(
+            parcel.price,
+          )
+        : "",
+    );
+
+  }, [
+    parcel?.id,
+    parcel?.price,
+  ]);
+
+
+  /**
+   * =======================================================
    * NO SELECTION
    * =======================================================
    */
@@ -218,22 +255,45 @@ export default function ParcelPanel({
    * =======================================================
    * PANEL DIMENSIONS
    * =======================================================
-   *
-   * Smaller than the previous 3.6 × 4.8 panel.
    */
 
-  const panelWidth = 2.8;
+  const panelWidth =
+    2.8;
 
-  const panelHeight = 3.65;
+  const panelHeight =
+    4.10;
 
 
   /**
    * =======================================================
-   * PANEL
+   * LIST
+   * =======================================================
+   */
+
+  const handleList = () => {
+
+    if (
+      !onList ||
+      isProcessing
+    ) {
+      return;
+    }
+
+    void onList(
+      parcel,
+      listingPrice,
+    );
+  };
+
+
+  /**
+   * =======================================================
+   * RENDER
    * =======================================================
    */
 
   return (
+
     <group
       name="parcel-panel"
       position={[
@@ -243,9 +303,9 @@ export default function ParcelPanel({
       ]}
     >
 
-      {/* ===================================================
-          OUTER BORDER
-          =================================================== */}
+      {/* =================================================
+          BORDER
+          ================================================= */}
 
       <mesh
         position={[
@@ -257,8 +317,10 @@ export default function ParcelPanel({
 
         <planeGeometry
           args={[
-            panelWidth + 0.06,
-            panelHeight + 0.06,
+            panelWidth +
+              0.06,
+            panelHeight +
+              0.06,
           ]}
         />
 
@@ -271,9 +333,9 @@ export default function ParcelPanel({
       </mesh>
 
 
-      {/* ===================================================
-          PANEL BACKGROUND
-          =================================================== */}
+      {/* =================================================
+          BACKGROUND
+          ================================================= */}
 
       <mesh
         position={[
@@ -299,16 +361,16 @@ export default function ParcelPanel({
       </mesh>
 
 
-      {/* ===================================================
+      {/* =================================================
           CLOSE
-          =================================================== */}
+          ================================================= */}
 
       {onClose && (
 
         <Button
           position={[
             1.16,
-            1.55,
+            1.75,
             0,
           ]}
           fontSize={0.10}
@@ -328,9 +390,9 @@ export default function ParcelPanel({
       )}
 
 
-      {/* ===================================================
+      {/* =================================================
           TITLE
-          =================================================== */}
+          ================================================= */}
 
       <Text
         color="#ffffff"
@@ -344,7 +406,8 @@ export default function ParcelPanel({
         anchorX="center"
         anchorY="middle"
       >
-        {typeof parcel.name === "string" &&
+        {typeof parcel.name ===
+          "string" &&
         parcel.name.trim()
           ? parcel.name
           : `Parcel ${
@@ -354,9 +417,9 @@ export default function ParcelPanel({
       </Text>
 
 
-      {/* ===================================================
+      {/* =================================================
           ID
-          =================================================== */}
+          ================================================= */}
 
       <InfoRow
         label="Parcel ID"
@@ -371,29 +434,31 @@ export default function ParcelPanel({
       />
 
 
-      {/* ===================================================
+      {/* =================================================
           ESTATE
-          =================================================== */}
+          ================================================= */}
 
       <InfoRow
-  label="Estate"
-  value={
-    parcel.estateId != null
-      ? String(parcel.estateId)
-      : "—"
-  }
-  position={[
-    0,
-    0.82,
-    0,
-  ]}
-/>
+        label="Estate"
+        value={
+          parcel.estateId !=
+          null
+            ? String(
+                parcel.estateId,
+              )
+            : "—"
+        }
+        position={[
+          0,
+          0.82,
+          0,
+        ]}
+      />
 
 
-
-      {/* ===================================================
+      {/* =================================================
           COORDINATES
-          =================================================== */}
+          ================================================= */}
 
       <InfoRow
         label="Coordinates"
@@ -408,9 +473,9 @@ export default function ParcelPanel({
       />
 
 
-      {/* ===================================================
+      {/* =================================================
           STATUS
-          =================================================== */}
+          ================================================= */}
 
       <Text
         color="#8d99ae"
@@ -430,7 +495,7 @@ export default function ParcelPanel({
       <Text
         color={
           getStatusColor(
-            parcel.status
+            parcel.status,
           )
         }
         fontSize={0.11}
@@ -443,20 +508,20 @@ export default function ParcelPanel({
         anchorY="middle"
       >
         {formatStatus(
-          parcel.status
+          parcel.status,
         )}
       </Text>
 
 
-      {/* ===================================================
+      {/* =================================================
           PRICE
-          =================================================== */}
+          ================================================= */}
 
       <InfoRow
         label="Price"
         value={
           formatPrice(
-            parcel.price
+            parcel.price,
           )
         }
         position={[
@@ -468,60 +533,62 @@ export default function ParcelPanel({
       />
 
 
-      {/* ===================================================
+      {/* =================================================
           DESCRIPTION
-          =================================================== */}
+          ================================================= */}
 
-      {typeof parcel.description === "string" &&
-      parcel.description.trim() && (
+      {typeof parcel.description ===
+        "string" &&
+        parcel.description.trim() && (
 
-        <Text
-          color="#b7c0d0"
-          fontSize={0.09}
-          maxWidth={2.25}
-          position={[
-            0,
-            -0.32,
-            0,
-          ]}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {parcel.description}
-        </Text>
+          <Text
+            color="#b7c0d0"
+            fontSize={0.09}
+            maxWidth={2.25}
+            position={[
+              0,
+              -0.32,
+              0,
+            ]}
+            anchorX="center"
+            anchorY="middle"
+          >
+            {parcel.description}
+          </Text>
 
-      )}
+        )}
 
 
-      {/* ===================================================
+      {/* =================================================
           ACTION ERROR
-          =================================================== */}
+          ================================================= */}
 
       {!isProcessing &&
-      typeof actionError === "string" &&
-      actionError.trim() && (
+        typeof actionError ===
+          "string" &&
+        actionError.trim() && (
 
-        <Text
-          color="#ff8d8d"
-          fontSize={0.085}
-          maxWidth={2.25}
-          position={[
-            0,
-            -0.70,
-            0,
-          ]}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {actionError}
-        </Text>
+          <Text
+            color="#ff8d8d"
+            fontSize={0.085}
+            maxWidth={2.25}
+            position={[
+              0,
+              -0.68,
+              0,
+            ]}
+            anchorX="center"
+            anchorY="middle"
+          >
+            {actionError}
+          </Text>
 
-      )}
+        )}
 
 
-      {/* ===================================================
+      {/* =================================================
           PROCESSING
-          =================================================== */}
+          ================================================= */}
 
       {isProcessing && (
 
@@ -531,129 +598,226 @@ export default function ParcelPanel({
           maxWidth={2.25}
           position={[
             0,
-            -0.70,
+            -0.68,
             0,
           ]}
           anchorX="center"
           anchorY="middle"
         >
           {getActionLabel(
-            actionType ?? null
+            actionType ??
+              null,
           )}
         </Text>
 
       )}
 
 
-      {/* ===================================================
+      {/* =================================================
           AVAILABLE → RESERVE
-          =================================================== */}
+          ================================================= */}
 
       {parcel.status ===
         "available" &&
-      onReserve && (
+        onReserve && (
 
-        <Button
-          position={[
-            0,
-            -1.13,
-            0,
-          ]}
-          fontSize={0.075}
-          onClick={() => {
+          <Button
+            position={[
+              0,
+              -1.13,
+              0,
+            ]}
+            fontSize={0.075}
+            onClick={() => {
 
-            if (
-              !isProcessing
-            ) {
-              void onReserve(
-                parcel
-              );
-            }
+              if (
+                !isProcessing
+              ) {
+                void onReserve(
+                  parcel,
+                );
+              }
 
-          }}
-        >
-          {isProcessing &&
-          actionType ===
-            "reserve"
-            ? "Reserving..."
-            : "Reserve Parcel"}
-        </Button>
+            }}
+          >
+            {isProcessing &&
+            actionType ===
+              "reserve"
+              ? "Reserving..."
+              : "Reserve Parcel"}
+          </Button>
 
-      )}
+        )}
 
 
-      {/* ===================================================
+      {/* =================================================
           FOR SALE → BUY
-          =================================================== */}
+          ================================================= */}
 
       {parcel.status ===
         "for_sale" &&
-      onBuy && (
+        onBuy && (
 
-        <Button
-          position={[
-            0,
-            -1.13,
-            0,
-          ]}
-          fontSize={0.075}
-          onClick={() => {
+          <Button
+            position={[
+              0,
+              -1.13,
+              0,
+            ]}
+            fontSize={0.075}
+            onClick={() => {
 
-            if (
-              !isProcessing
-            ) {
-              void onBuy(
-                parcel
-              );
-            }
+              if (
+                !isProcessing
+              ) {
+                void onBuy(
+                  parcel,
+                );
+              }
 
-          }}
-        >
-          {isProcessing &&
-          actionType ===
-            "buy"
-            ? "Buying..."
-            : "Buy Parcel"}
-        </Button>
+            }}
+          >
+            {isProcessing &&
+            actionType ===
+              "buy"
+              ? "Buying..."
+              : "Buy Parcel"}
+          </Button>
 
-      )}
+        )}
 
 
-      {/* ===================================================
+      {/* =================================================
           OWNED → LIST
-          =================================================== */}
+          ================================================= */}
 
       {parcel.status ===
         "owned" &&
-      onList && (
+        onList && (
 
-        <Button
-          position={[
-            0,
-            -1.13,
-            0,
-          ]}
-          fontSize={0.075}
-          onClick={() => {
+          <>
+            <Html
+              position={[
+                0,
+                -1.00,
+                0.01,
+              ]}
+              center
+              distanceFactor={7}
+              zIndexRange={[
+                100,
+                0,
+              ]}
+            >
 
-            if (
-              !isProcessing
-            ) {
-              void onList(
-                parcel
-              );
-            }
+              <div
+                style={{
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  gap:
+                    "6px",
+                  padding:
+                    "6px 8px",
+                  borderRadius:
+                    "7px",
+                  background:
+                    "rgba(15,23,42,0.96)",
+                  border:
+                    "1px solid #334155",
+                  pointerEvents:
+                    "auto",
+                  fontFamily:
+                    "Arial, sans-serif",
+                }}
+                onPointerDown={(
+                  event,
+                ) =>
+                  event.stopPropagation()
+                }
+                onClick={(
+                  event,
+                ) =>
+                  event.stopPropagation()
+                }
+              >
 
-          }}
-        >
-          {isProcessing &&
-          actionType ===
-            "list"
-            ? "Listing..."
-            : "List for Sale"}
-        </Button>
+                <input
+                  name="parcel-listing-price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={
+                    listingPrice
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setListingPrice(
+                      event
+                        .currentTarget
+                        .value,
+                    )
+                  }
+                  placeholder="CV price"
+                  style={{
+                    width:
+                      "92px",
+                    padding:
+                      "5px 7px",
+                    borderRadius:
+                      "5px",
+                    border:
+                      "1px solid #475569",
+                    background:
+                      "#111827",
+                    color:
+                      "#ffffff",
+                  }}
+                />
 
-      )}
+                <button
+                  type="button"
+                  disabled={
+                    isProcessing ||
+                    !listingPrice
+                  }
+                  onClick={
+                    handleList
+                  }
+                  style={{
+                    padding:
+                      "5px 8px",
+                    border:
+                      "0",
+                    borderRadius:
+                      "5px",
+                    background:
+                      "#2563eb",
+                    color:
+                      "#ffffff",
+                    cursor:
+                      "pointer",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      600,
+                  }}
+                >
+                  {isProcessing &&
+                  actionType ===
+                    "list"
+                    ? "..."
+                    : "LIST"}
+                </button>
+
+              </div>
+
+            </Html>
+          </>
+
+        )}
 
     </group>
   );
@@ -686,6 +850,7 @@ function InfoRow({
 }) {
 
   return (
+
     <group
       position={
         position
