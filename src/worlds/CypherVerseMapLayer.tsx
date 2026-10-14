@@ -221,12 +221,12 @@ function Road({
     return null;
   }
 
-  const labelPoint =
-    points[
-      Math.floor(
-        points.length / 2,
-      )
-    ];
+  const labelIndex = Math.max(
+  0,
+  Math.floor((points.length - 1) * 0.3),
+);
+
+const labelPoint = points[labelIndex];
 
   return (
     <group
