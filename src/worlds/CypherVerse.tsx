@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -12,15 +11,12 @@ import {
   Fog,
 } from "cyengine";
 
-import {
-  useFrame,
-  useThree,
-} from "@react-three/fiber";
-
 import CloudySky from "ideas/CloudySky";
+
 import Ground from "ideas/Ground";
 
 import ParcelLayer from "../parcels/ParcelLayer";
+
 import ParcelDirectory from "../parcels/ParcelDirectory";
 
 import {
@@ -50,6 +46,7 @@ import {
 } from "../marketplace";
 
 import LandmarkLayer from "./LandmarkLayer";
+
 import CypherVerseMapLayer from "./CypherVerseMapLayer";
 
 import {
@@ -65,80 +62,28 @@ import {
 const CHUNK_SIZE = 512;
 
 /**
- * =========================================================
- * CHUNK STREAMER
- * =========================================================
+ * The player starts at the centered world position:
  *
- * Must remain inside StandardReality.
+ *     Three.js: 0, 0
  *
- * Watches the player camera and requests the chunk
- * containing the player.
+ * which corresponds to database:
  *
- * Duplicate requests are handled by useParcels.
- * =========================================================
+ *     2400, 2400
+ *
+ * The initial 512 × 512 database chunk therefore covers:
+ *
+ *     2048 → 2560
+ *
+ * This contains the world center.
  */
 
-interface ParcelChunkStreamerProps {
-  loadChunk: (
-    minX: number,
-    maxX: number,
-    minY: number,
-    maxY: number,
-  ) => void | Promise<void>;
-}
+const INITIAL_WORLD_MIN =
+  CITY_CENTER -
+  CHUNK_SIZE / 2;
 
-function ParcelChunkStreamer({
-  loadChunk,
-}: ParcelChunkStreamerProps) {
-  const camera = useThree(
-    (state) => state.camera,
-  );
-
-  const lastChunkRef = useRef<string | null>(null);
-  const lastLoadRef = useRef(0);
-
-  useFrame(() => {
-    const now = performance.now();
-
-    // Avoid checking for a new chunk every frame.
-    if (now - lastLoadRef.current < 150) {
-      return;
-    }
-
-    lastLoadRef.current = now;
-
-    const chunkX = Math.floor(
-      camera.position.x / CHUNK_SIZE,
-    );
-
-    const chunkY = Math.floor(
-      camera.position.z / CHUNK_SIZE,
-    );
-
-    const minX = chunkX * CHUNK_SIZE;
-    const maxX = minX + CHUNK_SIZE;
-
-    const minY = chunkY * CHUNK_SIZE;
-    const maxY = minY + CHUNK_SIZE;
-
-    const chunkKey = `${chunkX}:${chunkY}`;
-
-    if (lastChunkRef.current === chunkKey) {
-      return;
-    }
-
-    lastChunkRef.current = chunkKey;
-
-    void loadChunk(
-      minX,
-      maxX,
-      minY,
-      maxY,
-    );
-  });
-
-  return null;
-}
+const INITIAL_WORLD_MAX =
+  CITY_CENTER +
+  CHUNK_SIZE / 2;
 
 /**
  * =========================================================
@@ -151,6 +96,13 @@ export default function CypherVerse() {
    * =======================================================
    * PARCEL DATA
    * =======================================================
+   *
+   * IMPORTANT:
+   *
+   * These are DATABASE coordinates.
+   *
+   * We start around the database world center rather than
+   * around database coordinate 0.
    */
 
   const {
@@ -161,10 +113,16 @@ export default function CypherVerse() {
     loadChunk,
   } = useParcels({
     enabled: true,
-    minX: 0,
-    maxX: CHUNK_SIZE,
-    minY: 0,
-    maxY: CHUNK_SIZE,
+
+    minX: INITIAL_WORLD_MIN,
+
+    maxX: INITIAL_WORLD_MAX,
+
+    minY: INITIAL_WORLD_MIN,
+
+    maxY: INITIAL_WORLD_MAX,
+
+    chunkSize: CHUNK_SIZE,
   });
 
   /**
@@ -179,7 +137,9 @@ export default function CypherVerse() {
   ] = useState<Parcel[]>([]);
 
   useEffect(() => {
-    setParcels(fetchedParcels);
+    setParcels(
+      fetchedParcels,
+    );
   }, [fetchedParcels]);
 
   /**
@@ -191,18 +151,27 @@ export default function CypherVerse() {
   const [
     selectedParcelId,
     setSelectedParcelId,
-  ] = useState<string | null>(null);
-
-  const selectedParcel = useMemo(
-    () =>
-      parcels.find(
-        (parcel) => parcel.id === selectedParcelId,
-      ) ?? null,
-    [parcels, selectedParcelId],
+  ] = useState<string | null>(
+    null,
   );
 
+  const selectedParcel =
+    useMemo(
+      () =>
+        parcels.find(
+          (parcel) =>
+            parcel.id ===
+            selectedParcelId,
+        ) ?? null,
+      [
+        parcels,
+        selectedParcelId,
+      ],
+    );
+
   const selectedParcelProject =
-    selectedParcel?.project ?? null;
+    selectedParcel?.project ??
+    null;
 
   /**
    * =======================================================
@@ -213,14 +182,18 @@ export default function CypherVerse() {
   const [
     loadedParcelProject,
     setLoadedParcelProject,
-  ] = useState<Project | null>(null);
+  ] = useState<Project | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     setLoadedParcelProject(null);
 
-    const slug = selectedParcelProject?.slug ?? null;
+    const slug =
+      selectedParcelProject?.slug ??
+      null;
 
     if (!slug) {
       return () => {
@@ -231,7 +204,9 @@ export default function CypherVerse() {
     void fetchPublicProject(slug)
       .then((project) => {
         if (!cancelled) {
-          setLoadedParcelProject(project);
+          setLoadedParcelProject(
+            project,
+          );
         }
       })
       .catch((projectError) => {
@@ -246,7 +221,9 @@ export default function CypherVerse() {
     return () => {
       cancelled = true;
     };
-  }, [selectedParcelProject?.slug]);
+  }, [
+    selectedParcelProject?.slug,
+  ]);
 
   /**
    * =======================================================
@@ -270,13 +247,17 @@ export default function CypherVerse() {
    * =======================================================
    */
 
-  const handleParcelSelect = useCallback(
-    (parcel: Parcel) => {
-      setSelectedParcelId(parcel.id);
-      clearAction();
-    },
-    [clearAction],
-  );
+  const handleParcelSelect =
+    useCallback(
+      (parcel: Parcel) => {
+        setSelectedParcelId(
+          parcel.id,
+        );
+
+        clearAction();
+      },
+      [clearAction],
+    );
 
   /**
    * =======================================================
@@ -284,28 +265,37 @@ export default function CypherVerse() {
    * =======================================================
    */
 
-  const handleBuyParcel = useCallback(
-    async (parcel: Parcel) => {
-      if (actionParcelId || !parcel?.id) {
-        return;
-      }
+  const handleBuyParcel =
+    useCallback(
+      async (parcel: Parcel) => {
+        if (
+          actionParcelId ||
+          !parcel?.id
+        ) {
+          return;
+        }
 
-      const result = await buyParcel(parcel);
+        const result =
+          await buyParcel(
+            parcel,
+          );
 
-      if (!result.success) {
-        return;
-      }
+        if (!result.success) {
+          return;
+        }
 
-      await refresh();
+        await refresh();
 
-      setSelectedParcelId(parcel.id);
-    },
-    [
-      actionParcelId,
-      buyParcel,
-      refresh,
-    ],
-  );
+        setSelectedParcelId(
+          parcel.id,
+        );
+      },
+      [
+        actionParcelId,
+        buyParcel,
+        refresh,
+      ],
+    );
 
   /**
    * =======================================================
@@ -313,38 +303,47 @@ export default function CypherVerse() {
    * =======================================================
    */
 
-  const handleReserveParcel = useCallback(
-    async (parcel: Parcel) => {
-      if (actionParcelId) {
-        return;
-      }
+  const handleReserveParcel =
+    useCallback(
+      async (parcel: Parcel) => {
+        if (actionParcelId) {
+          return;
+        }
 
-      const result = await reserveParcel(parcel);
+        const result =
+          await reserveParcel(
+            parcel,
+          );
 
-      if (!result.success) {
-        return;
-      }
+        if (!result.success) {
+          return;
+        }
 
-      if (result.parcel) {
-        setParcels((currentParcels) =>
-          currentParcels.map((currentParcel) =>
-            currentParcel.id === result.parcel!.id
-              ? result.parcel!
-              : currentParcel,
-          ),
-        );
+        if (result.parcel) {
+          setParcels(
+            (currentParcels) =>
+              currentParcels.map(
+                (currentParcel) =>
+                  currentParcel.id ===
+                  result.parcel!.id
+                    ? result.parcel!
+                    : currentParcel,
+              ),
+          );
 
-        setSelectedParcelId(result.parcel.id);
-      }
+          setSelectedParcelId(
+            result.parcel.id,
+          );
+        }
 
-      await refresh();
-    },
-    [
-      actionParcelId,
-      reserveParcel,
-      refresh,
-    ],
-  );
+        await refresh();
+      },
+      [
+        actionParcelId,
+        reserveParcel,
+        refresh,
+      ],
+    );
 
   /**
    * =======================================================
@@ -352,59 +351,70 @@ export default function CypherVerse() {
    * =======================================================
    */
 
-  const handleListParcel = useCallback(
-    async (parcel: Parcel) => {
-      if (actionParcelId) {
-        return;
-      }
+  const handleListParcel =
+    useCallback(
+      async (parcel: Parcel) => {
+        if (actionParcelId) {
+          return;
+        }
 
-      const rawPrice = parcel.price;
+        const rawPrice =
+          parcel.price;
 
-      if (
-        rawPrice === null ||
-        rawPrice === undefined
-      ) {
-        return;
-      }
+        if (
+          rawPrice === null ||
+          rawPrice === undefined
+        ) {
+          return;
+        }
 
-      const price = String(rawPrice).trim();
+        const price =
+          String(rawPrice).trim();
 
-      if (
-        !/^\d+(\.\d{1,2})?$/.test(price) ||
-        Number(price) <= 0
-      ) {
-        return;
-      }
+        if (
+          !/^\d+(\.\d{1,2})?$/.test(
+            price,
+          ) ||
+          Number(price) <= 0
+        ) {
+          return;
+        }
 
-      const result = await listParcel(
-        parcel,
-        price,
-      );
+        const result =
+          await listParcel(
+            parcel,
+            price,
+          );
 
-      if (!result.success) {
-        return;
-      }
+        if (!result.success) {
+          return;
+        }
 
-      if (result.parcel) {
-        setParcels((currentParcels) =>
-          currentParcels.map((currentParcel) =>
-            currentParcel.id === result.parcel!.id
-              ? result.parcel!
-              : currentParcel,
-          ),
-        );
+        if (result.parcel) {
+          setParcels(
+            (currentParcels) =>
+              currentParcels.map(
+                (currentParcel) =>
+                  currentParcel.id ===
+                  result.parcel!.id
+                    ? result.parcel!
+                    : currentParcel,
+              ),
+          );
 
-        setSelectedParcelId(result.parcel.id);
-      }
+          setSelectedParcelId(
+            result.parcel.id,
+          );
+        }
 
-      await refresh();
-    },
-    [
-      actionParcelId,
-      listParcel,
-      refresh,
-    ],
-  );
+        await refresh();
+      },
+      [
+        actionParcelId,
+        listParcel,
+        refresh,
+      ],
+    );
 
   /**
    * =======================================================
@@ -447,12 +457,16 @@ export default function CypherVerse() {
       return;
     }
 
-    const stillLoaded = parcels.some(
-      (parcel) => parcel.id === selectedParcelId,
-    );
+    const stillLoaded =
+      parcels.some(
+        (parcel) =>
+          parcel.id ===
+          selectedParcelId,
+      );
 
     if (!stillLoaded) {
       setSelectedParcelId(null);
+
       clearAction();
     }
   }, [
@@ -470,7 +484,10 @@ export default function CypherVerse() {
   return (
     <StandardReality
       environmentProps={{
-        dev: process.env.NODE_ENV === "development",
+        dev:
+          process.env.NODE_ENV ===
+          "development",
+
         canvasProps: {
           frameloop: "demand",
         },
@@ -479,34 +496,46 @@ export default function CypherVerse() {
         flying: true,
       }}
     >
-      {/* CAMERA CHUNK STREAMER */}
-
-      <ParcelChunkStreamer
-        loadChunk={loadChunk}
-      />
-
-      {/* PUBLISHED PROJECT */}
+      {/* =================================================
+          PUBLISHED PROJECT
+          ================================================= */}
 
       {loadedParcelProject?.scene && (
         <EditorProvider
-          initialScene={loadedParcelProject.scene}
+          initialScene={
+            loadedParcelProject.scene
+          }
           editorActive={false}
         >
           <Scene />
         </EditorProvider>
       )}
 
-      {/* WORLD ENVIRONMENT */}
+      {/* =================================================
+          WORLD ENVIRONMENT
+          ================================================= */}
 
       <LostWorld />
 
       <CloudySky
-        position={[0, 0, 0]}
+        position={[
+          0,
+          0,
+          0,
+        ]}
         colors={[
-          0.7, 0.85, 1,
-          0.4, 0.65, 0.9,
-          0.2, 0.45, 0.7,
-          0.1, 0.2, 0.5,
+          0.7,
+          0.85,
+          1,
+          0.4,
+          0.65,
+          0.9,
+          0.2,
+          0.45,
+          0.7,
+          0.1,
+          0.2,
+          0.5,
         ]}
       />
 
@@ -518,62 +547,110 @@ export default function CypherVerse() {
 
       <ambientLight />
 
-      {/* PHYSICAL PARCEL WORLD */}
+      {/* =================================================
+          PHYSICAL PARCEL WORLD
+          =================================================
+          
+          Database coordinates are translated into centered
+          Three.js coordinates by ParcelLayer through:
+
+              origin = [-2400, 0, -2400]
+          */}
 
       <group position-y={0}>
         <ParcelLayer
-  parcels={parcels}
-  tileSize={16}
-  origin={[-CITY_CENTER, 0, -CITY_CENTER]}
-  interactive={true}
-  selectedParcelId={selectedParcelId}
-  onParcelSelect={({ parcel }) => {
-    handleParcelSelect(parcel);
-  }}
-  onParcelClose={() => {
-    setSelectedParcelId(null);
-  }}
-  onBuy={handleBuyParcel}
-  onReserve={handleReserveParcel}
-  onList={handleListParcel}
-  actionParcelId={actionParcelId}
-  actionType={parcelActionType}
-  actionError={actionError}
-  onRequestBounds={({ minX, maxX, minY, maxY }) => {
-    void loadChunk(minX, maxX, minY, maxY);
-  }}
-/>
+          parcels={parcels}
+          tileSize={16}
+          origin={[
+            -CITY_CENTER,
+            0,
+            -CITY_CENTER,
+          ]}
+          interactive={true}
+          selectedParcelId={
+            selectedParcelId
+          }
+          onParcelSelect={({
+            parcel,
+          }) => {
+            handleParcelSelect(
+              parcel,
+            );
+          }}
+          onParcelClose={() => {
+            setSelectedParcelId(
+              null,
+            );
+          }}
+          onBuy={handleBuyParcel}
+          onReserve={
+            handleReserveParcel
+          }
+          onList={handleListParcel}
+          actionParcelId={
+            actionParcelId
+          }
+          actionType={
+            parcelActionType
+          }
+          actionError={
+            actionError
+          }
+          onRequestBounds={({
+            minX,
+            maxX,
+            minY,
+            maxY,
+          }) => {
+            void loadChunk(
+              minX,
+              maxX,
+              minY,
+              maxY,
+            );
+          }}
+        />
 
         <CypherVerseMapLayer
           showLabels={true}
         />
 
-        <LandmarkLayer
-          parcels={parcels}
-          tileSize={16}
-          origin={[0, 0, 0]}
-        />
+        
       </group>
 
-      {/* 3D LAND DIRECTORY */}
+      {/* =================================================
+          3D LAND DIRECTORY
+          ================================================= */}
 
       <ParcelDirectory
         parcels={parcels}
-        selectedParcelId={selectedParcelId}
-        onSelect={handleParcelSelect}
+        selectedParcelId={
+          selectedParcelId
+        }
+        onSelect={
+          handleParcelSelect
+        }
         onBuy={handleBuyParcel}
-        onReserve={handleReserveParcel}
+        onReserve={
+          handleReserveParcel
+        }
         onList={handleListParcel}
-        actionParcelId={actionParcelId}
-        actionType={parcelActionType}
-        actionError={actionError}
+        actionParcelId={
+          actionParcelId
+        }
+        actionType={
+          parcelActionType
+        }
+        actionError={
+          actionError
+        }
       />
 
-      {/* WORLD TERRAIN */}
+      {/* =================================================
+          WORLD TERRAIN
+          ================================================= */}
 
       <Ground />
-
-      {/* LOADING */}
 
       {loading && null}
     </StandardReality>

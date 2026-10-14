@@ -1,34 +1,75 @@
 import { useMemo } from "react";
+
 import { Text } from "@react-three/drei";
+
 import * as THREE from "three";
 
 import {
   CYPHERVERSE_MAP,
-  WORLD_CENTER,
   type WorldArea,
   type WorldRoad,
   type WorldPoint,
 } from "./CypherVerseMap";
 
-interface CypherVerseMapLayerProps {
-  showLabels?: boolean;
-}
+/**
+ * =========================================================
+ * EXISTING CITY → CENTERED WORLD
+ * =========================================================
+ *
+ * The existing map geometry is authored in a
+ * 2400 × 2400 coordinate system.
+ *
+ * Its center is therefore:
+ *
+ *     1200, 1200
+ *
+ * The new 4800 world has its center at:
+ *
+ *     2400, 2400 database coordinates
+ *
+ * Three.js world coordinates are centered at:
+ *
+ *     0, 0
+ *
+ * Therefore the existing map only needs:
+ *
+ *     old coordinate - 1200
+ *
+ * No road or district geometry needs to be rewritten.
+ * =========================================================
+ */
 
-const ROAD_COLOR = "#252b35";
-const ROAD_EDGE_COLOR = "#475569";
-const PLAZA_COLOR = "#64748b";
-const PARK_COLOR = "#315c43";
-const DISTRICT_COLOR = "#1e293b";
-const GENESIS_COLOR = "#d4a72c";
+const ORIGINAL_CITY_CENTER = 1200;
 
 const ROAD_SURFACE_Y = 0.04;
+
 const AREA_SURFACE_Y = 0.015;
+
 const AREA_HEIGHT = 0.025;
 
-function centerPoint(point: WorldPoint): WorldPoint {
+const ROAD_COLOR = "#252b35";
+
+const ROAD_EDGE_COLOR = "#475569";
+
+const PLAZA_COLOR = "#64748b";
+
+const PARK_COLOR = "#315c43";
+
+const DISTRICT_COLOR = "#1e293b";
+
+const GENESIS_COLOR = "#d4a72c";
+
+function centerPoint(
+  point: WorldPoint,
+): WorldPoint {
   return {
-    x: point.x - WORLD_CENTER.x,
-    z: point.z - WORLD_CENTER.z,
+    x:
+      point.x -
+      ORIGINAL_CITY_CENTER,
+
+    z:
+      point.z -
+      ORIGINAL_CITY_CENTER,
   };
 }
 
@@ -42,21 +83,32 @@ function RoadSegment({
   width: number;
 }) {
   const geometry = useMemo(() => {
-    const dx = to.x - from.x;
-    const dz = to.z - from.z;
-    const length = Math.hypot(dx, dz);
+    const dx =
+      to.x - from.x;
 
-    if (length <= 0) return null;
+    const dz =
+      to.z - from.z;
+
+    const length =
+      Math.hypot(dx, dz);
+
+    if (length <= 0) {
+      return null;
+    }
 
     return {
       length,
       angle: Math.atan2(dz, dx),
-      centerX: (from.x + to.x) / 2,
-      centerZ: (from.z + to.z) / 2,
+      centerX:
+        (from.x + to.x) / 2,
+      centerZ:
+        (from.z + to.z) / 2,
     };
-  }, [from, to, width]);
+  }, [from, to]);
 
-  if (!geometry) return null;
+  if (!geometry) {
+    return null;
+  }
 
   return (
     <group
@@ -65,53 +117,105 @@ function RoadSegment({
         ROAD_SURFACE_Y,
         geometry.centerZ,
       ]}
-      rotation={[0, -geometry.angle, 0]}
+      rotation={[
+        0,
+        -geometry.angle,
+        0,
+      ]}
     >
       <mesh>
         <boxGeometry
-          args={[geometry.length, 0.05, width]}
+          args={[
+            geometry.length,
+            0.05,
+            width,
+          ]}
         />
+
         <meshStandardMaterial
           color={ROAD_COLOR}
           roughness={0.95}
         />
       </mesh>
 
-      <mesh position={[0, 0.009, width / 2]}>
+      <mesh
+        position={[
+          0,
+          0.009,
+          width / 2,
+        ]}
+      >
         <boxGeometry
-          args={[geometry.length, 0.012, 0.12]}
+          args={[
+            geometry.length,
+            0.012,
+            0.12,
+          ]}
         />
-        <meshStandardMaterial color={ROAD_EDGE_COLOR} />
+
+        <meshStandardMaterial
+          color={ROAD_EDGE_COLOR}
+        />
       </mesh>
 
-      <mesh position={[0, 0.009, -width / 2]}>
+      <mesh
+        position={[
+          0,
+          0.009,
+          -width / 2,
+        ]}
+      >
         <boxGeometry
-          args={[geometry.length, 0.012, 0.12]}
+          args={[
+            geometry.length,
+            0.012,
+            0.12,
+          ]}
         />
-        <meshStandardMaterial color={ROAD_EDGE_COLOR} />
+
+        <meshStandardMaterial
+          color={ROAD_EDGE_COLOR}
+        />
       </mesh>
     </group>
   );
 }
 
-function Road({ road }: { road: WorldRoad }) {
+function Road({
+  road,
+}: {
+  road: WorldRoad;
+}) {
   const points = useMemo(
-    () => road.points.map(centerPoint),
+    () =>
+      road.points.map(
+        centerPoint,
+      ),
     [road.points],
   );
 
-  if (points.length < 2) return null;
+  if (points.length < 2) {
+    return null;
+  }
 
   return (
-    <group name={`road-${road.id}`}>
-      {points.slice(0, -1).map((point, index) => (
-        <RoadSegment
-          key={`${road.id}-${index}`}
-          from={point}
-          to={points[index + 1]}
-          width={road.width}
-        />
-      ))}
+    <group
+      name={`road-${road.id}`}
+    >
+      {points
+        .slice(0, -1)
+        .map(
+          (point, index) => (
+            <RoadSegment
+              key={`${road.id}-${index}`}
+              from={point}
+              to={
+                points[index + 1]
+              }
+              width={road.width}
+            />
+          ),
+        )}
     </group>
   );
 }
@@ -124,11 +228,16 @@ function Area({
   showLabel: boolean;
 }) {
   const center = useMemo(
-    () => centerPoint(area.center),
+    () =>
+      centerPoint(
+        area.center,
+      ),
     [area.center],
   );
 
-  const isGenesis = area.id === "genesis-core";
+  const isGenesis =
+    area.id ===
+    "genesis-core";
 
   const color = isGenesis
     ? GENESIS_COLOR
@@ -146,7 +255,9 @@ function Area({
         : 0.42;
 
   return (
-    <group name={`area-${area.id}`}>
+    <group
+      name={`area-${area.id}`}
+    >
       <mesh
         position={[
           center.x,
@@ -156,8 +267,13 @@ function Area({
         renderOrder={1}
       >
         <boxGeometry
-          args={[area.width, AREA_HEIGHT, area.depth]}
+          args={[
+            area.width,
+            AREA_HEIGHT,
+            area.depth,
+          ]}
         />
+
         <meshStandardMaterial
           color={color}
           roughness={0.9}
@@ -169,11 +285,26 @@ function Area({
 
       {isGenesis && (
         <mesh
-          position={[center.x, 0.065, center.z]}
-          rotation={[-Math.PI / 2, 0, 0]}
+          position={[
+            center.x,
+            0.065,
+            center.z,
+          ]}
+          rotation={[
+            -Math.PI / 2,
+            0,
+            0,
+          ]}
           renderOrder={2}
         >
-          <ringGeometry args={[72, 76, 96]} />
+          <ringGeometry
+            args={[
+              72,
+              76,
+              96,
+            ]}
+          />
+
           <meshStandardMaterial
             color="#f5d76e"
             emissive="#7a5b00"
@@ -194,11 +325,16 @@ function Area({
           fontSize={
             isGenesis
               ? 7
-              : area.kind === "DISTRICT"
+              : area.kind ===
+                  "DISTRICT"
                 ? 4
                 : 3
           }
-          color={isGenesis ? "#fff4bd" : "#ffffff"}
+          color={
+            isGenesis
+              ? "#fff4bd"
+              : "#ffffff"
+          }
           anchorX="center"
           anchorY="middle"
           outlineWidth={0.12}
@@ -215,23 +351,31 @@ function Area({
 
 export default function CypherVerseMapLayer({
   showLabels = true,
-}: CypherVerseMapLayerProps) {
+}: {
+  showLabels?: boolean;
+}) {
   return (
-    <group name="cypherverse-map">
-      {CYPHERVERSE_MAP.areas.map((area) => (
-        <Area
-          key={area.id}
-          area={area}
-          showLabel={showLabels}
-        />
-      ))}
+    <group
+      name="cypherverse-map"
+    >
+      {CYPHERVERSE_MAP.areas.map(
+        (area) => (
+          <Area
+            key={area.id}
+            area={area}
+            showLabel={showLabels}
+          />
+        ),
+      )}
 
-      {CYPHERVERSE_MAP.roads.map((road) => (
-        <Road
-          key={road.id}
-          road={road}
-        />
-      ))}
+      {CYPHERVERSE_MAP.roads.map(
+        (road) => (
+          <Road
+            key={road.id}
+            road={road}
+          />
+        ),
+      )}
     </group>
   );
 }

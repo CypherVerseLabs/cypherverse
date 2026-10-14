@@ -1,91 +1,120 @@
 import { useMemo } from "react";
+
 import { Text } from "@react-three/drei";
 
 import type { Parcel } from "../parcels/types";
 
 import {
   landmarkToWorldPosition,
+  worldPositionToDatabaseCoordinates,
 } from "../parcels/parcelCoordinates";
 
 import { CITY_LANDMARKS } from "./CityLandmarks";
-
-interface LandmarkLayerProps {
-  parcels: Parcel[];
-  tileSize?: number;
-  origin?: [number, number, number];
-}
 
 /**
  * =========================================================
  * LANDMARK LAYER
  * =========================================================
  *
- * Displays the 45 configured CypherVerse landmarks.
- *
- * COORDINATES
+ * Displays the configured CypherVerse landmarks.
  *
  * Landmark coordinates are offsets from Genesis.
- * landmarkToWorldPosition() converts those offsets into
- * the existing positive-world coordinate system.
  *
- * Genesis (0, 0) maps to (1192, 1192) when using the
- * existing 150 x 150 grid with 16-unit parcel spacing.
+ * Genesis:
  *
- * SAFETY
+ *     Three.js (0, 0)
  *
- * - Does not create database parcels.
- * - Does not modify parcel coordinates.
- * - Does not reserve or purchase land.
- * - Does not change parcel ownership.
- * - Does not execute marketplace actions.
- * - Does not assume every landmark has a parcel record.
+ * Database Genesis/world center:
+ *
+ *     (2400, 2400)
+ *
+ * Landmark positions are visual overlays only.
+ *
+ * They do not:
+ *
+ * - create database parcels
+ * - modify parcel coordinates
+ * - reserve land
+ * - purchase land
+ * - change ownership
+ * - execute marketplace actions
  * =========================================================
  */
+
+interface LandmarkLayerProps {
+  parcels: Parcel[];
+
+  tileSize?: number;
+
+  origin?: [
+    number,
+    number,
+    number,
+  ];
+}
 
 export default function LandmarkLayer({
   parcels = [],
   tileSize: _tileSize = 16,
   origin = [0, 0, 0],
 }: LandmarkLayerProps) {
-  /**
-   * Resolve landmark world positions.
-   *
-   * Match an existing parcel only when its database
-   * coordinates exactly match the landmark's world
-   * position. A missing match does not create a parcel.
-   */
-  const resolvedLandmarks = useMemo(() => {
-    return CITY_LANDMARKS.map((landmark) => {
-      const [worldX, , worldZ] =
-        landmarkToWorldPosition(
-          landmark.x,
-          landmark.y,
-          origin,
-        );
+  const resolvedLandmarks =
+    useMemo(() => {
+      return CITY_LANDMARKS.map(
+        (landmark) => {
+          const [
+            worldX,
+            ,
+            worldZ,
+          ] =
+            landmarkToWorldPosition(
+              landmark.x,
+              landmark.y,
+              origin,
+            );
 
-      const parcel = parcels.find(
-        (candidate) =>
-          candidate.x === worldX &&
-          candidate.y === worldZ,
-      ) ?? null;
+          const database =
+            worldPositionToDatabaseCoordinates(
+              worldX,
+              worldZ,
+            );
 
-      return {
-        landmark,
-        parcel,
-        worldX,
-        worldZ,
-      };
-    });
-  }, [parcels, origin]);
+          const parcel =
+            parcels.find(
+              (candidate) =>
+                candidate.x ===
+                  database.x &&
+                candidate.y ===
+                  database.y,
+            ) ?? null;
+
+          return {
+            landmark,
+            parcel,
+            worldX,
+            worldZ,
+          };
+        },
+      );
+    }, [parcels, origin]);
 
   return (
-    <group name="city-landmarks">
+    <group
+      name="city-landmarks"
+    >
       {resolvedLandmarks.map(
-        ({ landmark, parcel, worldX, worldZ }) => {
+        ({
+          landmark,
+          parcel,
+          worldX,
+          worldZ,
+        }) => {
           const isGenesis =
-            landmark.estateId === "landmark-genesis";
+            landmark.estateId ===
+            "landmark-genesis";
 
-          const height = isGenesis ? 10 : 6;
+          const height =
+            isGenesis ? 10 : 6;
 
           return (
             <group
@@ -96,13 +125,21 @@ export default function LandmarkLayer({
                 worldZ,
               ]}
             >
-              {/* Landmark base */}
               <mesh
-                position={[0, 0.35, 0]}
+                position={[
+                  0,
+                  0.35,
+                  0,
+                ]}
                 raycast={() => null}
               >
                 <cylinderGeometry
-                  args={[2.5, 2.5, 0.7, 32]}
+                  args={[
+                    2.5,
+                    2.5,
+                    0.7,
+                    32,
+                  ]}
                 />
 
                 <meshStandardMaterial
@@ -120,13 +157,21 @@ export default function LandmarkLayer({
                 />
               </mesh>
 
-              {/* Landmark beacon */}
               <mesh
-                position={[0, height / 2, 0]}
+                position={[
+                  0,
+                  height / 2,
+                  0,
+                ]}
                 raycast={() => null}
               >
                 <cylinderGeometry
-                  args={[0.35, 0.8, height, 16]}
+                  args={[
+                    0.35,
+                    0.8,
+                    height,
+                    16,
+                  ]}
                 />
 
                 <meshStandardMaterial
@@ -144,22 +189,36 @@ export default function LandmarkLayer({
                 />
               </mesh>
 
-              {/* Landmark light */}
               <pointLight
-                position={[0, height, 0]}
+                position={[
+                  0,
+                  height,
+                  0,
+                ]}
                 color={
                   isGenesis
                     ? "#ffd166"
                     : "#38bdf8"
                 }
-                intensity={isGenesis ? 25 : 10}
+                intensity={
+                  isGenesis
+                    ? 25
+                    : 10
+                }
                 distance={40}
               />
 
-              {/* Landmark name */}
               <Text
-                position={[0, height + 2, 0]}
-                fontSize={isGenesis ? 2 : 1.5}
+                position={[
+                  0,
+                  height + 2,
+                  0,
+                ]}
+                fontSize={
+                  isGenesis
+                    ? 2
+                    : 1.5
+                }
                 color="#ffffff"
                 anchorX="center"
                 anchorY="middle"
@@ -170,10 +229,13 @@ export default function LandmarkLayer({
                 {landmark.name}
               </Text>
 
-              {/* Existing parcel reference, if available */}
               {parcel && (
                 <Text
-                  position={[0, height + 0.5, 0]}
+                  position={[
+                    0,
+                    height + 0.5,
+                    0,
+                  ]}
                   fontSize={0.45}
                   color="#a5f3fc"
                   anchorX="center"
