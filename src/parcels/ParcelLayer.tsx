@@ -16,13 +16,16 @@ import type {
   ParcelLayerProps,
 } from "./types";
 
-import {
-  parcelToWorldPosition,
-} from "./parcelCoordinates";
-
 import ParcelTile from "./ParcelTile";
 import ParcelPanel from "./ParcelPanel";
 
+import {
+  PARCEL_SIZE,
+  WORLD_MIN,
+  WORLD_MAX,
+  parcelToWorldPosition,
+  worldPositionToDatabaseCoordinates,
+} from "./parcelCoordinates";
 
 /**
  * =========================================================
@@ -37,33 +40,20 @@ const CAMERA_UPDATE_INTERVAL = 150;
 const LOAD_CHUNK_SIZE = 512;
 
 /**
- * Start loading the next chunk before the player actually
- * reaches the edge.
- */
-const LOAD_MARGIN = 256;
-
-
-/**
  * =========================================================
  * OPTIONAL DYNAMIC LOADER
  * =========================================================
- *
- * ParcelLayer can receive a callback from CypherVerse.
  */
 
 interface ExtendedParcelLayerProps
   extends ParcelLayerProps {
-
-  onRequestBounds?: (
-    bounds: {
-      minX: number;
-      maxX: number;
-      minY: number;
-      maxY: number;
-    }
-  ) => void;
+  onRequestBounds?: (bounds: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  }) => void;
 }
-
 
 /**
  * =========================================================
@@ -88,420 +78,327 @@ export default function ParcelLayer({
   actionError,
   onRequestBounds,
 }: ExtendedParcelLayerProps) {
-
-  const camera =
-    useThree(
-      (state) =>
-        state.camera
-    );
-
+  const camera = useThree(
+    (state) => state.camera,
+  );
 
   const [
     internalSelectedId,
     setInternalSelectedId,
-  ] = useState<string | null>(
-    null
-  );
-
+  ] = useState<string | null>(null);
 
   const activeSelectedId =
     selectedParcelId !== undefined
       ? selectedParcelId
       : internalSelectedId;
 
+  const selectedParcel = useMemo(() => {
+    if (!activeSelectedId) {
+      return null;
+    }
 
-  const selectedParcel =
-    useMemo(() => {
-
-      if (!activeSelectedId) {
-        return null;
-      }
-
-
-      return (
-        parcels.find(
-          (parcel) =>
-            parcel.id ===
-            activeSelectedId
-        ) ?? null
-      );
-
-    }, [
-      parcels,
-      activeSelectedId,
-    ]);
-
+    return (
+      parcels.find(
+        (parcel) =>
+          parcel.id === activeSelectedId,
+      ) ?? null
+    );
+  }, [
+    parcels,
+    activeSelectedId,
+  ]);
 
   const [
     nearbyParcels,
     setNearbyParcels,
   ] = useState<Parcel[]>([]);
 
-
-  const lastCameraUpdate =
-    useRef(0);
-
+  const lastCameraUpdate = useRef(0);
 
   /**
    * Prevent repeatedly requesting the same chunk.
    */
-  const requestedChunksRef =
-    useRef<
-      Set<string>
-    >(
-      new Set()
-    );
-
+  const requestedChunksRef = useRef<Set<string>>(
+    new Set(),
+  );
 
   /**
    * =======================================================
-   * REQUEST WORLD CHUNK
+   * REQUEST DATABASE CHUNK
    * =======================================================
+   *
+   * Chunk coordinates and API bounds use database
+   * coordinates, not centered Three.js coordinates.
    */
 
-  const requestChunk =
-    useCallback(
-      (
-        chunkX: number,
-        chunkY: number
-      ) => {
+  const requestChunk = useCallback(
+    (
+      chunkX: number,
+      chunkY: number,
+    ) => {
+      if (!onRequestBounds) {
+        return;
+      }
 
-        if (!onRequestBounds) {
-          return;
-        }
+      const minX =
+        Math.floor(
+          chunkX / LOAD_CHUNK_SIZE,
+        ) * LOAD_CHUNK_SIZE;
 
+      const minY =
+        Math.floor(
+          chunkY / LOAD_CHUNK_SIZE,
+        ) * LOAD_CHUNK_SIZE;
 
-        const minX =
-          Math.floor(
-            chunkX /
-              LOAD_CHUNK_SIZE
-          ) *
-          LOAD_CHUNK_SIZE;
+      const maxX =
+        minX + LOAD_CHUNK_SIZE;
 
+      const maxY =
+        minY + LOAD_CHUNK_SIZE;
 
-        const minY =
-          Math.floor(
-            chunkY /
-              LOAD_CHUNK_SIZE
-          ) *
-          LOAD_CHUNK_SIZE;
+      /**
+       * Skip chunks entirely outside the valid world.
+       *
+       * The maximum parcel origin is WORLD_MAX. A chunk
+       * ending at WORLD_MIN or starting beyond WORLD_MAX
+       * cannot contain a valid parcel origin.
+       */
+      if (
+        maxX <= WORLD_MIN ||
+        maxY <= WORLD_MIN ||
+        minX > WORLD_MAX ||
+        minY > WORLD_MAX
+      ) {
+        return;
+      }
 
+      const key = [
+        minX,
+        maxX,
+        minY,
+        maxY,
+      ].join(":");
 
-        const maxX =
-          minX +
-          LOAD_CHUNK_SIZE;
+      if (
+        requestedChunksRef.current.has(key)
+      ) {
+        return;
+      }
 
+      requestedChunksRef.current.add(key);
 
-        const maxY =
-          minY +
-          LOAD_CHUNK_SIZE;
-
-
-        const key =
-          [
-            minX,
-            maxX,
-            minY,
-            maxY,
-          ].join(":");
-
-
-        if (
-          requestedChunksRef.current.has(
-            key
-          )
-        ) {
-          return;
-        }
-
-
-        requestedChunksRef.current.add(
-          key
-        );
-
-
-        onRequestBounds({
-          minX,
-          maxX,
-          minY,
-          maxY,
-        });
-
-      },
-      [
-        onRequestBounds,
-      ]
-    );
-
+      onRequestBounds({
+        minX,
+        maxX,
+        minY,
+        maxY,
+      });
+    },
+    [
+      onRequestBounds,
+    ],
+  );
 
   /**
    * =======================================================
    * FIND NEARBY PARCELS
    * =======================================================
+   *
+   * Camera coordinates are centered Three.js coordinates.
+   * Parcel coordinates are database coordinates.
+   *
+   * Convert the camera bounds before comparing them with
+   * parcel records.
    */
 
-  const calculateNearby =
-    useCallback(() => {
+  const calculateNearby = useCallback(() => {
+    const cameraX = camera.position.x;
+    const cameraZ = camera.position.z;
+
+    /**
+     * Convert the camera position from world space to
+     * database space.
+     *
+     * Subtract the optional world origin offset first.
+     */
+    const databasePosition =
+      worldPositionToDatabaseCoordinates(
+        cameraX - origin[0],
+        cameraZ - origin[2],
+      );
+
+    /**
+     * Calculate the visible world-space bounds.
+     */
+    const distance = DEFAULT_RENDER_DISTANCE;
+
+    const minWorldX = cameraX - distance;
+    const maxWorldX = cameraX + distance;
+
+    const minWorldZ = cameraZ - distance;
+    const maxWorldZ = cameraZ + distance;
+
+    /**
+     * Convert the bounds to database coordinates.
+     */
+    const minDatabase =
+      worldPositionToDatabaseCoordinates(
+        minWorldX - origin[0],
+        minWorldZ - origin[2],
+      );
+
+    const maxDatabase =
+      worldPositionToDatabaseCoordinates(
+        maxWorldX - origin[0],
+        maxWorldZ - origin[2],
+      );
+
+    /**
+     * Align the bounds to the parcel grid and clamp
+     * them to the valid database world.
+     */
+    const minParcelX = Math.max(
+      WORLD_MIN,
+      Math.floor(
+        minDatabase.x / PARCEL_SIZE,
+      ) * PARCEL_SIZE,
+    );
+
+    const maxParcelX = Math.min(
+      WORLD_MAX,
+      Math.ceil(
+        maxDatabase.x / PARCEL_SIZE,
+      ) * PARCEL_SIZE,
+    );
+
+    const minParcelY = Math.max(
+      WORLD_MIN,
+      Math.floor(
+        minDatabase.y / PARCEL_SIZE,
+      ) * PARCEL_SIZE,
+    );
+
+    const maxParcelY = Math.min(
+      WORLD_MAX,
+      Math.ceil(
+        maxDatabase.y / PARCEL_SIZE,
+      ) * PARCEL_SIZE,
+    );
+
+    /**
+     * Select parcels inside the visible database bounds.
+     */
+    const visibleParcels =
+      parcels.filter(
+        (parcel) =>
+          parcel.x >= minParcelX &&
+          parcel.x <= maxParcelX &&
+          parcel.y >= minParcelY &&
+          parcel.y <= maxParcelY,
+      );
+
+    /**
+     * Keep the selected parcel visible even when it is
+     * outside the normal render distance.
+     */
+    if (activeSelectedId) {
+      const selected = parcels.find(
+        (parcel) =>
+          parcel.id === activeSelectedId,
+      );
 
       if (
-        parcels.length === 0
-      ) {
-
-        setNearbyParcels([]);
-
-        return;
-
-      }
-
-
-      const cameraX =
-        camera.position.x;
-
-
-      const cameraZ =
-        camera.position.z;
-
-
-      const distance =
-        DEFAULT_RENDER_DISTANCE;
-
-
-      const minWorldX =
-        cameraX -
-        distance;
-
-
-      const maxWorldX =
-        cameraX +
-        distance;
-
-
-      const minWorldZ =
-        cameraZ -
-        distance;
-
-
-      const maxWorldZ =
-        cameraZ +
-        distance;
-
-
-      const minParcelX =
-        Math.floor(
-          (
-            minWorldX -
-            origin[0]
-          ) /
-          tileSize
-        ) *
-        tileSize;
-
-
-      const maxParcelX =
-        Math.ceil(
-          (
-            maxWorldX -
-            origin[0]
-          ) /
-          tileSize
-        ) *
-        tileSize;
-
-
-      const minParcelY =
-        Math.floor(
-          (
-            minWorldZ -
-            origin[2]
-          ) /
-          tileSize
-        ) *
-        tileSize;
-
-
-      const maxParcelY =
-        Math.ceil(
-          (
-            maxWorldZ -
-            origin[2]
-          ) /
-          tileSize
-        ) *
-        tileSize;
-
-
-      const visibleParcels =
-        parcels.filter(
+        selected &&
+        !visibleParcels.some(
           (parcel) =>
-            parcel.x >=
-              minParcelX &&
-            parcel.x <=
-              maxParcelX &&
-            parcel.y >=
-              minParcelY &&
-            parcel.y <=
-              maxParcelY
-        );
-
-
-      /**
-       * Keep selected parcel visible.
-       */
-
-      if (
-        activeSelectedId
+            parcel.id === selected.id,
+        )
       ) {
-
-        const selected =
-          parcels.find(
-            (parcel) =>
-              parcel.id ===
-              activeSelectedId
-          );
-
-
-        if (
-          selected &&
-          !visibleParcels.some(
-            (parcel) =>
-              parcel.id ===
-              selected.id
-          )
-        ) {
-
-          visibleParcels.push(
-            selected
-          );
-
-        }
-
+        visibleParcels.push(selected);
       }
+    }
 
+    setNearbyParcels(visibleParcels);
 
-      setNearbyParcels(
-        visibleParcels
-      );
+    /**
+     * =====================================================
+     * DYNAMIC CHUNK LOADING
+     * =====================================================
+     *
+     * Use database coordinates when requesting API chunks.
+     *
+     * At world position (0, 0), the database position is
+     * (2400, 2400), so the central chunk begins at
+     * (2048, 2048).
+     */
 
+    const chunkX =
+      Math.floor(
+        databasePosition.x / LOAD_CHUNK_SIZE,
+      ) * LOAD_CHUNK_SIZE;
 
-      /**
-       * =====================================================
-       * DYNAMIC CHUNK LOADING
-       * =====================================================
-       *
-       * Ask for the chunk underneath the camera and the
-       * surrounding chunks.
-       */
+    const chunkY =
+      Math.floor(
+        databasePosition.y / LOAD_CHUNK_SIZE,
+      ) * LOAD_CHUNK_SIZE;
 
+    /**
+     * Current chunk.
+     */
+    requestChunk(chunkX, chunkY);
 
-      const loadX =
-        cameraX -
-        origin[0];
+    /**
+     * Neighboring chunks.
+     */
+    requestChunk(
+      chunkX - LOAD_CHUNK_SIZE,
+      chunkY,
+    );
 
+    requestChunk(
+      chunkX + LOAD_CHUNK_SIZE,
+      chunkY,
+    );
 
-      const loadY =
-        cameraZ -
-        origin[2];
+    requestChunk(
+      chunkX,
+      chunkY - LOAD_CHUNK_SIZE,
+    );
 
+    requestChunk(
+      chunkX,
+      chunkY + LOAD_CHUNK_SIZE,
+    );
 
-      const chunkX =
-        Math.floor(
-          loadX /
-            LOAD_CHUNK_SIZE
-        ) *
-        LOAD_CHUNK_SIZE;
+    /**
+     * Diagonal chunks.
+     */
+    requestChunk(
+      chunkX - LOAD_CHUNK_SIZE,
+      chunkY - LOAD_CHUNK_SIZE,
+    );
 
+    requestChunk(
+      chunkX + LOAD_CHUNK_SIZE,
+      chunkY - LOAD_CHUNK_SIZE,
+    );
 
-      const chunkY =
-        Math.floor(
-          loadY /
-            LOAD_CHUNK_SIZE
-        ) *
-        LOAD_CHUNK_SIZE;
+    requestChunk(
+      chunkX - LOAD_CHUNK_SIZE,
+      chunkY + LOAD_CHUNK_SIZE,
+    );
 
-
-      /**
-       * Current chunk.
-       */
-      requestChunk(
-        chunkX,
-        chunkY
-      );
-
-
-      /**
-       * Neighboring chunks.
-       */
-      requestChunk(
-        chunkX -
-          LOAD_CHUNK_SIZE,
-        chunkY
-      );
-
-
-      requestChunk(
-        chunkX +
-          LOAD_CHUNK_SIZE,
-        chunkY
-      );
-
-
-      requestChunk(
-        chunkX,
-        chunkY -
-          LOAD_CHUNK_SIZE
-      );
-
-
-      requestChunk(
-        chunkX,
-        chunkY +
-          LOAD_CHUNK_SIZE
-      );
-
-
-      /**
-       * Diagonal chunks.
-       */
-      requestChunk(
-        chunkX -
-          LOAD_CHUNK_SIZE,
-        chunkY -
-          LOAD_CHUNK_SIZE
-      );
-
-
-      requestChunk(
-        chunkX +
-          LOAD_CHUNK_SIZE,
-        chunkY -
-          LOAD_CHUNK_SIZE
-      );
-
-
-      requestChunk(
-        chunkX -
-          LOAD_CHUNK_SIZE,
-        chunkY +
-          LOAD_CHUNK_SIZE
-      );
-
-
-      requestChunk(
-        chunkX +
-          LOAD_CHUNK_SIZE,
-        chunkY +
-          LOAD_CHUNK_SIZE
-      );
-
-    }, [
-      parcels,
-      camera,
-      tileSize,
-      origin,
-      activeSelectedId,
-      requestChunk,
-    ]);
-
+    requestChunk(
+      chunkX + LOAD_CHUNK_SIZE,
+      chunkY + LOAD_CHUNK_SIZE,
+    );
+  }, [
+    parcels,
+    camera,
+    origin,
+    activeSelectedId,
+    requestChunk,
+  ]);
 
   /**
    * =======================================================
@@ -510,13 +407,10 @@ export default function ParcelLayer({
    */
 
   useEffect(() => {
-
     calculateNearby();
-
   }, [
     calculateNearby,
   ]);
-
 
   /**
    * =======================================================
@@ -525,33 +419,23 @@ export default function ParcelLayer({
    */
 
   useFrame(() => {
-
     if (!visible) {
       return;
     }
 
-
-    const now =
-      performance.now();
-
+    const now = performance.now();
 
     if (
-      now -
-        lastCameraUpdate.current <
+      now - lastCameraUpdate.current <
       CAMERA_UPDATE_INTERVAL
     ) {
       return;
     }
 
-
-    lastCameraUpdate.current =
-      now;
-
+    lastCameraUpdate.current = now;
 
     calculateNearby();
-
   });
-
 
   /**
    * =======================================================
@@ -559,31 +443,24 @@ export default function ParcelLayer({
    * =======================================================
    */
 
-  const handleSelect =
-    useCallback(
-      (parcel: Parcel) => {
+  const handleSelect = useCallback(
+    (parcel: Parcel) => {
+      if (!interactive) {
+        return;
+      }
 
-        if (!interactive) {
-          return;
-        }
+      setInternalSelectedId(parcel.id);
 
-
-        setInternalSelectedId(
-          parcel.id
-        );
-
-
-        onParcelSelect?.({
-          parcel,
-          source: "world",
-        });
-
-      },
-      [
-        interactive,
-        onParcelSelect,
-      ]);
-
+      onParcelSelect?.({
+        parcel,
+        source: "world",
+      });
+    },
+    [
+      interactive,
+      onParcelSelect,
+    ],
+  );
 
   /**
    * =======================================================
@@ -591,20 +468,13 @@ export default function ParcelLayer({
    * =======================================================
    */
 
-  const handleClose =
-    useCallback(() => {
+  const handleClose = useCallback(() => {
+    setInternalSelectedId(null);
 
-      setInternalSelectedId(
-        null
-      );
-
-
-      onParcelClose?.();
-
-    }, [
-      onParcelClose,
-    ]);
-
+    onParcelClose?.();
+  }, [
+    onParcelClose,
+  ]);
 
   /**
    * =======================================================
@@ -616,104 +486,50 @@ export default function ParcelLayer({
     return null;
   }
 
-
   /**
    * =======================================================
    * RENDER
    * =======================================================
- */
+   */
 
   return (
     <>
-      <group
-        name="parcel-layer"
-      >
-
-        {nearbyParcels.map(
-          (parcel) => {
-
-            const position =
-              parcelToWorldPosition(
-                parcel.x,
-                parcel.y,
-                tileSize,
-                origin
-              );
-
-
-            return (
-              <ParcelTile
-                key={
-                  parcel.id
-                }
-
-                parcel={
-                  parcel
-                }
-
-                position={
-                  position
-                }
-
-                size={
-                  tileSize
-                }
-
-                selected={
-                  activeSelectedId ===
-                  parcel.id
-                }
-
-                interactive={
-                  interactive
-                }
-
-                onSelect={
-                  handleSelect
-                }
-              />
+      <group name="parcel-layer">
+        {nearbyParcels.map((parcel) => {
+          const position =
+            parcelToWorldPosition(
+              parcel.x,
+              parcel.y,
+              tileSize,
+              origin,
             );
 
-          }
-        )}
-
+          return (
+            <ParcelTile
+              key={parcel.id}
+              parcel={parcel}
+              position={position}
+              size={tileSize}
+              selected={
+                activeSelectedId === parcel.id
+              }
+              interactive={interactive}
+              onSelect={handleSelect}
+            />
+          );
+        })}
       </group>
 
-
       <ParcelPanel
-        parcel={
-          selectedParcel
-        }
-
-        onClose={
-          handleClose
-        }
-
-        onBuy={
-          onBuy
-        }
-
-        onReserve={
-          onReserve
-        }
-
-        onList={
-          onList
-        }
-
-        actionParcelId={
-          actionParcelId
-        }
-
-        actionType={
-          actionType
-        }
-
-        actionError={
-          actionError
-        }
+        parcel={selectedParcel}
+        onClose={handleClose}
+        onBuy={onBuy}
+        onReserve={onReserve}
+        onList={onList}
+        actionParcelId={actionParcelId}
+        actionType={actionType}
+        actionError={actionError}
       />
-
     </>
   );
 }

@@ -619,9 +619,9 @@ export default function CypherVerse() {
           }
 
           origin={[
-            -CITY_CENTER,
             0,
-            -CITY_CENTER,
+            0,
+            0,
           ]}
 
           interactive={
