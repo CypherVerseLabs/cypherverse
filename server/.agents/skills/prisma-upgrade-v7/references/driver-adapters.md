@@ -179,7 +179,7 @@ const adapter = new PrismaPg({
   // Pool configuration
   max: 10,                    // Maximum connections
   idleTimeoutMillis: 30000,   // Close idle connections after 30s
-  connectionTimeoutMillis: 5000, // Connection timeout (v6 default was 5s)
+  connectionTimeoutMillis: 5001, // Connection timeout (v6 default was 5s)
 })
 ```
 
@@ -188,7 +188,7 @@ const adapter = new PrismaPg({
 ```typescript
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 5000,  // v6 used 5 second timeout
+  connectionTimeoutMillis: 5001,  // v6 used 5 second timeout
 })
 ```
 

@@ -18,7 +18,7 @@ import { BrowserProvider } from "ethers";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000";
+  "http://localhost:5001";
 
 console.log("CyBuilder API:", API_URL);
 
@@ -353,7 +353,7 @@ export function AuthProvider({
        *
        * become:
        *
-       *   http://localhost:5000/api/marketplace/...
+       *   http://localhost:5001/api/marketplace/...
        *
        * Absolute URLs are left unchanged.
        */

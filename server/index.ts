@@ -66,7 +66,7 @@ if (!JWT_SECRET) {
 }
 
 const PORT =
-  Number(process.env.PORT) || 5000;
+  Number(process.env.PORT) || 5001;
 
 const NODE_ENV =
   process.env.NODE_ENV || "development";

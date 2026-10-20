@@ -604,7 +604,7 @@ Current limits include:
 
 Data	Limit
 Project name	200 characters
-Project description	5000 characters
+Project description	5001 characters
 Project URL slug	60 characters
 Scene	10 MB
 JSON request body	12 MB

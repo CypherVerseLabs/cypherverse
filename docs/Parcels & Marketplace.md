@@ -31,7 +31,7 @@ The system is split between the Next.js frontend and the CyBuilder API backend.
              │
              ▼
 ┌──────────────────────────┐
-│   CyBuilder API :5000    │
+│   CyBuilder API :5001    │
 │                          │
 │ Express                  │
 │ Marketplace Router       │
@@ -391,18 +391,18 @@ The frontend and backend run on different development servers.
 Typical development setup:
 
 Next.js frontend
-http://localhost:3000
+http://localhost:3001
 
 CyBuilder API
-http://localhost:5000
+http://localhost:5001
 
-Therefore API requests must reach port 5000.
+Therefore API requests must reach port 5001.
 
 The API base URL is:
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000";
+  "http://localhost:55001000";
 
 authFetch() resolves relative API paths.
 
@@ -414,7 +414,7 @@ authFetch(
 
 becomes:
 
-http://localhost:5000/api/marketplace/parcels/123/reserve
+http://localhost:5001/api/marketplace/parcels/123/reserve
 
 This prevents the browser from accidentally sending the request to:
 
@@ -615,11 +615,11 @@ nodemon --watch . --ext ts --exec tsx ./index.ts
 
 The API runs on:
 
-http://localhost:5000
+http://localhost:5001
 
 Expected startup message:
 
-CyBuilder server running on port 5000
+CyBuilder server running on port 5001
 
 24. Useful Server Routes
 Current API routes include:
@@ -653,7 +653,7 @@ POST   /api/ai
 25. Testing the Marketplace
 Before testing marketplace actions, make sure:
 
-1. Backend is running on port 5000.
+1. Backend is running on port 5001.
 2. Frontend is running.
 3. NEXT_PUBLIC_API_URL points to the backend.
 4. User is authenticated.
@@ -806,7 +806,7 @@ It should not decide whether a parcel is actually purchasable or reservable beyo
                              ▼
                     ┌─────────────────┐
                     │ CyBuilder API   │
-                    │   :5000         │
+                    │   :5001         │
                     └────────┬────────┘
                              │
                              ▼

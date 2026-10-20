@@ -13,7 +13,7 @@ export function ProfileForm() {
     setStatus("saving");
 
     try {
-      const res = await authFetch("http://localhost:5000/auth/profile", {
+      const res = await authFetch("http://localhost:5001/auth/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email }),

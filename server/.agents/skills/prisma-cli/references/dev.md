@@ -58,7 +58,7 @@ Frees your terminal for other commands.
 ### Custom ports
 
 ```bash
-prisma dev --port 5000 --db-port 5432
+prisma dev --port 5001 --db-port 5432
 ```
 
 ## Instance Management

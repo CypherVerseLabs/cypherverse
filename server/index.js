@@ -24,7 +24,7 @@ import { authenticateToken } from "./middleware/authMiddleware.js";
 // Init
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET is not defined");
@@ -32,7 +32,7 @@ if (!JWT_SECRET) {
 
 // Middleware
 const allowedOrigins = [
-  "http://localhost:3000",
+  "http://localhost:3001",
   "http://localhost:3005",
   "http://localhost:5173",
 ];
