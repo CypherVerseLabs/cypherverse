@@ -212,11 +212,15 @@ export async function createMarketplaceOrder(
       const listing =
         parcel.listings[0];
 
+
+
       if (!listing) {
         throw new Error(
           "ACTIVE_LISTING_NOT_FOUND"
         );
       }
+
+
 
       /**
        * -----------------------------------------------------
@@ -294,34 +298,20 @@ export async function createMarketplaceOrder(
        */
 
       const order =
-        await tx.marketplaceOrder.create({
-          data: {
-            userId,
+  await tx.marketplaceOrder.create({
+    data: {
+      userId,
+      productId: parcelId,
+      listingId: listing.id,
+      sellerId: listing.sellerId,
+      quantity: 1,
+      amount: new Prisma.Decimal(listing.price),
+      currency: "USD",
+      status: MarketplaceOrderStatus.PENDING,
+    },
+  });
 
-            productId:
-              parcelId,
-
-            listingId:
-              listing.id,
-
-            quantity: 1,
-
-            amount:
-              new Prisma.Decimal(
-                listing.price
-              ),
-
-            currency:
-              "USD",
-
-            status:
-              MarketplaceOrderStatus.PENDING,
-          },
-        });
-
-      return toMarketplaceOrder(
-        order
-      );
+return toMarketplaceOrder(order);
     }
   );
 }
@@ -524,6 +514,11 @@ export async function completeMarketplaceOrder(
         );
       }
 
+      if (listing.sellerId !== order.sellerId) {
+        throw new Error(
+          "LISTING_SELLER_MISMATCH"
+        );
+      }
       /**
        * -----------------------------------------------------
        * Transfer ownership.

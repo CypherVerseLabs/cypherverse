@@ -109,14 +109,54 @@ export async function createParcelOrder(input: CreateParcelOrderInput) {
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export async function cancelMarketplaceOrder(orderId: string, userId: string) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.marketplaceOrder.findFirst({ where: { id: orderId, userId } });
-    if (!order) return null;
-    if ([MarketplaceOrderStatus.PAID, MarketplaceOrderStatus.GRANTED].includes(order.status)) throw new MarketplaceError("ORDER_ALREADY_PAID", "A paid order cannot be cancelled.");
-    if ([MarketplaceOrderStatus.CANCELLED, MarketplaceOrderStatus.FAILED].includes(order.status)) return order;
-    return tx.marketplaceOrder.update({ where: { id: order.id }, data: { status: MarketplaceOrderStatus.CANCELLED } });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+export async function cancelMarketplaceOrder(
+  orderId: string,
+  userId: string
+) {
+  return prisma.$transaction(
+    async (tx) => {
+      const order =
+        await tx.marketplaceOrder.findFirst({
+          where: {
+            id: orderId,
+            userId,
+          },
+        });
+
+      if (!order) {
+        return null;
+      }
+
+      if (
+        order.status === MarketplaceOrderStatus.PAID ||
+        order.status === MarketplaceOrderStatus.GRANTED
+      ) {
+        throw new MarketplaceError(
+          "ORDER_ALREADY_PAID",
+          "A paid order cannot be cancelled."
+        );
+      }
+
+      if (
+        order.status === MarketplaceOrderStatus.CANCELLED ||
+        order.status === MarketplaceOrderStatus.FAILED
+      ) {
+        return order;
+      }
+
+      return tx.marketplaceOrder.update({
+        where: {
+          id: order.id,
+        },
+        data: {
+          status: MarketplaceOrderStatus.CANCELLED,
+        },
+      });
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    }
+  );
 }
 
 export async function getMarketplaceOrderById(orderId: string, userId: string) {

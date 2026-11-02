@@ -3,15 +3,50 @@ generator client {
   output   = "../generated/prisma"
 }
 
-datasource db { provider = "postgresql" }
+datasource db {
+  provider = "postgresql"
+}
 
-enum ProjectTemplate { editor found }
-enum ParcelStatus { available owned reserved for_sale }
-enum ParcelType { STANDARD CITY_LANDMARK }
-enum MarketplaceOrderStatus { PENDING PAYMENT_PROCESSING PAID GRANTED CANCELLED FAILED }
-enum MarketplacePaymentStatus { PENDING PAID FAILED CANCELLED }
-enum MarketplacePaymentEnvironment { TEST }
-enum MarketplaceEntitlementStatus { GRANTED }
+enum ProjectTemplate {
+  editor
+  found
+}
+
+enum ParcelStatus {
+  available
+  owned
+  reserved
+  for_sale
+}
+
+enum ParcelType {
+  STANDARD
+  CITY_LANDMARK
+}
+
+enum MarketplaceOrderStatus {
+  PENDING
+  PAYMENT_PROCESSING
+  PAID
+  GRANTED
+  CANCELLED
+  FAILED
+}
+
+enum MarketplacePaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum MarketplacePaymentEnvironment {
+  TEST
+}
+
+enum MarketplaceEntitlementStatus {
+  GRANTED
+}
 
 model User {
   id String @id @default(uuid())
