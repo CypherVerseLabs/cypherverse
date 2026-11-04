@@ -66,7 +66,7 @@ if (!JWT_SECRET) {
 }
 
 const PORT =
-  Number(process.env.PORT) || 5001;
+  Number(process.env.PORT) || 5000;
 
 const NODE_ENV =
   process.env.NODE_ENV || "development";
@@ -86,6 +86,12 @@ const allowedOrigins =
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+console.log("[TEST CORS DEBUG]", {
+  cwd: process.cwd(),
+  corsOrigin: process.env.CORS_ORIGIN,
+  allowedOrigins,
+});
 
 app.use(
   cors({
