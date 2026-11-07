@@ -18,6 +18,7 @@ import {
   confirmTestPaymentController,
   failTestPaymentController,
   cancelTestPaymentController,
+  payMarketplaceOrderWithCyphController,
 } from "../controllers/marketplaceController.js";
 
 /**
@@ -117,6 +118,16 @@ router.post(
 router.get(
   "/payments/:paymentId",
   getMarketplacePaymentController
+);
+
+/**
+ * Pay an existing marketplace order with CYPH.
+ *
+ * POST /api/marketplace/orders/:orderId/pay-cyph
+ */
+router.post(
+  "/orders/:orderId/pay-cyph",
+  payMarketplaceOrderWithCyphController
 );
 
 /**

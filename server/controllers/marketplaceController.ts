@@ -20,6 +20,7 @@ import {
   failTestMarketplacePayment,
   cancelTestMarketplacePayment,
   getMarketplacePaymentById,
+  payMarketplaceOrderWithCyph,
 } from "../services/marketplacePaymentService.js";
 
 /**
@@ -87,6 +88,14 @@ function sendMarketplaceError(
       PAYMENT_AMOUNT_MISMATCH: 409,
       PAYMENT_ENVIRONMENT_MISMATCH: 409,
       ORDER_PRICE_MISMATCH: 409,
+
+      CYPH_ACCOUNT_NOT_FOUND: 404,
+      CYPH_INSUFFICIENT_BALANCE: 409,
+      CYPH_LEDGER_STATE_CONFLICT: 409,
+
+      ORDER_PAYMENT_ALREADY_STARTED: 409,
+      ORDER_CURRENCY_UNSUPPORTED: 409,
+      INVALID_ORDER_AMOUNT: 409,
 
       UNSUPPORTED_PAYMENT_STATUS: 400,
     };
@@ -529,6 +538,45 @@ export async function cancelTestPaymentController(
     const result =
       await cancelTestMarketplacePayment(
         req.params.paymentId,
+        userId
+      );
+
+    return res.json(result);
+  } catch (error) {
+    return sendMarketplaceError(
+      res,
+      error
+    );
+  }
+}
+
+/**
+ * =========================================================
+ * CYPH MARKETPLACE PAYMENT
+ * =========================================================
+ *
+ * POST /api/marketplace/orders/:orderId/pay-cyph
+ *
+ * No amount or balance is accepted from the client.
+ */
+
+export async function payMarketplaceOrderWithCyphController(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const userId =
+    getAuthenticatedUserId(req);
+
+  if (!userId) {
+    return res.status(401).json({
+      error: "AUTHENTICATION_REQUIRED",
+    });
+  }
+
+  try {
+    const result =
+      await payMarketplaceOrderWithCyph(
+        req.params.orderId,
         userId
       );
 
