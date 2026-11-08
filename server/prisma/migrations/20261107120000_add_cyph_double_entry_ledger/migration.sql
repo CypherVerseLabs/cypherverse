@@ -2,6 +2,23 @@
 -- Additive migration. The already-applied 20261104092100 migration is not modified.
 -- No user balances are funded by this migration.
 
+DO $$
+DECLARE
+  zero_count BIGINT;
+BEGIN
+  SELECT COUNT(*)
+  INTO zero_count
+  FROM "CyphLedgerEntry"
+  WHERE "amount" = 0;
+
+  IF zero_count > 0 THEN
+    RAISE EXCEPTION
+      'CYPH migration blocked: % zero-value legacy entries require review',
+      zero_count;
+  END IF;
+END;
+$$;
+
 CREATE TYPE "UserRole" AS ENUM ('USER', 'ADMIN');
 CREATE TYPE "CyphAccountType" AS ENUM ('USER', 'SYSTEM');
 
