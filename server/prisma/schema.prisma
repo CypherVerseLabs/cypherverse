@@ -48,85 +48,102 @@ enum MarketplaceEntitlementStatus {
   GRANTED
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum CyphAccountType {
+  USER
+  SYSTEM
+}
+
 model User {
-  id String @id @default(uuid())
-  address String? @unique
-  email String? @unique
-  passwordHash String?
-  username String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  projects Project[]
-  parcelsOwned Parcel[]
-  parcelListings ParcelListing[]
-  parcelReservations ParcelReservation[]
-  marketplaceOrders MarketplaceOrder[] @relation("BuyerOrders")
-  marketplaceSales MarketplaceOrder[] @relation("SellerOrders")
-  marketplacePayments MarketplacePayment[]
-  marketplaceEntitlements MarketplaceEntitlement[]
+  id                         String                      @id @default(uuid())
+  address                    String?                     @unique
+  email                      String?                     @unique
+  passwordHash               String?
+  username                   String?
+  role                       String                      @default("USER")
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  projects                   Project[]
+  parcelsOwned               Parcel[]
+  parcelListings             ParcelListing[]
+  parcelReservations         ParcelReservation[]
+  marketplaceOrders          MarketplaceOrder[]          @relation("BuyerOrders")
+  marketplaceSales           MarketplaceOrder[]          @relation("SellerOrders")
+  marketplacePayments        MarketplacePayment[]
+  marketplaceEntitlements    MarketplaceEntitlement[]
   marketplaceIdempotencyKeys MarketplaceIdempotencyKey[]
-  marketplacePaymentEvents MarketplacePaymentEvent[]
-  cyphAccount CyphAccount?
-  cyphLedgerEntries CyphLedgerEntry[]
-  previousParcelOwnerships ParcelOwnershipHistory[] @relation("PreviousParcelOwner")
-  newParcelOwnerships ParcelOwnershipHistory[] @relation("NewParcelOwner")
+  marketplacePaymentEvents   MarketplacePaymentEvent[]
+  cyphAccount                CyphAccount?
+  cyphLedgerEntries          CyphLedgerEntry[]
+  cyphLedgerTransactions     CyphLedgerTransaction[]     @relation("CyphLedgerActor")
+  cyphFundingPresetsCreated  CyphFundingPreset[]         @relation("CyphFundingPresetCreator")
+  cyphFundingGrantsReceived  CyphFundingGrant[]          @relation("CyphFundingTarget")
+  previousParcelOwnerships   ParcelOwnershipHistory[]    @relation("PreviousParcelOwner")
+  newParcelOwnerships        ParcelOwnershipHistory[]    @relation("NewParcelOwner")
 }
 
 model Project {
-  id String @id
-  ownerId String
-  name String
+  id          String          @id
+  ownerId     String
+  name        String
   description String?
-  template ProjectTemplate @default(editor)
-  scene Json?
-  slug String? @unique
+  template    ProjectTemplate @default(editor)
+  scene       Json?
+  slug        String?         @unique
   publishedAt DateTime?
-  parcelId String? @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  assets ProjectAsset[]
-  parcel Parcel? @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+  parcelId    String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  assets      ProjectAsset[]
+  parcel      Parcel?         @relation(fields: [parcelId], references: [id], onDelete: SetNull)
+
   @@index([ownerId])
   @@index([publishedAt])
 }
 
 model ProjectAsset {
-  id String @id @default(uuid())
-  projectId String
+  id           String   @id @default(uuid())
+  projectId    String
   originalName String
-  storageKey String
-  mimeType String
-  sizeBytes Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
   @@unique([projectId, storageKey])
   @@index([projectId])
 }
 
 model Parcel {
-  id String @id @default(uuid())
-  estateId String @unique
-  x Int
-  y Int
-  type ParcelType @default(STANDARD)
-  status ParcelStatus @default(available)
-  ownerId String?
-  price Decimal? @db.Decimal(12, 2)
-  name String?
-  description String?
-  blockchainAddress String?
-  tokenId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  owner User? @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  listings ParcelListing[]
-  reservations ParcelReservation[]
-  project Project?
-  marketplaceOrders MarketplaceOrder[]
+  id                      String                   @id @default(uuid())
+  estateId                String                   @unique
+  x                       Int
+  y                       Int
+  type                    ParcelType               @default(STANDARD)
+  status                  ParcelStatus             @default(available)
+  ownerId                 String?
+  price                   Decimal?                 @db.Decimal(12, 2)
+  name                    String?
+  description             String?
+  blockchainAddress       String?
+  tokenId                 String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  owner                   User?                    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  listings                ParcelListing[]
+  reservations            ParcelReservation[]
+  project                 Project?
+  marketplaceOrders       MarketplaceOrder[]
   marketplaceEntitlements MarketplaceEntitlement[]
-  ownershipHistory ParcelOwnershipHistory[]
+  ownershipHistory        ParcelOwnershipHistory[]
+
   @@index([ownerId])
   @@index([status])
   @@index([type])
@@ -134,18 +151,19 @@ model Parcel {
 }
 
 model ParcelOwnershipHistory {
-  id String @id @default(uuid())
-  parcelId String
-  previousOwnerId String?
-  newOwnerId String?
-  transferredAt DateTime @default(now())
-  source String?
+  id                 String            @id @default(uuid())
+  parcelId           String
+  previousOwnerId    String?
+  newOwnerId         String?
+  transferredAt      DateTime          @default(now())
+  source             String?
   marketplaceOrderId String?
-  createdAt DateTime @default(now())
-  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Restrict)
-  previousOwner User? @relation("PreviousParcelOwner", fields: [previousOwnerId], references: [id], onDelete: SetNull)
-  newOwner User? @relation("NewParcelOwner", fields: [newOwnerId], references: [id], onDelete: SetNull)
-  marketplaceOrder MarketplaceOrder? @relation(fields: [marketplaceOrderId], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
+  parcel             Parcel            @relation(fields: [parcelId], references: [id], onDelete: Restrict)
+  previousOwner      User?             @relation("PreviousParcelOwner", fields: [previousOwnerId], references: [id], onDelete: SetNull)
+  newOwner           User?             @relation("NewParcelOwner", fields: [newOwnerId], references: [id], onDelete: SetNull)
+  marketplaceOrder   MarketplaceOrder? @relation(fields: [marketplaceOrderId], references: [id], onDelete: SetNull)
+
   @@index([parcelId, transferredAt])
   @@index([previousOwnerId])
   @@index([newOwnerId])
@@ -153,55 +171,58 @@ model ParcelOwnershipHistory {
 }
 
 model ParcelListing {
-  id String @id @default(uuid())
-  parcelId String
-  sellerId String
-  price Decimal @db.Decimal(12, 2)
-  active Boolean @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
-  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  id                String             @id @default(uuid())
+  parcelId          String
+  sellerId          String
+  price             Decimal            @db.Decimal(12, 2)
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  parcel            Parcel             @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  seller            User               @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   marketplaceOrders MarketplaceOrder[]
+
   @@index([parcelId])
   @@index([sellerId])
   @@index([active])
 }
 
 model ParcelReservation {
-  id String @id @default(uuid())
-  parcelId String
-  userId String
+  id        String   @id @default(uuid())
+  parcelId  String
+  userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
-  parcel Parcel @relation(fields: [parcelId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parcel    Parcel   @relation(fields: [parcelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([parcelId])
   @@index([userId])
   @@index([expiresAt])
 }
 
 model MarketplaceOrder {
-  id String @id @default(uuid())
-  userId String
-  productId String
-  listingId String?
-  sellerId String
-  quantity Int @default(1)
-  amount Decimal @db.Decimal(12, 2)
-  currency String @default("USD")
-  status MarketplaceOrderStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation("BuyerOrders", fields: [userId], references: [id], onDelete: Cascade)
-  seller User @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict)
-  product Parcel @relation(fields: [productId], references: [id], onDelete: Restrict)
-  listing ParcelListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  payments MarketplacePayment[]
-  entitlements MarketplaceEntitlement[]
-  paymentEvents MarketplacePaymentEvent[]
-  idempotencyKeys MarketplaceIdempotencyKey[]
+  id               String                      @id @default(uuid())
+  userId           String
+  productId        String
+  listingId        String?
+  sellerId         String
+  quantity         Int                         @default(1)
+  amount           Decimal                     @db.Decimal(12, 2)
+  currency         String                      @default("USD")
+  status           MarketplaceOrderStatus      @default(PENDING)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  user             User                        @relation("BuyerOrders", fields: [userId], references: [id], onDelete: Cascade)
+  seller           User                        @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict)
+  product          Parcel                      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  listing          ParcelListing?              @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  payments         MarketplacePayment[]
+  entitlements     MarketplaceEntitlement[]
+  paymentEvents    MarketplacePaymentEvent[]
+  idempotencyKeys  MarketplaceIdempotencyKey[]
   ownershipHistory ParcelOwnershipHistory[]
+
   @@index([userId])
   @@index([productId])
   @@index([listingId])
@@ -211,22 +232,23 @@ model MarketplaceOrder {
 }
 
 model MarketplacePayment {
-  id String @id @default(uuid())
-  orderId String
-  userId String
-  providerTransactionId String @unique
-  amount Decimal @db.Decimal(12, 2)
-  currency String
-  status MarketplacePaymentStatus @default(PENDING)
-  environment MarketplacePaymentEnvironment @default(TEST)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  paidAt DateTime?
-  failedAt DateTime?
-  cancelledAt DateTime?
-  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events MarketplacePaymentEvent[]
+  id                    String                        @id @default(uuid())
+  orderId               String
+  userId                String
+  providerTransactionId String                        @unique
+  amount                Decimal                       @db.Decimal(12, 2)
+  currency              String
+  status                MarketplacePaymentStatus      @default(PENDING)
+  environment           MarketplacePaymentEnvironment @default(TEST)
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  paidAt                DateTime?
+  failedAt              DateTime?
+  cancelledAt           DateTime?
+  order                 MarketplaceOrder              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                  User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events                MarketplacePaymentEvent[]
+
   @@index([orderId])
   @@index([userId])
   @@index([status])
@@ -234,19 +256,20 @@ model MarketplacePayment {
 }
 
 model MarketplacePaymentEvent {
-  id String @id @default(uuid())
-  providerEventId String @unique
+  id                    String                        @id @default(uuid())
+  providerEventId       String                        @unique
   providerTransactionId String?
-  orderId String
-  userId String
-  status MarketplacePaymentStatus
-  environment MarketplacePaymentEnvironment @default(TEST)
-  processed Boolean @default(false)
-  createdAt DateTime @default(now())
-  processedAt DateTime?
-  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  payment MarketplacePayment? @relation(fields: [providerTransactionId], references: [providerTransactionId], onDelete: SetNull)
+  orderId               String
+  userId                String
+  status                MarketplacePaymentStatus
+  environment           MarketplacePaymentEnvironment @default(TEST)
+  processed             Boolean                       @default(false)
+  createdAt             DateTime                      @default(now())
+  processedAt           DateTime?
+  order                 MarketplaceOrder              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                  User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment               MarketplacePayment?           @relation(fields: [providerTransactionId], references: [providerTransactionId], onDelete: SetNull)
+
   @@index([providerTransactionId])
   @@index([orderId])
   @@index([userId])
@@ -255,18 +278,19 @@ model MarketplacePaymentEvent {
 }
 
 model MarketplaceEntitlement {
-  id String @id @default(uuid())
-  userId String
+  id        String                       @id @default(uuid())
+  userId    String
   productId String
-  orderId String
-  quantity Int @default(1)
-  status MarketplaceEntitlementStatus @default(GRANTED)
-  grantedAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  product Parcel @relation(fields: [productId], references: [id], onDelete: Restrict)
-  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  quantity  Int                          @default(1)
+  status    MarketplaceEntitlementStatus @default(GRANTED)
+  grantedAt DateTime                     @default(now())
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+  user      User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Parcel                       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order     MarketplaceOrder             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
   @@unique([userId, productId])
   @@index([userId])
   @@index([productId])
@@ -275,17 +299,18 @@ model MarketplaceEntitlement {
 }
 
 model MarketplaceIdempotencyKey {
-  id String @id @default(uuid())
-  userId String
-  operation String
-  key String
-  orderId String?
+  id             String            @id @default(uuid())
+  userId         String
+  operation      String
+  key            String
+  orderId        String?
   responseStatus Int?
-  responseJson Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  responseJson   Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order          MarketplaceOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
   @@unique([userId, operation, key])
   @@index([userId])
   @@index([orderId])
@@ -293,29 +318,99 @@ model MarketplaceIdempotencyKey {
 }
 
 model CyphAccount {
-  id String @id @default(uuid())
-  userId String @unique
-  balance Decimal @default(0) @db.Decimal(24, 8)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String              @id @default(uuid())
+  userId        String?             @unique
+  systemCode    String?             @unique
+  accountType   CyphAccountType     @default(USER)
+  balance       Decimal             @default(0) @db.Decimal(24, 8)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User?               @relation(fields: [userId], references: [id], onDelete: Restrict)
   ledgerEntries CyphLedgerEntry[]
+  postings      CyphLedgerPosting[]
+
   @@index([userId])
 }
 
 model CyphLedgerEntry {
-  id String @id @default(uuid())
-  userId String
-  accountId String
-  amount Decimal @db.Decimal(24, 8)
-  type String
-  referenceType String?
-  referenceId String?
-  idempotencyKey String? @unique
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account CyphAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id             String      @id @default(uuid())
+  userId         String
+  accountId      String
+  amount         Decimal     @db.Decimal(24, 8)
+  type           String
+  referenceType  String?
+  referenceId    String?
+  idempotencyKey String?     @unique
+  createdAt      DateTime    @default(now())
+  user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  account        CyphAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
   @@index([userId])
   @@index([accountId])
   @@index([referenceType, referenceId])
+}
+
+model CyphLedgerTransaction {
+  id             String              @id @default(uuid())
+  type           String
+  idempotencyKey String              @unique
+  actorUserId    String?
+  referenceType  String?
+  referenceId    String?
+  reason         String?
+  createdAt      DateTime            @default(now())
+  actorUser      User?               @relation("CyphLedgerActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  postings       CyphLedgerPosting[]
+  fundingGrant   CyphFundingGrant?
+
+  @@index([actorUserId])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model CyphLedgerPosting {
+  id            String                @id @default(uuid())
+  transactionId String
+  accountId     String
+  amount        Decimal               @db.Decimal(24, 8)
+  createdAt     DateTime              @default(now())
+  transaction   CyphLedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       CyphAccount           @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([accountId])
+}
+
+model CyphFundingPreset {
+  id              String             @id @default(uuid())
+  code            String             @unique
+  label           String
+  baseAmount      Decimal            @db.Decimal(24, 8)
+  bonusAmount     Decimal            @default(0) @db.Decimal(24, 8)
+  enabled         Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  createdByUserId String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  createdByUser   User?              @relation("CyphFundingPresetCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  grants          CyphFundingGrant[]
+
+  @@index([enabled, sortOrder])
+}
+
+model CyphFundingGrant {
+  id            String                @id @default(uuid())
+  transactionId String                @unique
+  targetUserId  String
+  presetId      String?
+  baseAmount    Decimal               @db.Decimal(24, 8)
+  bonusAmount   Decimal               @default(0) @db.Decimal(24, 8)
+  reason        String
+  createdAt     DateTime              @default(now())
+  transaction   CyphLedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  targetUser    User                  @relation("CyphFundingTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  preset        CyphFundingPreset?    @relation(fields: [presetId], references: [id], onDelete: Restrict)
+
+  @@index([targetUserId, createdAt])
+  @@index([presetId])
 }

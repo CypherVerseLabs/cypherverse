@@ -34,6 +34,9 @@ import marketplaceRoutes from "./routes/marketplaceRoutes.js";
 
 import ideasRouter from "./routes/ideas.js";
 
+import cyphRouter from "./routes/cyphRoutes.js";
+import adminCyphRouter from "./routes/adminCyphRoutes.js";
+
 // =========================================================
 // AUTH MIDDLEWARE
 // =========================================================
@@ -335,6 +338,21 @@ app.use(
   "/api/marketplace",
   marketplaceRoutes
 );
+
+// =========================================================
+// CYPH ACCOUNT AND LEDGER ROUTES
+// =========================================================
+
+app.use(
+  "/api/cyph",
+  cyphRouter
+);
+
+app.use(
+  "/api/admin/cyph",
+  adminCyphRouter
+);
+
 
 // =========================================================
 // AI ROUTES

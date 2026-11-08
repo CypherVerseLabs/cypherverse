@@ -1,6 +1,7 @@
 import { Prisma, ParcelStatus, ParcelType, MarketplaceOrderStatus, MarketplacePaymentStatus, MarketplacePaymentEnvironment } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import { MarketplaceError } from "./marketplaceOrderService.js";
+import { createCyphLedgerTransaction } from "./cyphLedgerService.js";
 
 export const MARKETPLACE_PAYMENT_OPERATION = { CREATE_PAYMENT: "CREATE_MARKETPLACE_PAYMENT" } as const;
 export const MARKETPLACE_PAYMENT_ENVIRONMENT = MarketplacePaymentEnvironment.TEST;
@@ -391,6 +392,43 @@ export async function payMarketplaceOrderWithCyph(
           referenceId: order.id,
           idempotencyKey: ledgerIdempotencyKey,
         },
+      });
+
+      const marketplaceRevenueAccount =
+        await tx.cyphAccount.findUnique({
+          where: {
+            systemCode: "CYPH_MARKETPLACE_REVENUE",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+      if (!marketplaceRevenueAccount) {
+        throw new MarketplaceError(
+          "CYPH_SYSTEM_ACCOUNT_MISSING",
+          "The CYPH marketplace revenue account is missing."
+        );
+      }
+
+      await createCyphLedgerTransaction(tx, {
+        type: "MARKETPLACE_PAYMENT",
+        idempotencyKey:
+          `marketplace-order:${order.id}:cyph-journal`,
+        actorUserId: userId,
+        referenceType: "MARKETPLACE_ORDER",
+        referenceId: order.id,
+        reason: "Marketplace order paid with CYPH.",
+        postings: [
+          {
+            accountId: account.id,
+            amount: amount.negated(),
+          },
+          {
+            accountId: marketplaceRevenueAccount.id,
+            amount,
+          },
+        ],
       });
 
       /**
