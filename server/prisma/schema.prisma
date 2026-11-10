@@ -104,6 +104,7 @@ model Project {
 
   @@index([ownerId])
   @@index([publishedAt])
+  @@index([parcelId])
 }
 
 model ProjectAsset {
@@ -236,8 +237,11 @@ model MarketplacePayment {
   orderId               String
   userId                String
   providerTransactionId String                        @unique
-  amount                Decimal                       @db.Decimal(12, 2)
+  amount                Decimal                       @db.Decimal(24, 8)
   currency              String
+  sourceAmount          Decimal?                      @db.Decimal(12, 2)
+  sourceCurrency        String?
+  conversionRate        Decimal?                      @db.Decimal(12, 8)
   status                MarketplacePaymentStatus      @default(PENDING)
   environment           MarketplacePaymentEnvironment @default(TEST)
   createdAt             DateTime                      @default(now())
