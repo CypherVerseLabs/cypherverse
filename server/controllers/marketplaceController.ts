@@ -21,6 +21,7 @@ import {
   cancelTestMarketplacePayment,
   getMarketplacePaymentById,
   payMarketplaceOrderWithCyph,
+  getMarketplaceOrderCyphQuote,
 } from "../services/marketplacePaymentService.js";
 
 /**
@@ -92,6 +93,8 @@ function sendMarketplaceError(
       CYPH_ACCOUNT_NOT_FOUND: 404,
       CYPH_INSUFFICIENT_BALANCE: 409,
       CYPH_LEDGER_STATE_CONFLICT: 409,
+      CYPH_SYSTEM_ACCOUNT_MISSING: 500,
+      CYPH_PAYMENT_RETRY_EXHAUSTED: 409,
 
       ORDER_PAYMENT_ALREADY_STARTED: 409,
       ORDER_CURRENCY_UNSUPPORTED: 409,
@@ -586,5 +589,34 @@ export async function payMarketplaceOrderWithCyphController(
       res,
       error
     );
+  }
+}
+
+/**
+ * Get a server-calculated CYPH quote for an existing USD order.
+ *
+ * GET /api/marketplace/orders/:orderId/pay-cyph/quote
+ */
+export async function getMarketplaceOrderCyphQuoteController(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  const userId = getAuthenticatedUserId(req);
+
+  if (!userId) {
+    return res.status(401).json({
+      error: "AUTHENTICATION_REQUIRED",
+    });
+  }
+
+  try {
+    const quote = await getMarketplaceOrderCyphQuote(
+      req.params.orderId,
+      userId
+    );
+
+    return res.json({ quote });
+  } catch (error) {
+    return sendMarketplaceError(res, error);
   }
 }
