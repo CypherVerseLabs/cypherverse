@@ -467,8 +467,14 @@ export async function payMarketplaceOrderWithCyph(
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
     } catch (error) {
-      if (!isRetryableCyphPaymentError(error) || attempt === CYPH_PAYMENT_MAX_RETRIES) {
+      if (!isRetryableCyphPaymentError(error)) {
         throw error;
+      }
+      if (attempt === CYPH_PAYMENT_MAX_RETRIES) {
+        throw new MarketplaceError(
+          "CYPH_PAYMENT_RETRY_EXHAUSTED",
+          "The CYPH payment could not be completed after concurrent updates. Please retry."
+        );
       }
     }
   }
