@@ -157,386 +157,324 @@ async function grantMarketplaceEntitlement(tx: Prisma.TransactionClient, orderId
  * No account is automatically created or funded.
  */
 
+const CYPH_USD_CONVERSION_RATE = new Prisma.Decimal("0.10000000");
+const CYPH_PER_USD = new Prisma.Decimal(10);
+const CYPH_PAYMENT_MAX_RETRIES = 3;
+
+function getCyphAmountFromUsd(sourceAmount: Prisma.Decimal): Prisma.Decimal {
+  // 1 CYPH has a reference value of USD 0.10; this is a payment conversion,
+  // not a redemption promise. Multiplication avoids floating-point rounding.
+  return sourceAmount.mul(CYPH_PER_USD);
+}
+
+function assertCyphOrderCanBeQuoted(order: {
+  currency: string;
+  amount: Prisma.Decimal;
+  status: MarketplaceOrderStatus;
+  payments: unknown[];
+}) {
+  if (order.currency !== "USD") {
+    throw new MarketplaceError(
+      "ORDER_CURRENCY_UNSUPPORTED",
+      "CYPH payments require a USD-denominated marketplace order."
+    );
+  }
+
+  if (order.amount.lte(0)) {
+    throw new MarketplaceError(
+      "INVALID_ORDER_AMOUNT",
+      "The marketplace order amount must be greater than zero."
+    );
+  }
+
+  if (order.status === MarketplaceOrderStatus.CANCELLED) {
+    throw new MarketplaceError("ORDER_CANCELLED", "The order has been cancelled.");
+  }
+  if (order.status === MarketplaceOrderStatus.FAILED) {
+    throw new MarketplaceError("ORDER_FAILED", "The order has failed.");
+  }
+  if (
+    order.status === MarketplaceOrderStatus.PAID ||
+    order.status === MarketplaceOrderStatus.GRANTED
+  ) {
+    throw new MarketplaceError("ORDER_ALREADY_PAID", "This order has already been paid.");
+  }
+  if (order.status !== MarketplaceOrderStatus.PENDING) {
+    throw new MarketplaceError(
+      "ORDER_PAYMENT_ALREADY_STARTED",
+      "This order is not available for a new CYPH payment."
+    );
+  }
+  if (order.payments.length > 0) {
+    throw new MarketplaceError(
+      "ORDER_PAYMENT_ALREADY_STARTED",
+      "A payment has already been started for this order."
+    );
+  }
+}
+
+/**
+ * Returns a server-calculated CYPH quote for an owned USD marketplace order.
+ * The quote does not reserve funds or create a payment.
+ */
+export async function getMarketplaceOrderCyphQuote(orderId: string, userId: string) {
+  if (!orderId.trim()) throw new MarketplaceError("ORDER_ID_REQUIRED");
+  if (!userId.trim()) throw new MarketplaceError("USER_ID_REQUIRED");
+
+  const order = await prisma.marketplaceOrder.findFirst({
+    where: { id: orderId, userId },
+    include: { payments: true },
+  });
+
+  if (!order) {
+    throw new MarketplaceError("ORDER_NOT_FOUND", "Marketplace order not found.");
+  }
+
+  assertCyphOrderCanBeQuoted(order);
+
+  const sourceAmount = new Prisma.Decimal(order.amount);
+  const amount = getCyphAmountFromUsd(sourceAmount);
+
+  return {
+    orderId: order.id,
+    sourceAmount: sourceAmount.toFixed(2),
+    sourceCurrency: "USD",
+    conversionRate: CYPH_USD_CONVERSION_RATE.toFixed(8),
+    amount: amount.toFixed(8),
+    currency: "CYPH",
+  };
+}
+
+function isRetryableCyphPaymentError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("code" in error)) return false;
+  const code = (error as { code?: unknown }).code;
+  // Retry the entire transaction only. Prisma aborts a transaction after
+  // serialization/unique races; never continue inside the failed transaction.
+  return code === "P2034" || code === "P2002";
+}
+
+/**
+ * Pays an authoritative USD order using CYPH.
+ *
+ * The server calculates USD multiplied by 10. The client supplies only the
+ * order ID. Debit, ledger entries, payment snapshot, event, and entitlement
+ * settlement commit in one transaction.
+ */
 export async function payMarketplaceOrderWithCyph(
   orderId: string,
   userId: string
 ) {
-  if (!orderId.trim()) {
-    throw new MarketplaceError("ORDER_ID_REQUIRED");
-  }
+  if (!orderId.trim()) throw new MarketplaceError("ORDER_ID_REQUIRED");
+  if (!userId.trim()) throw new MarketplaceError("USER_ID_REQUIRED");
 
-  if (!userId.trim()) {
-    throw new MarketplaceError("USER_ID_REQUIRED");
-  }
+  for (let attempt = 1; attempt <= CYPH_PAYMENT_MAX_RETRIES; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const order = await tx.marketplaceOrder.findFirst({
+            where: { id: orderId, userId },
+            include: { payments: true },
+          });
 
-  return prisma.$transaction(
-    async (tx) => {
-      const order = await tx.marketplaceOrder.findFirst({
-        where: {
-          id: orderId,
-          userId,
-        },
-        include: {
-          payments: true,
-        },
-      });
+          if (!order) {
+            throw new MarketplaceError("ORDER_NOT_FOUND", "Marketplace order not found.");
+          }
 
-      if (!order) {
-        throw new MarketplaceError(
-          "ORDER_NOT_FOUND",
-          "Marketplace order not found."
-        );
-      }
+          if (order.currency !== "USD") {
+            throw new MarketplaceError(
+              "ORDER_CURRENCY_UNSUPPORTED",
+              "CYPH payments require a USD-denominated marketplace order."
+            );
+          }
 
-      if (order.currency !== "USD") {
-        throw new MarketplaceError(
-          "ORDER_CURRENCY_UNSUPPORTED",
-          "CYPH payments require a USD-denominated marketplace order."
-        );
-      }
+          const sourceAmount = new Prisma.Decimal(order.amount);
+          if (sourceAmount.lte(0)) {
+            throw new MarketplaceError(
+              "INVALID_ORDER_AMOUNT",
+              "The marketplace order amount must be greater than zero."
+            );
+          }
 
-      const amount = new Prisma.Decimal(order.amount);
+          const amount = getCyphAmountFromUsd(sourceAmount);
+          const ledgerIdempotencyKey = "marketplace-order:" + order.id + ":cyph-debit";
+          const providerTransactionId = "cyph_order_" + order.id;
+          const providerEventId = "cyph_event_" + order.id;
 
-      if (amount.lte(0)) {
-        throw new MarketplaceError(
-          "INVALID_ORDER_AMOUNT",
-          "The marketplace order amount must be greater than zero."
-        );
-      }
+          // A committed CYPH payment is an idempotent success. Check this
+          // before generic order-state and cross-rail guards.
+          const existingCyphPayment = await tx.marketplacePayment.findFirst({
+            where: { orderId: order.id, userId, currency: "CYPH" },
+          });
 
-      const ledgerIdempotencyKey =
-        `marketplace-order:${order.id}:cyph-debit`;
+          if (
+            existingCyphPayment?.status === MarketplacePaymentStatus.PAID &&
+            order.status === MarketplaceOrderStatus.GRANTED
+          ) {
+            const account = await tx.cyphAccount.findUnique({ where: { userId } });
+            return {
+              alreadyPaid: true,
+              order,
+              payment: existingCyphPayment,
+              balance: account?.balance.toString() ?? null,
+            };
+          }
 
-      const providerTransactionId =
-        `cyph_order_${order.id}`;
+          assertCyphOrderCanBeQuoted(order);
 
-      const providerEventId =
-        `cyph_event_${order.id}`;
+          if (existingCyphPayment) {
+            throw new MarketplaceError(
+              "CYPH_LEDGER_STATE_CONFLICT",
+              "A CYPH payment record exists but the order is not in a completed state."
+            );
+          }
 
-      /**
-       * -----------------------------------------------------
-       * IDEMPOTENT RETRY
-       * -----------------------------------------------------
-       *
-       * A completed CYPH purchase must never debit twice.
-       */
+          const account = await tx.cyphAccount.findUnique({ where: { userId } });
+          if (!account) {
+            throw new MarketplaceError(
+              "CYPH_ACCOUNT_NOT_FOUND",
+              "No funded CYPH account exists for this user."
+            );
+          }
 
-      const existingCyphPayment =
-        await tx.marketplacePayment.findFirst({
-          where: {
-            orderId: order.id,
-            userId,
-            currency: "CYPH",
-          },
-        });
+          const existingLedgerEntry = await tx.cyphLedgerEntry.findUnique({
+            where: { idempotencyKey: ledgerIdempotencyKey },
+          });
+          if (existingLedgerEntry) {
+            throw new MarketplaceError(
+              "CYPH_LEDGER_STATE_CONFLICT",
+              "A CYPH debit already exists for this order, but its payment state is inconsistent."
+            );
+          }
 
-      if (
-        existingCyphPayment?.status ===
-          MarketplacePaymentStatus.PAID &&
-        order.status === MarketplaceOrderStatus.GRANTED
-      ) {
-        const account =
-          await tx.cyphAccount.findUnique({
+          const debit = await tx.cyphAccount.updateMany({
             where: {
+              id: account.id,
               userId,
+              balance: { gte: amount },
+            },
+            data: { balance: { decrement: amount } },
+          });
+
+          if (debit.count !== 1) {
+            throw new MarketplaceError(
+              "CYPH_INSUFFICIENT_BALANCE",
+              "Your CYPH balance is insufficient for this purchase."
+            );
+          }
+
+          await tx.cyphLedgerEntry.create({
+            data: {
+              userId,
+              accountId: account.id,
+              amount: amount.negated(),
+              type: "MARKETPLACE_PAYMENT",
+              referenceType: "MARKETPLACE_ORDER",
+              referenceId: order.id,
+              idempotencyKey: ledgerIdempotencyKey,
             },
           });
 
-        return {
-          alreadyPaid: true,
-          order,
-          payment: existingCyphPayment,
-          balance: account?.balance.toString() ?? null,
-        };
-      }
+          const marketplaceRevenueAccount = await tx.cyphAccount.findUnique({
+            where: { systemCode: "CYPH_MARKETPLACE_REVENUE" },
+            select: { id: true },
+          });
+          if (!marketplaceRevenueAccount) {
+            throw new MarketplaceError(
+              "CYPH_SYSTEM_ACCOUNT_MISSING",
+              "The CYPH marketplace revenue account is missing."
+            );
+          }
 
-      /**
-       * -----------------------------------------------------
-       * ORDER STATE
-       * -----------------------------------------------------
-       */
+          const journal = await createCyphLedgerTransaction(tx, {
+            type: "MARKETPLACE_PAYMENT",
+            idempotencyKey: "marketplace-order:" + order.id + ":cyph-journal",
+            actorUserId: userId,
+            referenceType: "MARKETPLACE_ORDER",
+            referenceId: order.id,
+            reason: "Marketplace order paid with CYPH.",
+            postings: [
+              { accountId: account.id, amount: amount.negated() },
+              { accountId: marketplaceRevenueAccount.id, amount },
+            ],
+          });
 
-      if (
-        order.status ===
-        MarketplaceOrderStatus.CANCELLED
-      ) {
-        throw new MarketplaceError(
-          "ORDER_CANCELLED",
-          "The order has been cancelled."
-        );
-      }
+          if (journal.duplicate) {
+            throw new MarketplaceError(
+              "CYPH_LEDGER_STATE_CONFLICT",
+              "A CYPH journal already exists without a matching completed marketplace payment."
+            );
+          }
 
-      if (
-        order.status ===
-        MarketplaceOrderStatus.FAILED
-      ) {
-        throw new MarketplaceError(
-          "ORDER_FAILED",
-          "The order has failed."
-        );
-      }
-
-      if (
-        order.status === MarketplaceOrderStatus.PAID ||
-        order.status === MarketplaceOrderStatus.GRANTED
-      ) {
-        throw new MarketplaceError(
-          "ORDER_ALREADY_PAID",
-          "This order has already been paid."
-        );
-      }
-
-      /**
-       * -----------------------------------------------------
-       * PREVENT CROSS-RAIL PAYMENT
-       * -----------------------------------------------------
-       *
-       * An order with an existing pending payment on another
-       * rail cannot also be paid with CYPH.
-       */
-
-      if (order.payments.length > 0) {
-        throw new MarketplaceError(
-          "ORDER_PAYMENT_ALREADY_STARTED",
-          "A payment has already been started for this order."
-        );
-      }
-
-      /**
-       * -----------------------------------------------------
-       * EXISTING FUNDED ACCOUNT
-       * -----------------------------------------------------
-       */
-
-      const account =
-        await tx.cyphAccount.findUnique({
-          where: {
-            userId,
-          },
-        });
-
-      if (!account) {
-        throw new MarketplaceError(
-          "CYPH_ACCOUNT_NOT_FOUND",
-          "No funded CYPH account exists for this user."
-        );
-      }
-
-      /**
-       * -----------------------------------------------------
-       * LEDGER IDEMPOTENCY
-       * -----------------------------------------------------
-       */
-
-      const existingLedgerEntry =
-        await tx.cyphLedgerEntry.findUnique({
-          where: {
-            idempotencyKey: ledgerIdempotencyKey,
-          },
-        });
-
-      if (existingLedgerEntry) {
-        throw new MarketplaceError(
-          "CYPH_LEDGER_STATE_CONFLICT",
-          "A CYPH debit already exists for this order, but its payment state is inconsistent."
-        );
-      }
-
-      /**
-       * -----------------------------------------------------
-       * ATOMIC BALANCE DEBIT
-       * -----------------------------------------------------
-       *
-       * The balance condition is evaluated by PostgreSQL.
-       * Concurrent purchases cannot spend the same balance.
-       */
-
-      const debit =
-        await tx.cyphAccount.updateMany({
-          where: {
-            id: account.id,
-            userId,
-            balance: {
-              gte: amount,
+          const now = new Date();
+          const payment = await tx.marketplacePayment.create({
+            data: {
+              orderId: order.id,
+              userId,
+              providerTransactionId,
+              amount,
+              currency: "CYPH",
+              sourceAmount,
+              sourceCurrency: "USD",
+              conversionRate: CYPH_USD_CONVERSION_RATE,
+              status: MarketplacePaymentStatus.PAID,
+              environment: MarketplacePaymentEnvironment.TEST,
+              paidAt: now,
             },
-          },
-          data: {
-            balance: {
-              decrement: amount,
+          });
+
+          await tx.marketplacePaymentEvent.create({
+            data: {
+              providerEventId,
+              providerTransactionId,
+              orderId: order.id,
+              userId,
+              status: MarketplacePaymentStatus.PAID,
+              environment: MarketplacePaymentEnvironment.TEST,
+              processed: true,
+              processedAt: now,
             },
-          },
-        });
+          });
 
-      if (debit.count !== 1) {
-        throw new MarketplaceError(
-          "CYPH_INSUFFICIENT_BALANCE",
-          "Your CYPH balance is insufficient for this purchase."
-        );
-      }
+          await tx.marketplaceOrder.update({
+            where: { id: order.id },
+            data: { status: MarketplaceOrderStatus.PAID },
+          });
 
-      /**
-       * -----------------------------------------------------
-       * LEDGER ENTRY
-       * -----------------------------------------------------
-       *
-       * Negative amount = debit.
-       */
-
-      await tx.cyphLedgerEntry.create({
-        data: {
-          userId,
-          accountId: account.id,
-          amount: amount.negated(),
-          type: "MARKETPLACE_PAYMENT",
-          referenceType: "MARKETPLACE_ORDER",
-          referenceId: order.id,
-          idempotencyKey: ledgerIdempotencyKey,
-        },
-      });
-
-      const marketplaceRevenueAccount =
-        await tx.cyphAccount.findUnique({
-          where: {
-            systemCode: "CYPH_MARKETPLACE_REVENUE",
-          },
-          select: {
-            id: true,
-          },
-        });
-
-      if (!marketplaceRevenueAccount) {
-        throw new MarketplaceError(
-          "CYPH_SYSTEM_ACCOUNT_MISSING",
-          "The CYPH marketplace revenue account is missing."
-        );
-      }
-
-      await createCyphLedgerTransaction(tx, {
-        type: "MARKETPLACE_PAYMENT",
-        idempotencyKey:
-          `marketplace-order:${order.id}:cyph-journal`,
-        actorUserId: userId,
-        referenceType: "MARKETPLACE_ORDER",
-        referenceId: order.id,
-        reason: "Marketplace order paid with CYPH.",
-        postings: [
-          {
-            accountId: account.id,
-            amount: amount.negated(),
-          },
-          {
-            accountId: marketplaceRevenueAccount.id,
-            amount,
-          },
-        ],
-      });
-
-      /**
-       * -----------------------------------------------------
-       * PAID MARKETPLACE PAYMENT
-       * -----------------------------------------------------
-       */
-
-      const now = new Date();
-
-      const payment =
-        await tx.marketplacePayment.create({
-          data: {
-            orderId: order.id,
-            userId,
-            providerTransactionId,
-            amount,
-            currency: "CYPH",
-            status: MarketplacePaymentStatus.PAID,
-            environment: MarketplacePaymentEnvironment.TEST,
-            paidAt: now,
-          },
-        });
-
-      /**
-       * -----------------------------------------------------
-       * PAYMENT EVENT
-       * -----------------------------------------------------
-       */
-
-      await tx.marketplacePaymentEvent.create({
-        data: {
-          providerEventId,
-          providerTransactionId,
-          orderId: order.id,
-          userId,
-          status: MarketplacePaymentStatus.PAID,
-          environment: MarketplacePaymentEnvironment.TEST,
-          processed: true,
-          processedAt: now,
-        },
-      });
-
-      /**
-       * -----------------------------------------------------
-       * REUSE EXISTING SETTLEMENT
-       * -----------------------------------------------------
-       */
-
-      await tx.marketplaceOrder.update({
-        where: {
-          id: order.id,
-        },
-        data: {
-          status: MarketplaceOrderStatus.PAID,
-        },
-      });
-
-      const grant =
-        await grantMarketplaceEntitlement(
-          tx,
-          order.id
-        );
-
-      const updatedOrder =
-        await tx.marketplaceOrder.update({
-          where: {
-            id: order.id,
-          },
-          data: {
-            status: MarketplaceOrderStatus.GRANTED,
-          },
-          include: {
-            product: true,
-            listing: true,
-            payments: {
-              orderBy: {
-                createdAt: "desc",
-              },
+          const grant = await grantMarketplaceEntitlement(tx, order.id);
+          const updatedOrder = await tx.marketplaceOrder.update({
+            where: { id: order.id },
+            data: { status: MarketplaceOrderStatus.GRANTED },
+            include: {
+              product: true,
+              listing: true,
+              payments: { orderBy: { createdAt: "desc" } },
+              entitlements: true,
             },
-            entitlements: true,
-          },
-        });
+          });
 
-      /**
-       * -----------------------------------------------------
-       * RETURN UPDATED BALANCE
-       * -----------------------------------------------------
-       */
+          const updatedAccount = await tx.cyphAccount.findUniqueOrThrow({
+            where: { id: account.id },
+          });
 
-      const updatedAccount =
-        await tx.cyphAccount.findUniqueOrThrow({
-          where: {
-            id: account.id,
-          },
-        });
-
-      return {
-        alreadyPaid: false,
-        order: updatedOrder,
-        payment,
-        balance: updatedAccount.balance.toString(),
-        grant,
-      };
-    },
-    {
-      isolationLevel:
-        Prisma.TransactionIsolationLevel.Serializable,
+          return {
+            alreadyPaid: false,
+            order: updatedOrder,
+            payment,
+            balance: updatedAccount.balance.toString(),
+            grant,
+          };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error) {
+      if (!isRetryableCyphPaymentError(error) || attempt === CYPH_PAYMENT_MAX_RETRIES) {
+        throw error;
+      }
     }
+  }
+
+  throw new MarketplaceError(
+    "CYPH_PAYMENT_RETRY_EXHAUSTED",
+    "The CYPH payment could not be completed after concurrent updates. Please retry."
   );
 }
