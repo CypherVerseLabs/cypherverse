@@ -16,6 +16,8 @@ import type {
   ParcelActionType,
 } from "./types";
 
+import type { CyphPaymentQuote } from "../marketplace/types";
+
 
 /**
  * =========================================================
@@ -55,6 +57,10 @@ interface ParcelDirectoryProps {
   onBuy?: (
     parcel: Parcel
   ) => void | Promise<void>;
+
+  onBuyWithCyph?: (parcel: Parcel) => void | Promise<void>;
+
+  cyphQuote?: CyphPaymentQuote | null;
 
   onReserve?: (
     parcel: Parcel
@@ -184,6 +190,8 @@ function ParcelRow({
   selected,
   onSelect,
   onBuy,
+  onBuyWithCyph,
+  cyphQuote,
   onReserve,
   onList,
   index,
@@ -201,6 +209,10 @@ function ParcelRow({
   onBuy?: (
     parcel: Parcel
   ) => void | Promise<void>;
+
+  onBuyWithCyph?: (parcel: Parcel) => void | Promise<void>;
+
+  cyphQuote?: CyphPaymentQuote | null;
 
   onReserve?: (
     parcel: Parcel
@@ -358,28 +370,17 @@ function ParcelRow({
           BUY
           ========================================= */}
 
-      {parcel.status ===
-        "for_sale" &&
-        onBuy && (
+      {parcel.status === "for_sale" && onBuy && (
+        <Button position={[0.86, -0.15, 0]} fontSize={0.06} onClick={() => onBuy(parcel)}>
+          {actionRunning && actionType === "buy" ? "BUYING..." : "BUY (TEST)"}
+        </Button>
+      )}
 
-          <Button
-            position={[
-              0.86,
-              -0.15,
-              0,
-            ]}
-            fontSize={0.06}
-            onClick={() =>
-              onBuy(parcel)
-            }
-          >
-            {actionRunning &&
-            actionType === "buy"
-              ? "BUYING..."
-              : "BUY"}
-          </Button>
-
-        )}
+      {parcel.status === "for_sale" && onBuyWithCyph && (
+        <Button position={[0.86, -0.39, 0]} fontSize={0.055} onClick={() => onBuyWithCyph(parcel)}>
+          {cyphQuote ? `CONFIRM ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "QUOTE CYPH"}
+        </Button>
+      )}
 
 
       {/* =========================================
@@ -780,6 +781,10 @@ export default function ParcelDirectory({
                 onBuy={
                   onBuy
                 }
+
+                onBuyWithCyph={onBuyWithCyph}
+
+                cyphQuote={cyphQuote}
 
                 onReserve={
                   onReserve

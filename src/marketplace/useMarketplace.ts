@@ -466,6 +466,66 @@ export default function useMarketplace() {
 
   /**
    * =======================================================
+   * PREPARE CYPH CHECKOUT
+   * =======================================================
+   *
+   * Creates an order and retrieves a quote without debiting.
+   */
+
+  const prepareCyphCheckout = useCallback(
+    async (parcel: Parcel): Promise<MarketplaceResult> => {
+      if (!parcel?.id) {
+        return { success: false, action: "buy", error: "Parcel ID is required." };
+      }
+      return runAction(parcel.id, "buy", async () => {
+        const orderResult = await marketplace.buyParcel(
+          parcel,
+          { idempotencyKey: createIdempotencyKey(parcel.id) }
+        );
+        if (!orderResult.success || !orderResult.order) {
+          return orderResult.success
+            ? { success: false, action: "buy", error: "Marketplace order was not returned." }
+            : orderResult;
+        }
+        const quoteResult = await marketplace.getCyphQuote(orderResult.order.id);
+        if (!quoteResult.success || !quoteResult.quote) {
+          return quoteResult.success
+            ? { success: false, action: "buy", error: "CYPH quote was not returned." }
+            : quoteResult;
+        }
+        return {
+          success: true,
+          action: "buy",
+          order: orderResult.order,
+          quote: quoteResult.quote,
+        };
+      });
+    },
+    [createIdempotencyKey, marketplace, runAction]
+  );
+
+
+  /**
+   * =======================================================
+   * CONFIRM CYPH CHECKOUT
+   * =======================================================
+   *
+   * Server recalculates the amount from the USD order.
+   */
+
+  const payWithCyph = useCallback(
+    async (parcelId: string, orderId: string): Promise<MarketplaceResult> => {
+      if (!parcelId || !orderId) {
+        return { success: false, action: "buy", error: "Parcel and order IDs are required." };
+      }
+      return runAction(parcelId, "buy", () => marketplace.payWithCyph(orderId));
+    },
+    [marketplace, runAction]
+  );
+
+
+  /**
+   * =======================================================
    * CREATE PAYMENT
    * =======================================================
    *
@@ -877,6 +937,10 @@ export default function useMarketplace() {
     actionError,
 
     buyParcel,
+
+    prepareCyphCheckout,
+
+    payWithCyph,
 
     createPayment,
 

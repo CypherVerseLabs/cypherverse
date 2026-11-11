@@ -42,6 +42,7 @@ import type {
 import {
   useMarketplace,
 } from "../marketplace";
+import type { CyphPaymentQuote } from "../marketplace/types";
 import LandmarkLayer from "./LandmarkLayer";
 
 
@@ -235,6 +236,12 @@ const selectedParcel =
 const selectedParcelProject =
   selectedParcel?.project ?? null;
 
+const [cyphCheckout, setCyphCheckout] = useState<{
+  parcelId: string;
+  orderId: string;
+  quote: CyphPaymentQuote;
+} | null>(null);
+
 const [
   loadedParcelProject,
   setLoadedParcelProject,
@@ -289,6 +296,8 @@ useEffect(() => {
     actionError,
 
     buyParcel,
+    prepareCyphCheckout,
+    payWithCyph,
     reserveParcel,
     listParcel,
 
@@ -310,6 +319,7 @@ useEffect(() => {
           parcel.id
         );
 
+        setCyphCheckout(null);
         clearAction();
       },
       [
@@ -422,6 +432,37 @@ useEffect(() => {
     );
 
 
+
+
+  /**
+   * =======================================================
+   * CYPH CHECKOUT
+   * =======================================================
+   *
+   * First click obtains a quote without charging. The second
+   * click explicitly confirms and pays that order.
+   */
+
+  const handleBuyWithCyph = useCallback(
+    async (parcel: Parcel) => {
+      if (actionParcelId) return;
+
+      if (cyphCheckout?.parcelId === parcel.id) {
+        const result = await payWithCyph(parcel.id, cyphCheckout.orderId);
+        if (!result.success) return;
+        setCyphCheckout(null);
+        await refresh();
+        setSelectedParcelId(parcel.id);
+        return;
+      }
+
+      setCyphCheckout(null);
+      const result = await prepareCyphCheckout(parcel);
+      if (!result.success || !result.order || !result.quote) return;
+      setCyphCheckout({ parcelId: parcel.id, orderId: result.order.id, quote: result.quote });
+    },
+    [actionParcelId, cyphCheckout, payWithCyph, prepareCyphCheckout, refresh]
+  );
 
 
   /**
@@ -798,6 +839,10 @@ useEffect(() => {
     handleBuyParcel
   }
 
+  onBuyWithCyph={handleBuyWithCyph}
+
+  cyphQuote={cyphCheckout?.parcelId === selectedParcelId ? cyphCheckout.quote : null}
+
   onReserve={
     handleReserveParcel
   }
@@ -896,6 +941,10 @@ useEffect(() => {
         onBuy={
           handleBuyParcel
         }
+
+        onBuyWithCyph={handleBuyWithCyph}
+
+        cyphQuote={cyphCheckout?.parcelId === selectedParcelId ? cyphCheckout.quote : null}
 
         onReserve={
           handleReserveParcel

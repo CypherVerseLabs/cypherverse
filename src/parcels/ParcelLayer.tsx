@@ -37,6 +37,8 @@ export default function ParcelLayer({
   onParcelSelect,
   onParcelClose,
   onBuy,
+  onBuyWithCyph,
+  cyphQuote,
   onReserve,
   onList,
   actionParcelId,
@@ -398,6 +400,10 @@ export default function ParcelLayer({
         onBuy={
           onBuy
         }
+
+        onBuyWithCyph={onBuyWithCyph}
+
+        cyphQuote={cyphQuote}
 
         onReserve={
           onReserve

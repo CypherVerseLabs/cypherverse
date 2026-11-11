@@ -438,6 +438,9 @@ export interface ParcelLayerProps {
     parcel: Parcel
   ) => void | Promise<void>;
 
+  onBuyWithCyph?: (parcel: Parcel) => void | Promise<void>;
+
+  cyphQuote?: import("../marketplace/types").CyphPaymentQuote | null;
 
   onReserve?: (
     parcel: Parcel

@@ -190,6 +190,15 @@ export interface MarketplacePayment {
   updatedAt: string;
 }
 
+export interface CyphPaymentQuote {
+  orderId: string;
+  sourceAmount: string;
+  sourceCurrency: "USD";
+  conversionRate: string;
+  amount: string;
+  currency: "CYPH";
+}
+
 
 /**
  * =========================================================
@@ -211,6 +220,10 @@ export type MarketplaceSuccess = {
   payment?: MarketplacePayment;
 
   purchase?: MarketplacePurchase;
+
+  quote?: CyphPaymentQuote;
+
+  balance?: string;
 };
 
 
@@ -263,6 +276,10 @@ export interface MarketplaceService {
   createPayment(
     orderId: string
   ): Promise<MarketplaceResult>;
+
+  getCyphQuote(orderId: string): Promise<MarketplaceResult>;
+
+  payWithCyph(orderId: string): Promise<MarketplaceResult>;
 
   confirmTestPayment(
     paymentId: string

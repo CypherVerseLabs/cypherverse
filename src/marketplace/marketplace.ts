@@ -229,6 +229,76 @@ export function useMarketplaceService(): MarketplaceService {
 
     /**
      * =======================================================
+     * CYPH PAYMENT QUOTE
+     * =======================================================
+     *
+     * GET /api/marketplace/orders/:orderId/pay-cyph/quote
+     */
+
+    async getCyphQuote(orderId: string): Promise<MarketplaceResult> {
+      if (!orderId) {
+        return { success: false, action: "buy", error: "Order ID is required." };
+      }
+      try {
+        const response = await authFetch(
+          `/api/marketplace/orders/${encodeURIComponent(orderId)}/pay-cyph/quote`,
+          { method: "GET" }
+        );
+        const data = await readResponse(response);
+        if (!response.ok) {
+          return { success: false, action: "buy", error: data?.message || data?.error || `Failed to get CYPH quote (${response.status}).` };
+        }
+        if (!data?.quote || data.quote.currency !== "CYPH") {
+          return { success: false, action: "buy", error: "The server returned an invalid CYPH quote." };
+        }
+        return { success: true, action: "buy", quote: data.quote };
+      } catch (error) {
+        console.error("[Marketplace] CYPH quote error:", error);
+        return { success: false, action: "buy", error: error instanceof Error ? error.message : "Failed to get CYPH quote." };
+      }
+    },
+
+
+    /**
+     * =======================================================
+     * PAY MARKETPLACE ORDER WITH CYPH
+     * =======================================================
+     *
+     * POST /api/marketplace/orders/:orderId/pay-cyph
+     */
+
+    async payWithCyph(orderId: string): Promise<MarketplaceResult> {
+      if (!orderId) {
+        return { success: false, action: "buy", error: "Order ID is required." };
+      }
+      try {
+        const response = await authFetch(
+          `/api/marketplace/orders/${encodeURIComponent(orderId)}/pay-cyph`,
+          { method: "POST", headers: { "Content-Type": "application/json" } }
+        );
+        const data = await readResponse(response);
+        if (!response.ok) {
+          return { success: false, action: "buy", error: data?.message || data?.error || `CYPH payment failed (${response.status}).` };
+        }
+        if (!data?.order || !data?.payment) {
+          return { success: false, action: "buy", error: "CYPH payment completed without returning its order and payment." };
+        }
+        return {
+          success: true,
+          action: "buy",
+          order: data.order,
+          payment: data.payment,
+          balance: typeof data.balance === "string" ? data.balance : undefined,
+        };
+      } catch (error) {
+        console.error("[Marketplace] CYPH payment error:", error);
+        return { success: false, action: "buy", error: error instanceof Error ? error.message : "Failed to pay with CYPH." };
+      }
+    },
+
+
+    /**
+     * =======================================================
      * CREATE MARKETPLACE PAYMENT
      * =======================================================
      *

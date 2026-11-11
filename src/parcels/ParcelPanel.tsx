@@ -11,6 +11,8 @@ import type {
   ParcelActionType,
 } from "./types";
 
+import type { CyphPaymentQuote } from "../marketplace/types";
+
 
 /**
  * =========================================================
@@ -29,6 +31,10 @@ interface ParcelPanelProps {
   onBuy?: (
     parcel: Parcel
   ) => void | Promise<void>;
+
+  onBuyWithCyph?: (parcel: Parcel) => void | Promise<void>;
+
+  cyphQuote?: CyphPaymentQuote | null;
 
   onReserve?: (
     parcel: Parcel
@@ -69,7 +75,7 @@ function formatPrice(
     return "Not listed";
   }
 
-  return `${price.toLocaleString()} CV`;
+  return `${price.toLocaleString()} USD`;
 }
 
 
@@ -178,6 +184,10 @@ export default function ParcelPanel({
   onClose,
 
   onBuy,
+
+  onBuyWithCyph,
+
+  cyphQuote,
 
   onReserve,
 
@@ -584,36 +594,19 @@ export default function ParcelPanel({
           FOR SALE → BUY
           =================================================== */}
 
-      {parcel.status ===
-        "for_sale" &&
-      onBuy && (
-
-        <Button
-          position={[
-            0,
-            -1.13,
-            0,
-          ]}
-          fontSize={0.075}
-          onClick={() => {
-
-            if (
-              !isProcessing
-            ) {
-              void onBuy(
-                parcel
-              );
-            }
-
-          }}
-        >
-          {isProcessing &&
-          actionType ===
-            "buy"
-            ? "Buying..."
-            : "Buy Parcel"}
+      {parcel.status === "for_sale" && onBuy && (
+        <Button position={onBuyWithCyph ? [-0.48, -1.13, 0] : [0, -1.13, 0]} fontSize={0.065} onClick={() => { if (!isProcessing) void onBuy(parcel); }}>
+          {isProcessing && actionType === "buy" ? "Buying..." : "Buy (TEST)"}
         </Button>
+      )}
 
+      {parcel.status === "for_sale" && onBuyWithCyph && (
+        <>
+          {cyphQuote && <Text color="#9fe7c2" fontSize={0.075} position={[0, -0.92, 0]} anchorX="center" anchorY="middle">{`Quote: ${cyphQuote.amount} CYPH`}</Text>}
+          <Button position={[0.48, -1.13, 0]} fontSize={0.065} onClick={() => { if (!isProcessing) void onBuyWithCyph(parcel); }}>
+            {isProcessing && actionType === "buy" ? "Processing..." : cyphQuote ? `Confirm ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "Quote CYPH"}
+          </Button>
+        </>
       )}
 
 
