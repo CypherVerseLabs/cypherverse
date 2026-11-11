@@ -75,7 +75,7 @@ function formatPrice(
     return "Not listed";
   }
 
-  return `${price.toLocaleString()} USD`;
+  return "USD " + price.toLocaleString();
 }
 
 

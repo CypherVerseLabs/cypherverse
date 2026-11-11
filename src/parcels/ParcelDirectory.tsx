@@ -320,7 +320,7 @@ function ParcelRow({
             anchorX="center"
             anchorY="middle"
           >
-            {`${parcel.price.toLocaleString()} CV`}
+            {"USD " + parcel.price.toLocaleString()}
           </Text>
 
         )}
