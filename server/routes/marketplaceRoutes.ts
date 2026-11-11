@@ -19,6 +19,7 @@ import {
   failTestPaymentController,
   cancelTestPaymentController,
   payMarketplaceOrderWithCyphController,
+  getMarketplaceOrderCyphQuoteController,
 } from "../controllers/marketplaceController.js";
 
 /**
@@ -125,6 +126,11 @@ router.get(
  *
  * POST /api/marketplace/orders/:orderId/pay-cyph
  */
+router.get(
+  "/orders/:orderId/pay-cyph/quote",
+  getMarketplaceOrderCyphQuoteController
+);
+
 router.post(
   "/orders/:orderId/pay-cyph",
   payMarketplaceOrderWithCyphController
