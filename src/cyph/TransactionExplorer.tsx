@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthContext } from "../ideas/context/AuthContext";
 
 type LedgerPosting = {
@@ -53,6 +53,8 @@ function shortId(value: string) {
 
 export default function TransactionExplorer() {
   const { user, cyphAccount, authFetch, isAuthenticated, loading: authLoading } = useAuthContext();
+  const authFetchRef = useRef(authFetch);
+  authFetchRef.current = authFetch;
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function TransactionExplorer() {
     setLoading(true);
     setError(null);
 
-    authFetch("/api/cyph/ledger?limit=100", { method: "GET" })
+    authFetchRef.current("/api/cyph/ledger?limit=100", { method: "GET" })
       .then(async (response) => {
         const data = await response.json().catch(() => null);
         if (!response.ok) {
@@ -93,7 +95,7 @@ export default function TransactionExplorer() {
     return () => {
       active = false;
     };
-  }, [authFetch, cyphAccount?.id, isAuthenticated, refreshKey]);
+  }, [cyphAccount?.id, isAuthenticated, refreshKey]);
 
   const rows = useMemo(() => transactions.map((transaction) => {
     const ownPosting = transaction.postings.find(
