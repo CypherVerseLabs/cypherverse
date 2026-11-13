@@ -116,6 +116,10 @@ interface ParcelDirectoryProps {
   actionType?: ParcelActionType | null;
 
   actionError?: string | null;
+
+  cyphBalance?: string | null;
+  cyphAccountLoading?: boolean;
+  isAuthenticated?: boolean;
 }
 
 
@@ -484,6 +488,10 @@ export default function ParcelDirectory({
 
   actionError,
 
+  cyphBalance = null,
+  cyphAccountLoading = false,
+  isAuthenticated = false,
+
 }: ParcelDirectoryProps) {
 
   /**
@@ -586,6 +594,40 @@ export default function ParcelDirectory({
         anchorY="middle"
       >
         LAND DIRECTORY
+      </Text>
+
+      <Text
+        position={[
+          0,
+          0.29,
+          0,
+        ]}
+        fontSize={0.075}
+        color="#94a3b8"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {cyphAccountLoading
+          ? "CYPH BALANCE: Loading..."
+          : cyphBalance !== null
+            ? `CYPH BALANCE: ${Number(cyphBalance).toLocaleString()} CYPH`
+            : isAuthenticated
+              ? "CYPH BALANCE: No account"
+              : "Sign in to view CYPH balance"}
+      </Text>
+
+      <Text
+        position={[
+          0,
+          0.14,
+          0,
+        ]}
+        fontSize={0.052}
+        color="#64748b"
+        anchorX="center"
+        anchorY="middle"
+      >
+        1 CYPH = $0.10 USD reference value; non-redeemable
       </Text>
 
 
