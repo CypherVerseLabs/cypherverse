@@ -14,8 +14,10 @@
 /build
 /dist
 
-# Prisma generated client
+# Prisma generated client and server build output
 /generated/prisma
+/server/generated/
+/server/dist/
 
 # Environment / secrets
 .env
