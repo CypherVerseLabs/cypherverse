@@ -52,7 +52,8 @@ export default function AdminMarketplacePage() {
 
   const normalizedPrice = price.trim();
   const validPrice = /^\d+(\.\d{1,2})?$/.test(normalizedPrice)
-    && Number(normalizedPrice) >= 20\n    && Number(normalizedPrice) <= 50;
+    && Number(normalizedPrice) >= 20
+    && Number(normalizedPrice) <= 50;
   const validParcelId = parcelId.trim().length > 0;
   const canSubmit = isAuthenticated && !loading && !submitting
     && validParcelId && validPrice;
