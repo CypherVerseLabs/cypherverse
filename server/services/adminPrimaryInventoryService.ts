@@ -61,10 +61,13 @@ export async function activatePrimaryInventory(
         select: {
           id: true,
           estateId: true,
+          x: true,
+          y: true,
           type: true,
           status: true,
           ownerId: true,
           price: true,
+          name: true,
         },
       });
 
