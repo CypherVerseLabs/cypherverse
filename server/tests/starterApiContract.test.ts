@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import starterHandler from "../../src/pages/api/ai/starter.js";
-
 test("Next StarterAI endpoint accepts history and returns the message contract", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () =>
@@ -39,7 +37,9 @@ test("Next StarterAI endpoint accepts history and returns the message contract",
   };
 
   try {
-    await starterHandler(request as never, response as never);
+    const loaded = await import("../../src/pages/api/ai/starter.js");
+    const handler = (loaded.default as unknown as { default?: typeof loaded.default }).default ?? loaded.default;
+    await handler(request as never, response as never);
     assert.equal(statusCode, 200);
     assert.deepEqual(responseBody, { message: "Welcome back." });
   } finally {
