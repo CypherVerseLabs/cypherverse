@@ -311,7 +311,8 @@ function ParcelRow({
           PRICE
           ========================================= */}
 
-      {parcel.price !== null &&
+      {parcel.status === "for_sale" &&
+        parcel.price !== null &&
         parcel.price !== undefined && (
 
           <Text
@@ -325,7 +326,7 @@ function ParcelRow({
             anchorX="center"
             anchorY="middle"
           >
-            {"USD " + parcel.price.toLocaleString()}
+            {`PRICE ${Number(parcel.price).toFixed(2)} USD`}
           </Text>
 
         )}
