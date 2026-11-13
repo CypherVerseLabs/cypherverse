@@ -604,7 +604,7 @@ export default function ParcelPanel({
         <>
           {cyphQuote && <Text color="#9fe7c2" fontSize={0.075} position={[0, -0.92, 0]} anchorX="center" anchorY="middle">{`Quote: ${cyphQuote.amount} CYPH`}</Text>}
           <Button position={[0.48, -1.13, 0]} fontSize={0.065} onClick={() => { if (!isProcessing) void onBuyWithCyph(parcel); }}>
-            {isProcessing && actionType === "buy" ? "Processing..." : cyphQuote ? `Confirm ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "Quote CYPH"}
+            {isProcessing && actionType === "buy" ? "Processing..." : cyphQuote ? `Confirm ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "Buy with CYPH"}
           </Button>
         </>
       )}
