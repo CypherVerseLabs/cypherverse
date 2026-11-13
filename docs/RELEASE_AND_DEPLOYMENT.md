@@ -28,7 +28,7 @@ These route observations are not evidence that a reverse proxy or hosting rewrit
 Use Node.js 20 or newer and npm. The repository has separate npm lockfiles for the root web application and Express server. Install each independently:
 
 ```sh
-npm ci
+npm ci --legacy-peer-deps
 npm --prefix server ci
 npm run prisma:generate
 npm run prisma:validate
