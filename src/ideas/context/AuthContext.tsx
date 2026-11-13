@@ -53,6 +53,12 @@ export interface User {
   updatedAt?: string;
 }
 
+export interface CyphAccount {
+  id: string;
+  userId: string;
+  balance: string;
+}
+
 /*
  * ---------------------------------------------------------
  * AUTH CONTEXT TYPE
@@ -65,6 +71,14 @@ interface AuthContextType {
   user: User | null;
 
   walletAddress: string | null;
+
+  cyphAccount: CyphAccount | null;
+
+  cyphAccountLoading: boolean;
+
+  cyphAccountError: string | null;
+
+  refreshCyphAccount: () => Promise<void>;
 
   loading: boolean;
 
@@ -139,6 +153,15 @@ export function AuthProvider({
   const [walletAddress, setWalletAddress] =
     useState<string | null>(null);
 
+  const [cyphAccount, setCyphAccount] =
+    useState<CyphAccount | null>(null);
+
+  const [cyphAccountLoading, setCyphAccountLoading] =
+    useState(false);
+
+  const [cyphAccountError, setCyphAccountError] =
+    useState<string | null>(null);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -152,6 +175,9 @@ export function AuthProvider({
     setJwt(null);
     setUser(null);
     setWalletAddress(null);
+    setCyphAccount(null);
+    setCyphAccountLoading(false);
+    setCyphAccountError(null);
   };
 
   /*
@@ -480,6 +506,76 @@ export function AuthProvider({
       return response;
     };
 
+
+  /*
+   * -------------------------------------------------------
+   * REFRESH CYPH ACCOUNT
+   * -------------------------------------------------------
+   *
+   * The backend balance is authoritative. A missing account
+   * remains null; reading the wallet never creates an account.
+   */
+  const refreshCyphAccount = async (): Promise<void> => {
+    if (!jwt) {
+      setCyphAccount(null);
+      setCyphAccountError(null);
+      setCyphAccountLoading(false);
+      return;
+    }
+
+    setCyphAccountLoading(true);
+    setCyphAccountError(null);
+
+    try {
+      const response = await authFetch("/api/cyph/account", {
+        method: "GET",
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || `Failed to load CYPH account (${response.status}).`
+        );
+      }
+
+      setCyphAccount(
+        data?.account
+          ? {
+              ...data.account,
+              balance: String(data.account.balance),
+            }
+          : null
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load CYPH account.";
+
+      setCyphAccountError(message);
+      console.warn("CYPH account refresh failed:", error);
+    } finally {
+      setCyphAccountLoading(false);
+    }
+  };
+
+  /*
+   * Load the authenticated user's account after session
+   * restoration or login. The explicit refresh method is also
+   * used after a successful CYPH payment.
+   */
+  useEffect(() => {
+    if (jwt && user) {
+      void refreshCyphAccount();
+      return;
+    }
+
+    setCyphAccount(null);
+    setCyphAccountError(null);
+    setCyphAccountLoading(false);
+    // refreshCyphAccount intentionally runs only when the session identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jwt, user?.id]);
 
   /*
    * -------------------------------------------------------
@@ -894,6 +990,11 @@ export function AuthProvider({
         user,
 
         walletAddress,
+
+        cyphAccount,
+        cyphAccountLoading,
+        cyphAccountError,
+        refreshCyphAccount,
 
         loading,
 
