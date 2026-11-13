@@ -591,7 +591,7 @@ export default function ParcelDirectory({
       <Text
         position={[
           0,
-          0.45,
+          0.65,
           0,
         ]}
         fontSize={0.20}
@@ -646,7 +646,7 @@ export default function ParcelDirectory({
       <Text
         position={[
           0,
-          0.22,
+          0.43,
           0,
         ]}
         fontSize={0.08}
