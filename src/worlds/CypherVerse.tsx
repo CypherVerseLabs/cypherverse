@@ -45,6 +45,7 @@ import {
 import type { CyphPaymentQuote } from "../marketplace/types";
 import { useAuthContext } from "../ideas/context/AuthContext";
 import LandmarkLayer from "./LandmarkLayer";
+import { Html } from "@react-three/drei";
 
 
 /**
@@ -1043,6 +1044,30 @@ useEffect(() => {
           =================================================== */}
 
       {loading && null}
+
+      <Html fullscreen>
+        <a
+          href="/account"
+          style={{
+            position: "fixed",
+            top: 16,
+            right: 16,
+            zIndex: 20,
+            padding: "10px 14px",
+            borderRadius: 8,
+            border: "1px solid rgba(148, 163, 184, 0.45)",
+            background: "rgba(8, 13, 24, 0.88)",
+            color: "#e8eef8",
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: "none",
+            fontFamily: "Inter, system-ui, sans-serif",
+            pointerEvents: "auto",
+          }}
+        >
+          CYPH Activity ↗
+        </a>
+      </Html>
 
     </StandardReality>
   );
