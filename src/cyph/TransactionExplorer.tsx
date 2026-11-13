@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { useAuthContext } from "../ideas/context/AuthContext";
 
 type LedgerPosting = {
@@ -27,7 +28,6 @@ type LedgerTransaction = {
     id: string;
     baseAmount: string;
     bonusAmount: string;
-    presetCode: string;
     reason: string | null;
   } | null;
 };
@@ -231,7 +231,7 @@ export default function TransactionExplorer() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: { minHeight: "100vh", background: "#080d18", color: "#e8eef8", padding: "40px 20px", fontFamily: "Inter, system-ui, sans-serif" },
   shell: { maxWidth: 1040, margin: "0 auto" },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap", marginBottom: 28 },
