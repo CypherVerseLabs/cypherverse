@@ -52,7 +52,7 @@ function shortId(value: string) {
 }
 
 export default function TransactionExplorer() {
-  const { user, cyphAccount, authFetch, isAuthenticated, loading: authLoading } = useAuthContext();
+  const { user, cyphAccount, authFetch, refreshCyphAccount, isAuthenticated, loading: authLoading } = useAuthContext();
   const authFetchRef = useRef(authFetch);
   authFetchRef.current = authFetch;
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
@@ -61,6 +61,11 @@ export default function TransactionExplorer() {
   const [filter, setFilter] = useState<Filter>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = async () => {
+    await refreshCyphAccount();
+    setRefreshKey((value) => value + 1);
+  };
 
   useEffect(() => {
     if (!isAuthenticated || !cyphAccount?.id) {
@@ -147,7 +152,7 @@ export default function TransactionExplorer() {
               {cyphAccount ? `${formatAmount(cyphAccount.balance)} CYPH` : "No CYPH account"}
             </strong>
           </div>
-          <button type="button" onClick={() => setRefreshKey((value) => value + 1)} style={styles.refreshButton} disabled={loading}>
+          <button type="button" onClick={handleRefresh} style={styles.refreshButton} disabled={loading}>
             {loading ? "Refreshing…" : "Refresh activity"}
           </button>
         </section>
