@@ -36,6 +36,7 @@ import ideasRouter from "./routes/ideas.js";
 
 import cyphRouter from "./routes/cyphRoutes.js";
 import adminCyphRouter from "./routes/adminCyphRoutes.js";
+import adminMarketplaceRouter from "./routes/adminMarketplaceRoutes.js";
 
 // =========================================================
 // AUTH MIDDLEWARE
@@ -351,6 +352,11 @@ app.use(
 app.use(
   "/api/admin/cyph",
   adminCyphRouter
+);
+
+app.use(
+  "/api/admin/marketplace",
+  adminMarketplaceRouter
 );
 
 
