@@ -42,6 +42,8 @@ import type {
 import {
   useMarketplace,
 } from "../marketplace";
+import type { CyphPaymentQuote } from "../marketplace/types";
+import { useAuthContext } from "../ideas/context/AuthContext";
 import LandmarkLayer from "./LandmarkLayer";
 
 
@@ -121,6 +123,13 @@ const WORLD_BOUNDS: WorldBounds = {
  */
 
 export default function CypherVerse() {
+  const {
+    cyphAccount,
+    cyphAccountLoading,
+    cyphAccountError,
+    isAuthenticated,
+    refreshCyphAccount,
+  } = useAuthContext();
 
   /**
    * =======================================================
@@ -289,11 +298,19 @@ useEffect(() => {
     actionError,
 
     buyParcel,
+    prepareCyphCheckout,
+    payWithCyph,
     reserveParcel,
     listParcel,
 
     clearAction,
   } = useMarketplace();
+
+  const [cyphCheckout, setCyphCheckout] = useState<{
+    parcelId: string;
+    orderId: string;
+    quote: CyphPaymentQuote;
+  } | null>(null);
 
 
   /**
@@ -422,6 +439,66 @@ useEffect(() => {
     );
 
 
+
+
+  /**
+   * =======================================================
+   * CYPH PARCEL CHECKOUT
+   * =======================================================
+   *
+   * First click creates the order and obtains a server quote.
+   * Second click submits the payment to the backend.
+   */
+  const handleBuyWithCyph = useCallback(
+    async (parcel: Parcel) => {
+      if (actionParcelId) {
+        return;
+      }
+
+      if (cyphCheckout?.parcelId === parcel.id) {
+        const result = await payWithCyph(
+          parcel.id,
+          cyphCheckout.orderId
+        );
+
+        if (!result.success) {
+          return;
+        }
+
+        setCyphCheckout(null);
+
+        await Promise.all([
+          refresh(),
+          refreshCyphAccount(),
+        ]);
+
+        setSelectedParcelId(parcel.id);
+        return;
+      }
+
+      setCyphCheckout(null);
+
+      const result = await prepareCyphCheckout(parcel);
+
+      if (!result.success || !result.order || !result.quote) {
+        return;
+      }
+
+      setCyphCheckout({
+        parcelId: parcel.id,
+        orderId: result.order.id,
+        quote: result.quote,
+      });
+    },
+    [
+      actionParcelId,
+      cyphCheckout,
+      payWithCyph,
+      prepareCyphCheckout,
+      refresh,
+      refreshCyphAccount,
+    ]
+  );
 
 
   /**
@@ -798,6 +875,14 @@ useEffect(() => {
     handleBuyParcel
   }
 
+  onBuyWithCyph={handleBuyWithCyph}
+
+  cyphQuote={
+    cyphCheckout?.parcelId === selectedParcelId
+      ? cyphCheckout.quote
+      : null
+  }
+
   onReserve={
     handleReserveParcel
   }
@@ -896,6 +981,19 @@ useEffect(() => {
         onBuy={
           handleBuyParcel
         }
+
+        onBuyWithCyph={handleBuyWithCyph}
+
+        cyphQuote={
+          cyphCheckout?.parcelId === selectedParcelId
+            ? cyphCheckout.quote
+            : null
+        }
+
+        cyphBalance={cyphAccount?.balance ?? null}
+        cyphAccountLoading={cyphAccountLoading}
+        cyphAccountError={cyphAccountError}
+        isAuthenticated={isAuthenticated}
 
         onReserve={
           handleReserveParcel
