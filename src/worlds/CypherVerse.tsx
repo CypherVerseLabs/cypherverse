@@ -930,6 +930,14 @@ useEffect(() => {
     handleBuyParcel
   }
 
+  onBuyWithCyph={handleBuyWithCyph}
+
+  cyphQuote={
+    cyphCheckout?.parcelId === selectedParcelId
+      ? cyphCheckout.quote
+      : null
+  }
+
   onReserve={
     handleReserveParcel
   }
