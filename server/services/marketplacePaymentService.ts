@@ -2,10 +2,10 @@ import { Prisma, ParcelStatus, ParcelType, MarketplaceOrderStatus, MarketplacePa
 import { prisma } from "../lib/prisma.js";
 import { MarketplaceError } from "./marketplaceOrderService.js";
 import { createCyphLedgerTransaction } from "./cyphLedgerService.js";
+import { getPrimaryMarketplaceSellerEmail } from "../config/marketplaceConfig.js";
 
 export const MARKETPLACE_PAYMENT_OPERATION = { CREATE_PAYMENT: "CREATE_MARKETPLACE_PAYMENT" } as const;
 export const MARKETPLACE_PAYMENT_ENVIRONMENT = MarketplacePaymentEnvironment.TEST;
-export const PRIMARY_MARKETPLACE_SELLER_EMAIL = "marketplace@cypherverse.test";
 
 function createTestTransactionId(): string { return `test_tx_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`; }
 function createTestEventId(): string { return `test_event_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`; }
@@ -92,7 +92,8 @@ export async function processMarketplacePaymentEvent(input: PaymentEventInput) {
 async function grantMarketplaceEntitlement(tx: Prisma.TransactionClient, orderId: string) {
   const order = await tx.marketplaceOrder.findUnique({ where: { id: orderId }, include: { product: true, listing: true, entitlements: { where: { status: "GRANTED" }, take: 1 } } });
   if (!order) throw new MarketplaceError("ORDER_NOT_FOUND", "Order not found.");
-  const primarySeller = await tx.user.findUnique({ where: { email: PRIMARY_MARKETPLACE_SELLER_EMAIL }, select: { id: true } });
+  const primarySellerEmail = getPrimaryMarketplaceSellerEmail();
+  const primarySeller = await tx.user.findUnique({ where: { email: primarySellerEmail }, select: { id: true } });
   if (!primarySeller) throw new MarketplaceError("PRIMARY_MARKETPLACE_SELLER_NOT_CONFIGURED", "The primary marketplace seller identity is not configured.");
 
   const existingEntitlement = order.entitlements[0];

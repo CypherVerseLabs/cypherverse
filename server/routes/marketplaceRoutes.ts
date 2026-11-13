@@ -7,6 +7,10 @@ import {
 } from "../middleware/authMiddleware.js";
 
 import {
+  requireTestPaymentSimulation,
+} from "../middleware/testPaymentSimulation.js";
+
+import {
   createParcelOrderController,
   getMarketplaceOrderController,
   getMarketplaceOrdersController,
@@ -108,6 +112,7 @@ router.post(
  */
 router.post(
   "/orders/:orderId/payment",
+  requireTestPaymentSimulation,
   createMarketplacePaymentController
 );
 
@@ -157,6 +162,7 @@ router.post(
  */
 router.post(
   "/test/payments/:paymentId/confirm",
+  requireTestPaymentSimulation,
   confirmTestPaymentController
 );
 
@@ -167,6 +173,7 @@ router.post(
  */
 router.post(
   "/test/payments/:paymentId/fail",
+  requireTestPaymentSimulation,
   failTestPaymentController
 );
 
@@ -177,6 +184,7 @@ router.post(
  */
 router.post(
   "/test/payments/:paymentId/cancel",
+  requireTestPaymentSimulation,
   cancelTestPaymentController
 );
 

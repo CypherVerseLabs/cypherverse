@@ -1,0 +1,59 @@
+name: Release validation
+
+on:
+  push:
+    branches:
+      - release-hardening/2026-11-13
+  pull_request:
+    branches:
+      - production-release/2026-11-13
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/cypherverse_ci
+      JWT_SECRET: ci-only-placeholder-secret
+      OPENAI_API_KEY: ci-only-placeholder-key
+      R2_ENDPOINT: https://example.r2.cloudflarestorage.com
+      R2_ACCESS_KEY_ID: ci-only-placeholder
+      R2_SECRET_ACCESS_KEY: ci-only-placeholder
+      R2_BUCKET_NAME: ci-only-placeholder
+      R2_PUBLIC_URL: https://example.invalid
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:5000
+      CORS_ORIGIN: http://127.0.0.1:3000
+      ENABLE_TEST_PAYMENT_SIMULATION: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install web dependencies from lockfile
+        run: npm ci --legacy-peer-deps
+
+      - name: Install API dependencies from lockfile
+        run: npm --prefix server ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Run server unit tests
+        run: npm run test:server
+
+      - name: Build Next.js web application
+        run: npm run build:web
+
+      - name: Build Express API
+        run: npm run build:server
