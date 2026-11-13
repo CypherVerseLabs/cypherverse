@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 import Head from "next/head";
 import { useAuthContext } from "ideas/context/AuthContext";
 
@@ -266,7 +266,7 @@ export default function AdminMarketplacePage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<string, CSSProperties> = {
   page: {
     minHeight: "100vh",
     background: "#0b1020",
