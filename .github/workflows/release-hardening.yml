@@ -1,0 +1,33 @@
+name: Release hardening
+
+on:
+  push:
+    branches:
+      - release-hardening/2026-11-13
+  pull_request:
+    branches:
+      - production-release/2026-11-13
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build Next.js server application
+        run: npm run build:web
+      - name: Install backend dependencies
+        run: npm install --prefix server --no-audit --no-fund
+      - name: Generate Prisma client
+        run: npm --prefix server run prisma:generate
+      - name: Validate Prisma schema
+        run: npm --prefix server run prisma:validate
+      - name: Build Express API
+        run: npm run build:server
+      - name: Run release-hardening tests
+        run: npm run test:server

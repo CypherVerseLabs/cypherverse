@@ -3,39 +3,34 @@
   "version": "0.0.4",
   "private": false,
   "description": "A visual scene builder for the 3D Web.",
-  "keywords": [
-    "react",
-    "3d",
-    "cyengine",
-    "webxr",
-    "threejs",
-    "cyengine"
-  ],
+  "keywords": ["react", "3d", "cyengine", "webxr", "threejs", "cyengine"],
   "license": "MIT",
   "homepage": "https://cypherverse.space",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CypherVerseLabs/cypherverse.git"
   },
-
   "author": {
     "name": "Mac Tohbala",
     "email": "mactohbala@gmail.com",
     "url": "https://github.com/CypherVerseLabs/cypherverse.git"
   },
-
-  "scripts": { 
-    "dev": "tsx scripts/generateIdeaMetadata.ts && next dev", 
-    "build": "tsx scripts/generateIdeaMetadata.ts && next build && next export", 
-    "generate:ideas": "tsx scripts/generateIdeaMetadata.ts", 
-    "build:server": "tsc --project ./server/tsconfig.build.json", 
-    "start": "next start", 
-    "start:server": "node ./server/dist/index.js", 
-    "lint": "yarn prettier && yarn eslint", 
-    "eslint": "eslint --fix 'src/**/*.{js,jsx,ts,tsx}'", 
-    "prettier": "prettier --list-different 'src/**/*.{js,jsx,ts,tsx,md}'" 
+  "scripts": {
+    "dev": "npm run generate:ideas && next dev",
+    "build": "npm run generate:ideas && next build",
+    "build:web": "npm run generate:ideas && next build",
+    "generate:ideas": "tsx scripts/generateIdeaMetadata.ts",
+    "build:server": "npm --prefix server run build:dist",
+    "start": "next start",
+    "start:web": "next start",
+    "start:server": "node ./server/dist/index.js",
+    "test:server": "npm --prefix server test",
+    "prisma:generate": "npm --prefix server run prisma:generate",
+    "prisma:validate": "npm --prefix server run prisma:validate",
+    "lint": "yarn prettier && yarn eslint",
+    "eslint": "eslint --fix 'src/**/*.{js,jsx,ts,tsx}'",
+    "prettier": "prettier --list-different 'src/**/*.{js,jsx,ts,tsx,md}'"
   },
-  
   "dependencies": {
     "@react-spring/core": "^10.0.1",
     "@react-spring/three": "^10.0.1",
