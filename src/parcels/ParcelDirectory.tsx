@@ -119,6 +119,7 @@ interface ParcelDirectoryProps {
 
   cyphBalance?: string | null;
   cyphAccountLoading?: boolean;
+  cyphAccountError?: string | null;
   isAuthenticated?: boolean;
 }
 
@@ -490,6 +491,7 @@ export default function ParcelDirectory({
 
   cyphBalance = null,
   cyphAccountLoading = false,
+  cyphAccountError = null,
   isAuthenticated = false,
 
 }: ParcelDirectoryProps) {
@@ -611,9 +613,11 @@ export default function ParcelDirectory({
           ? "CYPH BALANCE: Loading..."
           : cyphBalance !== null
             ? `CYPH BALANCE: ${Number(cyphBalance).toLocaleString()} CYPH`
-            : isAuthenticated
-              ? "CYPH BALANCE: No account"
-              : "Sign in to view CYPH balance"}
+            : cyphAccountError
+              ? "CYPH BALANCE: Unavailable"
+              : isAuthenticated
+                ? "CYPH BALANCE: No account"
+                : "Sign in to view CYPH balance"}
       </Text>
 
       <Text
