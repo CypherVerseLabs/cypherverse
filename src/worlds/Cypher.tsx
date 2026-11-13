@@ -126,6 +126,7 @@ export default function Cypher() {
   const {
     cyphAccount,
     cyphAccountLoading,
+    cyphAccountError,
     isAuthenticated,
     refreshCyphAccount,
   } = useAuthContext();
@@ -978,6 +979,7 @@ useEffect(() => {
 
         cyphBalance={cyphAccount?.balance ?? null}
         cyphAccountLoading={cyphAccountLoading}
+        cyphAccountError={cyphAccountError}
         isAuthenticated={isAuthenticated}
 
       />
