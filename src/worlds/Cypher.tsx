@@ -44,6 +44,7 @@ import {
 } from "../marketplace";
 import type { CyphPaymentQuote } from "../marketplace/types";
 import LandmarkLayer from "./LandmarkLayer";
+import { useAuthContext } from "../ideas/context/AuthContext";
 
 
 /**
@@ -122,6 +123,12 @@ const WORLD_BOUNDS: WorldBounds = {
  */
 
 export default function Cypher() {
+  const {
+    cyphAccount,
+    cyphAccountLoading,
+    isAuthenticated,
+    refreshCyphAccount,
+  } = useAuthContext();
 
   /**
    * =======================================================
@@ -451,7 +458,10 @@ useEffect(() => {
         const result = await payWithCyph(parcel.id, cyphCheckout.orderId);
         if (!result.success) return;
         setCyphCheckout(null);
-        await refresh();
+        await Promise.all([
+          refresh(),
+          refreshCyphAccount(),
+        ]);
         setSelectedParcelId(parcel.id);
         return;
       }
@@ -965,6 +975,10 @@ useEffect(() => {
         actionError={
           actionError
         }
+
+        cyphBalance={cyphAccount?.balance ?? null}
+        cyphAccountLoading={cyphAccountLoading}
+        isAuthenticated={isAuthenticated}
 
       />
 
