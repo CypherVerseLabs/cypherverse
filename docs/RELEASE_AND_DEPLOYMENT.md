@@ -15,6 +15,14 @@ The Next API routes currently present are `/api/ai/scene`, `/api/ai/starter`, an
 
 Do not configure this application as a static-only site or use `next export` unless the API-route/runtime architecture is deliberately redesigned and verified. A successful frontend build alone does not prove that both processes are deployed and networked correctly.
 
+The current frontend/API route audit found these integration details:
+
+- `StarterAI.tsx` calls the Next route `/api/ai/starter`. Its client currently sends `messages` and expects a `response` field, while the Next handler accepts `history` and returns the service's `message` field. This request/response contract is inconsistent and should be corrected before relying on this guide UI in Production.
+- `CyVerseBot` calls `/api/ai/agents` using a same-origin relative URL, but that endpoint is mounted by Express and there is no matching Next API route. When web and Express run on separate origins, the hosting layer must explicitly route this path to Express or the client must call the configured API origin.
+- `/api/ai/scene` and `/api/greet` are present as Next API routes; no matching frontend caller was identified in the source search performed for this audit.
+
+These route observations are not evidence that a reverse proxy or hosting rewrite is configured. Validate the actual provider routing before release.
+
 ## Reproducible install and build
 
 Use Node.js 20 or newer and npm. The repository has separate npm lockfiles for the root web application and Express server. Install each independently:
