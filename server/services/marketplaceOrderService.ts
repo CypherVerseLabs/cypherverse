@@ -74,6 +74,12 @@ export async function createParcelOrder(input: CreateParcelOrderInput) {
       if (activeListings > 0) throw new MarketplaceError("PRIMARY_PARCEL_LISTING_CONFLICT", "Primary parcel inventory cannot have an active resale listing.");
       validatePrimaryPrice(parcel.price);
       sellerId = await getPrimarySeller(tx);
+      if (sellerId === userId) {
+        throw new MarketplaceError(
+          "CANNOT_BUY_OWN_PARCEL",
+          "The primary marketplace seller account cannot purchase its own inventory."
+        );
+      }
       amount = new Prisma.Decimal(parcel.price!);
     } else {
       const activeListings = await tx.parcelListing.findMany({ where: { parcelId, active: true }, orderBy: { createdAt: "desc" }, take: 2 });
