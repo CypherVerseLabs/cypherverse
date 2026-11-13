@@ -11,6 +11,17 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/cypherverse_ci
+      JWT_SECRET: ci-only-placeholder-secret
+      OPENAI_API_KEY: ci-only-placeholder-key
+      R2_ENDPOINT: https://example.r2.cloudflarestorage.com
+      R2_ACCESS_KEY_ID: ci-only-placeholder
+      R2_SECRET_ACCESS_KEY: ci-only-placeholder
+      R2_BUCKET_NAME: ci-only-placeholder
+      R2_PUBLIC_URL: https://example.invalid
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:5000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
