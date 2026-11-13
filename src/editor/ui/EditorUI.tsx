@@ -23,6 +23,8 @@ import {
 
 import EditorLeftPanel from "./EditorLeftPanel";
 import EditorContextualPanel from "./EditorContextualPanel";
+import { useAuthContext } from "../../ideas/context/AuthContext";
+import type { Parcel } from "../../parcels/types";
 
 type EditorUIProps = {
   projectId?: string;
@@ -113,6 +115,15 @@ export default function EditorUI({
     setProjectLoading,
   ] = useState(false);
 
+  const [deployPanelOpen, setDeployPanelOpen] = useState(false);
+  const [ownedParcels, setOwnedParcels] = useState<Parcel[]>([]);
+  const [ownedParcelsLoading, setOwnedParcelsLoading] = useState(false);
+  const [deployingParcelId, setDeployingParcelId] = useState<string | null>(null);
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
+  const [deploymentSuccess, setDeploymentSuccess] = useState<string | null>(null);
+
+  const { authFetch } = useAuthContext();
+
   const {
     scene,
     selectedId,
@@ -142,6 +153,7 @@ export default function EditorUI({
     loadScene,
 
     publishProject,
+    deployProject,
     loadProject,
   } = useEditor();
 
@@ -486,6 +498,104 @@ export default function EditorUI({
       }
     };
 
+  const handleOpenDeployPanel = async () => {
+    if (!projectId) {
+      window.alert("No project is selected.");
+      return;
+    }
+
+    if (deployPanelOpen) {
+      setDeployPanelOpen(false);
+      return;
+    }
+
+    setDeployPanelOpen(true);
+    setDeploymentError(null);
+    setDeploymentSuccess(null);
+    setOwnedParcelsLoading(true);
+
+    try {
+      const response = await authFetch("/api/parcels/owned", {
+        method: "GET",
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || "Failed to load your owned Parcels.");
+      }
+
+      if (!Array.isArray(data?.parcels)) {
+        throw new Error("The server returned an invalid owned Parcel list.");
+      }
+
+      setOwnedParcels(data.parcels as Parcel[]);
+    } catch (error) {
+      setDeploymentError(
+        error instanceof Error ? error.message : "Failed to load your owned Parcels."
+      );
+    } finally {
+      setOwnedParcelsLoading(false);
+    }
+  };
+
+  const handleDeployProject = async (parcel: Parcel) => {
+    if (!projectId || deployingParcelId) {
+      return;
+    }
+
+    if (parcel.project) {
+      setDeploymentError(
+        parcel.project.id === projectId
+          ? "This Project is already deployed to this Parcel."
+          : "This Parcel already has an active Project."
+      );
+      return;
+    }
+
+    const parcelLabel = parcel.name || parcel.estateId || `Parcel ${parcel.x}, ${parcel.y}`;
+    if (!window.confirm(`Deploy this Project to ${parcelLabel}? A Parcel can have only one active Project.`)) {
+      return;
+    }
+
+    setDeployingParcelId(parcel.id);
+    setDeploymentError(null);
+    setDeploymentSuccess(null);
+
+    try {
+      const deployedProject = await deployProject(projectId, parcel.id);
+
+      setOwnedParcels((current) =>
+        current.map((item) =>
+          item.id === parcel.id
+            ? {
+                ...item,
+                project: {
+                  id: deployedProject.id,
+                  name: deployedProject.name,
+                  template: deployedProject.template,
+                  slug: deployedProject.slug ?? null,
+                  publishedAt: deployedProject.publishedAt ?? null,
+                },
+              }
+            : item
+        )
+      );
+
+      setDeploymentSuccess(`Project deployed to ${parcelLabel}.`);
+    } catch (error) {
+      const deploymentError = error as Error & { code?: string };
+      setDeploymentError(
+        deploymentError.code === "PARCEL_ALREADY_HAS_PROJECT"
+          ? "This Parcel already has an active Project. No changes were made."
+          : deploymentError.code === "PROJECT_ALREADY_DEPLOYED"
+            ? "This Project is already deployed to another Parcel."
+            : deploymentError.message || "Failed to deploy project."
+      );
+    } finally {
+      setDeployingParcelId(null);
+    }
+  };
+
   const handleLoadProject =
     async () => {
       if (!projectId) {
@@ -744,6 +854,88 @@ export default function EditorUI({
           }}
         />
 
+        {deployPanelOpen && (
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              bottom: 76,
+              transform: "translateX(-50%)",
+              width: "min(420px, calc(100vw - 32px))",
+              maxHeight: "min(48vh, 420px)",
+              overflowY: "auto",
+              padding: 14,
+              borderRadius: 14,
+              background: "rgba(24, 25, 31, 0.98)",
+              border: "1px solid rgba(255,255,255,0.14)",
+              boxShadow: "0 18px 45px rgba(0,0,0,0.38)",
+              color: "#f8fafc",
+              pointerEvents: "auto",
+              zIndex: 51,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <strong style={{ fontSize: 14 }}>Deploy Project to Parcel</strong>
+              <button
+                type="button"
+                onClick={() => setDeployPanelOpen(false)}
+                aria-label="Close deployment panel"
+                style={{ border: 0, background: "transparent", color: "#cbd5e1", cursor: "pointer", fontSize: 18 }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: "8px 0 12px", color: "#aeb8c7", fontSize: 12, lineHeight: 1.5 }}>
+              Choose one of your owned Parcels. Each Parcel can have only one active Project.
+            </p>
+            {deploymentError && (
+              <p role="alert" style={{ margin: "8px 0", color: "#fca5a5", fontSize: 12 }}>
+                {deploymentError}
+              </p>
+            )}
+            {deploymentSuccess && (
+              <p role="status" style={{ margin: "8px 0", color: "#86efac", fontSize: 12 }}>
+                {deploymentSuccess}
+              </p>
+            )}
+            {ownedParcelsLoading ? (
+              <p style={{ color: "#cbd5e1", fontSize: 12 }}>Loading your owned Parcels…</p>
+            ) : ownedParcels.length === 0 ? (
+              <p style={{ color: "#cbd5e1", fontSize: 12 }}>You do not currently own any Parcels.</p>
+            ) : (
+              <div style={{ display: "grid", gap: 8 }}>
+                {ownedParcels.map((parcel) => {
+                  const alreadyThisProject = parcel.project?.id === projectId;
+                  const occupied = Boolean(parcel.project);
+                  const label = parcel.name || parcel.estateId || `Parcel ${parcel.x}, ${parcel.y}`;
+
+                  return (
+                    <div key={parcel.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 10, borderRadius: 10, background: "rgba(255,255,255,0.06)" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                        <div style={{ marginTop: 3, color: "#aeb8c7", fontSize: 11 }}>X {parcel.x} · Y {parcel.y}</div>
+                        {occupied && (
+                          <div style={{ marginTop: 3, color: alreadyThisProject ? "#86efac" : "#fbbf24", fontSize: 11 }}>
+                            {alreadyThisProject ? "This Project is deployed here" : `Occupied by ${parcel.project?.name || "another Project"}`}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={occupied || deployingParcelId !== null}
+                        onClick={() => void handleDeployProject(parcel)}
+                        style={{ flexShrink: 0, border: 0, borderRadius: 8, padding: "7px 11px", background: occupied ? "#3b414c" : "#4c7dff", color: "#fff", cursor: occupied || deployingParcelId !== null ? "default" : "pointer", opacity: occupied || (deployingParcelId !== null && deployingParcelId !== parcel.id) ? 0.65 : 1, fontSize: 11, fontWeight: 600 }}
+                      >
+                        {alreadyThisProject ? "Deployed" : occupied ? "Occupied" : deployingParcelId === parcel.id ? "Deploying…" : "Deploy"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div
           style={{
             position:
@@ -933,6 +1125,14 @@ export default function EditorUI({
             onClick={
               handleLoadProject
             }
+          />
+
+          <ToolbarButton
+            label="Deploy"
+            icon="publish"
+            active={deployPanelOpen}
+            disabled={!projectId || projectSaving || projectLoading}
+            onClick={handleOpenDeployPanel}
           />
 
           <ToolbarButton
