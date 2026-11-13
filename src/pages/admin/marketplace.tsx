@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import Head from "next/head";
 import { useAuthContext } from "ideas/context/AuthContext";
 
@@ -14,6 +14,43 @@ type ActivationResponse = {
   error?: string;
   message?: string;
 };
+
+
+type FundingPreset = {
+  id: string;
+  code: string;
+  label: string;
+  baseAmount: string | number;
+  bonusAmount: string | number;
+  enabled: boolean;
+};
+
+type FundingResponse = {
+  duplicate?: boolean;
+  fundingGrant?: {
+    id?: string;
+    baseAmount?: string | number;
+    bonusAmount?: string | number;
+    reason?: string;
+  };
+  account?: {
+    userId?: string;
+    balance?: string | number;
+  };
+  transaction?: {
+    id?: string;
+    idempotencyKey?: string;
+  };
+  error?: string;
+  message?: string;
+};
+
+const TEST_BUYER_ID = "bd938cb2-3225-4b51-83da-164976e23cfc";
+const TEST_BUYER_EMAIL = "bmode55@gmail.com";
+const TEST_FUNDING_PRESET_CODE = "TEST_BUYER_10000";
+const TEST_FUNDING_REASON = "Approved TEST buyer allocation for CYPH marketplace checkout.";
+const TEST_FUNDING_IDEMPOTENCY_KEY =
+  "test-admin-funding:bd938cb2-3225-4b51-83da-164976e23cfc:TEST_BUYER_10000:v1";
 
 const DEFAULT_PARCEL_ID = "16d7a921-012f-420e-9e54-20b062586b42";
 const DEFAULT_PRICE = "20.00";
@@ -50,6 +87,39 @@ export default function AdminMarketplacePage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ActivationResponse | null>(null);
 
+  const [preset, setPreset] = useState<FundingPreset | null>(null);
+  const [presetLoading, setPresetLoading] = useState(false);
+  const [fundingSubmitting, setFundingSubmitting] = useState(false);
+  const [fundingError, setFundingError] = useState<string | null>(null);
+  const [fundingResult, setFundingResult] = useState<FundingResponse | null>(null);
+  const [fundingStatus, setFundingStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || loading) return;
+    let cancelled = false;
+    setPresetLoading(true);
+    authFetch("/api/admin/cyph/presets")
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || data.error || `Preset lookup failed (HTTP ${response.status}).`);
+        const found = (data.presets || []).find(
+          (item: FundingPreset) => item.code === TEST_FUNDING_PRESET_CODE
+        ) as FundingPreset | undefined;
+        if (!cancelled) {
+          setPreset(found || null);
+          setFundingStatus(found ? "Preset found. Verify its amount and enabled status before granting." : "No TEST funding preset exists yet.");
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setFundingError(err instanceof Error ? err.message : "Could not load funding presets.");
+      })
+      .finally(() => {
+        if (!cancelled) setPresetLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [authFetch, isAuthenticated, loading]);
+
+
   const normalizedPrice = price.trim();
   const validPrice = /^\d+(\.\d{1,2})?$/.test(normalizedPrice)
     && Number(normalizedPrice) >= 20
@@ -57,6 +127,89 @@ export default function AdminMarketplacePage() {
   const validParcelId = parcelId.trim().length > 0;
   const canSubmit = isAuthenticated && !loading && !submitting
     && validParcelId && validPrice;
+
+
+  async function handleCreatePreset() {
+    setFundingError(null);
+    setFundingResult(null);
+    setPresetLoading(true);
+    try {
+      const listResponse = await authFetch("/api/admin/cyph/presets");
+      const listData = await listResponse.json().catch(() => ({}));
+      if (!listResponse.ok) throw new Error(listData.message || listData.error || `Preset lookup failed (HTTP ${listResponse.status}).`);
+      const existing = (listData.presets || []).find(
+        (item: FundingPreset) => item.code === TEST_FUNDING_PRESET_CODE
+      ) as FundingPreset | undefined;
+      if (existing) {
+        setPreset(existing);
+        if (Number(existing.baseAmount) !== 10000 || Number(existing.bonusAmount) !== 0 || !existing.enabled) {
+          throw new Error("A preset with this code already exists but does not match 10,000 base / 0 bonus / enabled. No preset changes were made.");
+        }
+        setFundingStatus("The exact 10,000 CYPH, zero-bonus preset already exists and is enabled.");
+        return;
+      }
+
+      const response = await authFetch("/api/admin/cyph/presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: TEST_FUNDING_PRESET_CODE,
+          label: "TEST buyer allocation — 10,000 CYPH",
+          baseAmount: "10000",
+          bonusAmount: "0",
+          sortOrder: 9000,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || data.error || `Preset creation failed (HTTP ${response.status}).`);
+      setPreset(data.preset || null);
+      setFundingStatus("Enabled TEST preset created: 10,000 CYPH base, 0 bonus.");
+    } catch (err) {
+      setFundingError(err instanceof Error ? err.message : "Could not create the TEST funding preset.");
+    } finally {
+      setPresetLoading(false);
+    }
+  }
+
+  async function handleGrantFunding() {
+    setFundingError(null);
+    setFundingResult(null);
+    if (!preset || preset.code !== TEST_FUNDING_PRESET_CODE ||
+        Number(preset.baseAmount) !== 10000 || Number(preset.bonusAmount) !== 0 || !preset.enabled) {
+      setFundingError("Create or verify the exact enabled 10,000 CYPH preset before granting.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Grant 10,000 CYPH to ${TEST_BUYER_EMAIL} in TEST?\\n\\nThis uses the existing admin funding endpoint and a fixed idempotency key. Retrying the same request will not issue a second grant.`
+    );
+    if (!confirmed) return;
+
+    setFundingSubmitting(true);
+    try {
+      const response = await authFetch("/api/admin/cyph/funding", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": TEST_FUNDING_IDEMPOTENCY_KEY,
+        },
+        body: JSON.stringify({
+          targetUserId: TEST_BUYER_ID,
+          presetCode: TEST_FUNDING_PRESET_CODE,
+          reason: TEST_FUNDING_REASON,
+        }),
+      });
+      const data = await response.json().catch(() => ({})) as FundingResponse;
+      if (!response.ok) throw new Error(data.message || data.error || `Funding failed (HTTP ${response.status}).`);
+      setFundingResult(data);
+      setFundingStatus(data.duplicate
+        ? "The original funding grant was found; no second grant was issued."
+        : "Funding endpoint accepted the grant. Verify the buyer ledger and balance before checkout.");
+    } catch (err) {
+      setFundingError(err instanceof Error ? err.message : "The TEST funding request failed.");
+    } finally {
+      setFundingSubmitting(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -252,6 +405,84 @@ export default function AdminMarketplacePage() {
                   {submitting ? "Activating…" : "Review and activate parcel"}
                 </button>
               </form>
+            </section>
+          )}
+
+
+          {isAuthenticated && (
+            <section style={styles.panel}>
+              <h2 style={styles.sectionTitle}>TEST CYPH buyer funding</h2>
+              <p style={styles.muted}>
+                Fixed recipient: {TEST_BUYER_EMAIL}. This section uses the existing admin preset and funding APIs.
+                It does not edit balances directly. Funding is issued once using a stable idempotency key.
+              </p>
+
+              <div style={styles.summary}>
+                <div>
+                  <span style={styles.summaryLabel}>Funding preset</span>
+                  <strong>{TEST_FUNDING_PRESET_CODE}</strong>
+                </div>
+                <div>
+                  <span style={styles.summaryLabel}>Allocation</span>
+                  <strong>10,000 CYPH · 0 bonus</strong>
+                </div>
+                <div>
+                  <span style={styles.summaryLabel}>Buyer</span>
+                  <strong>{TEST_BUYER_ID}</strong>
+                </div>
+              </div>
+
+              {preset && (
+                <p style={styles.help}>
+                  Current preset: {preset.label} · base {String(preset.baseAmount)} · bonus {String(preset.bonusAmount)} · {preset.enabled ? "enabled" : "disabled"}
+                </p>
+              )}
+
+              {fundingStatus && <p role="status" style={styles.help}>{fundingStatus}</p>}
+              {fundingError && (
+                <div role="alert" style={styles.error}>
+                  <strong>Funding not completed</strong>
+                  <span>{fundingError}</span>
+                </div>
+              )}
+
+              {fundingResult && (
+                <div role="status" style={styles.success}>
+                  <strong>{fundingResult.duplicate ? "Existing grant confirmed" : "Funding grant response received"}</strong>
+                  <span>Base: {String(fundingResult.fundingGrant?.baseAmount ?? "10,000")} CYPH</span>
+                  <span>Bonus: {String(fundingResult.fundingGrant?.bonusAmount ?? "0")} CYPH</span>
+                  {fundingResult.account?.balance !== undefined && (
+                    <span>Returned account balance: {String(fundingResult.account.balance)} CYPH</span>
+                  )}
+                  {fundingResult.transaction?.id && <span>Ledger transaction: {fundingResult.transaction.id}</span>}
+                  <span>Idempotency key: {TEST_FUNDING_IDEMPOTENCY_KEY}</span>
+                </div>
+              )}
+
+              <div style={styles.actions}>
+                <button
+                  type="button"
+                  disabled={presetLoading || fundingSubmitting}
+                  onClick={handleCreatePreset}
+                  style={{ ...styles.button, ...(presetLoading || fundingSubmitting ? styles.buttonDisabled : {}) }}
+                >
+                  {presetLoading ? "Checking preset…" : "Create / verify 10,000 CYPH preset"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!preset || !preset.enabled || Number(preset.baseAmount) !== 10000 || Number(preset.bonusAmount) !== 0 || fundingSubmitting || presetLoading}
+                  onClick={handleGrantFunding}
+                  style={{ ...styles.button, ...((!preset || !preset.enabled || Number(preset.baseAmount) !== 10000 || Number(preset.bonusAmount) !== 0 || fundingSubmitting || presetLoading) ? styles.buttonDisabled : {}) }}
+                >
+                  {fundingSubmitting ? "Granting…" : "Review and grant 10,000 CYPH"}
+                </button>
+              </div>
+
+              <p style={styles.help}>
+                After the grant, the buyer’s ledger and balance must be independently rechecked.
+                The checkout quote must then be requested while authenticated as the buyer; this admin session cannot impersonate the buyer.
+                No payment is initiated from this page.
+              </p>
             </section>
           )}
 
@@ -451,6 +682,7 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0.45,
     cursor: "not-allowed",
   },
+  actions: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 18 },
   footer: {
     display: "flex",
     justifyContent: "space-between",
