@@ -472,7 +472,7 @@ useEffect(() => {
       if (!result.success || !result.order || !result.quote) return;
       setCyphCheckout({ parcelId: parcel.id, orderId: result.order.id, quote: result.quote });
     },
-    [actionParcelId, cyphCheckout, payWithCyph, prepareCyphCheckout, refresh]
+    [actionParcelId, cyphCheckout, payWithCyph, prepareCyphCheckout, refresh, refreshCyphAccount]
   );
 
 
