@@ -11,22 +11,9 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: cypherverse_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d cypherverse_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cypherverse_ci?schema=public
+      # CI-only placeholders; never use these values in a deployed environment.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/cypherverse_ci
       JWT_SECRET: ci-only-not-a-secret
       NODE_ENV: test
       OPENAI_API_KEY: ci-placeholder-not-a-real-key
@@ -62,9 +49,6 @@ jobs:
 
       - name: Validate Prisma schema
         run: npm run prisma:validate
-
-      - name: Apply migrations to ephemeral PostgreSQL
-        run: npm --prefix server exec prisma migrate deploy -- --schema ./prisma/schema.prisma
 
       - name: Run server unit tests
         run: npm run test:server
