@@ -10,7 +10,7 @@ export type PaymentSimulationEnvironment = {
  * Production is denied regardless of the opt-in flag.
  */
 export function isTestPaymentSimulationEnabled(
-  env: PaymentSimulationEnvironment = process.env
+  env: PaymentSimulationEnvironment = process.env as PaymentSimulationEnvironment
 ): boolean {
   return (
     env.NODE_ENV !== "production" &&
