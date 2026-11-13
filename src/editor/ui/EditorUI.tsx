@@ -49,7 +49,8 @@ type ToolbarIconName =
   | "save"
   | "download"
   | "folder"
-  | "publish";
+  | "publish"
+  | "deploy";
 
 function cloneSceneObject(
   object: SceneObject
@@ -1129,7 +1130,7 @@ export default function EditorUI({
 
           <ToolbarButton
             label="Deploy"
-            icon="publish"
+            icon="deploy"
             active={deployPanelOpen}
             disabled={!projectId || projectSaving || projectLoading}
             onClick={handleOpenDeployPanel}
@@ -1391,6 +1392,15 @@ function ToolbarIcon({
           <path d="m7 9 5-5 5 5" />
           <path d="M5 20h14" />
           <path d="M7 16h10" />
+        </svg>
+      );
+
+    case "deploy":
+      return (
+        <svg {...commonProps}>
+          <path d="M12 3v11" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M4 18v3h16v-3" />
         </svg>
       );
 
