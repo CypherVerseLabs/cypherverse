@@ -18,7 +18,7 @@ jobs:
           node-version: 20
           cache: npm
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Build Next.js server application
         run: npm run build:web
       - name: Install backend dependencies

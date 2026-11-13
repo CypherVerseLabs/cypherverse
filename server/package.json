@@ -38,7 +38,7 @@
   "scripts": {
     "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
     "frontend": "next dev -p 3000",
-    "dev": "concurrently \"npm run server && npm run frontend\"",
+    "dev": "npm run server",
     "build": "tsc --noEmit",
     "build:dist": "tsc --project ./tsconfig.build.json",
     "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",

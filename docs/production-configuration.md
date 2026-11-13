@@ -16,7 +16,7 @@ The frontend reads `NEXT_PUBLIC_API_URL` in `src/ideas/context/AuthContext.tsx`.
 
 Run the Next.js web process and Express API as separate services. Route the browser's configured `NEXT_PUBLIC_API_URL` to Express; route the web origin to the Next.js process. Do not assume Vercel or any other hosting provider is the final host. The three Next API handlers remain part of the Next runtime. Before a future static-hosting migration, trace each frontend caller and move/replace any required Pages API handlers deliberately; do not reintroduce `next export` while those handlers remain.
 
-The repository contains both Next API handlers and Express AI routes. The Next API handlers import the shared server AI services directly. A full frontend call-site inventory could not be established from the repository search interface during this hardening pass, so verify whether the scene/starter UI calls the Next origin or the Express API before changing or deleting either implementation.
+The repository contains both Next API handlers and Express AI routes. The Next API handlers import the shared server AI services directly. A full frontend call-site inventory could not be established during this hardening pass, so neither implementation was removed.
 
 ## Environment variables
 
@@ -46,7 +46,7 @@ The current Express startup imports R2 and AI service modules, which validate th
 
 ## Marketplace payment safety
 
-There is no verified real-money payment provider implementation in this release baseline. The order payment-creation endpoint currently creates a synthetic TEST payment record; it is not a checkout integration. The route is now gated together with the confirm/fail/cancel simulation routes.
+There is no verified real-money payment provider implementation in this release baseline. The order payment-creation endpoint currently creates a synthetic TEST payment record; it is not a checkout integration. The payment-record creation route and all confirm/fail/cancel simulation routes are gated by the same middleware.
 
 The server gate requires both:
 - `NODE_ENV` is not `production`; and
@@ -56,7 +56,7 @@ In Production, the gate returns 404 even if the flag is mistakenly set to `true`
 
 ## Production system seller
 
-The service no longer silently looks up the TEST email in Production. Set `MARKETPLACE_SYSTEM_SELLER_EMAIL` to the email of a deliberately provisioned existing system-seller User. The application validates that Production does not use a `.test` email and fails the seller lookup with an explicit configuration error if the value is missing. Non-production environments retain the current TEST fallback.
+The service no longer silently looks up the TEST email in Production. Set `MARKETPLACE_SYSTEM_SELLER_EMAIL` to the email of a deliberately provisioned existing system-seller User. The application validates that Production does not use a `.test` email and fails the settlement lookup with an explicit configuration error if the value is missing. This is evaluated when settlement is attempted, not during API startup. Non-production environments retain the current TEST fallback.
 
 This change does not create users, alter ownership, or require a database migration. Production provisioning must ensure the configured email belongs to the intended User before marketplace settlement is enabled. If no approved Production system-seller User exists, treat marketplace seller settlement as a release blocker; do not copy the TEST seller account or seed data.
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { getPrimaryMarketplaceSellerEmail } from "../config/marketplaceConfig.js";
-import { isTestPaymentSimulationEnabled } from "../middleware/testPaymentSimulation.js";
+import { isTestPaymentSimulationEnabled, requireTestPaymentSimulation } from "../middleware/testPaymentSimulation.js";
 
 test("payment simulation is disabled by default", () => {
   assert.equal(isTestPaymentSimulationEnabled({ NODE_ENV: "test" }), false);
@@ -89,5 +89,57 @@ test("every Prisma migration directory contains migration.sql", () => {
       statSync(path.join(migrationsPath, directory, "migration.sql")).isFile(),
       `missing migration.sql in ${directory}`
     );
+  }
+});
+
+test("payment simulation middleware returns 404 when disabled", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalFlag = process.env.ENABLE_TEST_PAYMENT_SIMULATION;
+  process.env.NODE_ENV = "production";
+  process.env.ENABLE_TEST_PAYMENT_SIMULATION = "true";
+  let statusCode = 0;
+  let responseBody: unknown;
+  let nextCalled = false;
+  const response = {
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    json(body: unknown) {
+      responseBody = body;
+      return this;
+    },
+  };
+  try {
+    requireTestPaymentSimulation({} as never, response as never, () => {
+      nextCalled = true;
+    });
+    assert.equal(statusCode, 404);
+    assert.deepEqual(responseBody, { error: "Not found" });
+    assert.equal(nextCalled, false);
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalFlag === undefined) delete process.env.ENABLE_TEST_PAYMENT_SIMULATION;
+    else process.env.ENABLE_TEST_PAYMENT_SIMULATION = originalFlag;
+  }
+});
+
+test("payment simulation middleware continues only after explicit non-production opt-in", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalFlag = process.env.ENABLE_TEST_PAYMENT_SIMULATION;
+  process.env.NODE_ENV = "test";
+  process.env.ENABLE_TEST_PAYMENT_SIMULATION = "true";
+  let nextCalled = false;
+  try {
+    requireTestPaymentSimulation({} as never, {} as never, () => {
+      nextCalled = true;
+    });
+    assert.equal(nextCalled, true);
+  } finally {
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+    if (originalFlag === undefined) delete process.env.ENABLE_TEST_PAYMENT_SIMULATION;
+    else process.env.ENABLE_TEST_PAYMENT_SIMULATION = originalFlag;
   }
 });
