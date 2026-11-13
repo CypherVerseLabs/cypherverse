@@ -232,6 +232,11 @@ type EditorContextValue = {
   publishProject: (
     projectId: string
   ) => Promise<void>;
+
+  deployProject: (
+    projectId: string,
+    parcelId: string
+  ) => Promise<{ id: string; name: string; template: "editor" | "found"; slug?: string; publishedAt?: string }>;
 };
 
 /* =========================================
@@ -1526,6 +1531,55 @@ export function EditorProvider({
     );
 
   /* =======================================
+     DEPLOY PROJECT TO PARCEL
+  ======================================= */
+
+  const deployProject =
+    useCallback(
+      async (
+        projectId: string,
+        parcelId: string
+      ) => {
+        if (!projectId) {
+          throw new Error("Project ID is required.");
+        }
+
+        if (!parcelId) {
+          throw new Error("Parcel ID is required.");
+        }
+
+        const response = await authFetch(
+          `/api/projects/${encodeURIComponent(projectId)}/deploy`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ parcelId }),
+          }
+        );
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const error = new Error(
+            data?.error || data?.message || "Failed to deploy project."
+          ) as Error & { code?: string };
+          error.code = data?.code;
+          throw error;
+        }
+
+        if (!data?.project) {
+          throw new Error("Server did not return the deployed project.");
+        }
+
+        console.log("✅ Project deployed:", projectId, "to parcel:", parcelId);
+        return data.project;
+      },
+      [authFetch]
+    );
+
+  /* =======================================
      BEGIN TRANSFORM
   ======================================= */
 
@@ -2502,6 +2556,8 @@ const updateObject =
         saveProject,
 
         publishProject,
+
+        deployProject,
       }),
       [
         scene,
@@ -2559,6 +2615,8 @@ const updateObject =
         saveProject,
 
         publishProject,
+
+        deployProject,
       ]
     );
 
