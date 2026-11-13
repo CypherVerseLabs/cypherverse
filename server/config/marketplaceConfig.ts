@@ -11,7 +11,7 @@ export type MarketplaceEnvironment = {
  * an already-provisioned User; this helper never creates or mutates users.
  */
 export function getPrimaryMarketplaceSellerEmail(
-  env: MarketplaceEnvironment = process.env
+  env: MarketplaceEnvironment = process.env as MarketplaceEnvironment
 ): string {
   const configuredEmail = env.MARKETPLACE_SYSTEM_SELLER_EMAIL?.trim();
 
