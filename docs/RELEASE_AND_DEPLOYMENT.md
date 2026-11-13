@@ -17,7 +17,7 @@ Do not configure this application as a static-only site or use `next export` unl
 
 The current frontend/API route audit found these integration details:
 
-- `StarterAI.tsx` calls the Next route `/api/ai/starter`. Its client currently sends `messages` and expects a `response` field, while the Next handler accepts `history` and returns the service's `message` field. This request/response contract is inconsistent and should be corrected before relying on this guide UI in Production.
+- `StarterAI.tsx` calls the Next route `/api/ai/starter`. Its request now sends the previous conversation as `history` and consumes the service's `message` response, matching the handler contract. The optional client `systemContext` value is still not consumed by the server; the server-owned prompt remains authoritative.
 - `CyVerseBot` calls `/api/ai/agents` using a same-origin relative URL, but that endpoint is mounted by Express and there is no matching Next API route. When web and Express run on separate origins, the hosting layer must explicitly route this path to Express or the client must call the configured API origin.
 - `/api/ai/scene` and `/api/greet` are present as Next API routes; no matching frontend caller was identified in the source search performed for this audit.
 
