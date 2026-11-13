@@ -52,7 +52,7 @@ export default function AdminMarketplacePage() {
 
   const normalizedPrice = price.trim();
   const validPrice = /^\d+(\.\d{1,2})?$/.test(normalizedPrice)
-    && Number(normalizedPrice) > 0;
+    && Number(normalizedPrice) >= 20\n    && Number(normalizedPrice) <= 50;
   const validParcelId = parcelId.trim().length > 0;
   const canSubmit = isAuthenticated && !loading && !submitting
     && validParcelId && validPrice;
@@ -63,7 +63,7 @@ export default function AdminMarketplacePage() {
     setResult(null);
 
     if (!validParcelId || !validPrice) {
-      setError("Enter a parcel ID and a positive USD price with no more than two decimal places.");
+      setError("Enter a parcel ID and a USD price from $20.00 to $50.00 with no more than two decimal places.");
       return;
     }
 
@@ -184,7 +184,7 @@ export default function AdminMarketplacePage() {
                     id="price"
                     name="price"
                     type="number"
-                    min="0.01"
+                    min="20"
                     max="50"
                     step="0.01"
                     value={price}
