@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -162,6 +163,8 @@ export function AuthProvider({
   const [cyphAccountError, setCyphAccountError] =
     useState<string | null>(null);
 
+  const cyphAccountRequestId = useRef(0);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -175,6 +178,7 @@ export function AuthProvider({
     setJwt(null);
     setUser(null);
     setWalletAddress(null);
+    cyphAccountRequestId.current += 1;
     setCyphAccount(null);
     setCyphAccountLoading(false);
     setCyphAccountError(null);
@@ -523,6 +527,7 @@ export function AuthProvider({
       return;
     }
 
+    const requestId = ++cyphAccountRequestId.current;
     setCyphAccountLoading(true);
     setCyphAccountError(null);
 
@@ -538,24 +543,30 @@ export function AuthProvider({
         );
       }
 
-      setCyphAccount(
-        data?.account
-          ? {
-              ...data.account,
-              balance: String(data.account.balance),
-            }
-          : null
-      );
+      if (requestId === cyphAccountRequestId.current) {
+        setCyphAccount(
+          data?.account
+            ? {
+                ...data.account,
+                balance: String(data.account.balance),
+              }
+            : null
+        );
+      }
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "Failed to load CYPH account.";
 
-      setCyphAccountError(message);
+      if (requestId === cyphAccountRequestId.current) {
+        setCyphAccountError(message);
+      }
       console.warn("CYPH account refresh failed:", error);
     } finally {
-      setCyphAccountLoading(false);
+      if (requestId === cyphAccountRequestId.current) {
+        setCyphAccountLoading(false);
+      }
     }
   };
 
@@ -566,6 +577,7 @@ export function AuthProvider({
    */
   useEffect(() => {
     if (jwt && user) {
+      setCyphAccount(null);
       void refreshCyphAccount();
       return;
     }
