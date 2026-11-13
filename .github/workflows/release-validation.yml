@@ -1,0 +1,76 @@
+name: Release validation
+
+on:
+  pull_request:
+    branches:
+      - production-release/2026-11-13
+  push:
+    branches:
+      - release-hardening/2026-11-13
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cypherverse_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cypherverse_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cypherverse_ci?schema=public
+      JWT_SECRET: ci-only-not-a-secret
+      NODE_ENV: test
+      OPENAI_API_KEY: ci-placeholder-not-a-real-key
+      R2_ENDPOINT: https://example.invalid
+      R2_ACCESS_KEY_ID: ci-placeholder
+      R2_SECRET_ACCESS_KEY: ci-placeholder
+      R2_BUCKET_NAME: ci-placeholder
+      R2_PUBLIC_URL: https://example.invalid/assets
+      NEXT_PUBLIC_API_URL: http://localhost:5000
+      CORS_ORIGIN: http://localhost:3000
+      ENABLE_TEST_PAYMENT_SIMULATION: "false"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Install API dependencies
+        run: npm --prefix server ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Apply migrations to ephemeral PostgreSQL
+        run: npm --prefix server exec prisma migrate deploy -- --schema ./prisma/schema.prisma
+
+      - name: Run server unit tests
+        run: npm run test:server
+
+      - name: Build Next.js web application
+        run: npm run build:web
+
+      - name: Build Express API
+        run: npm run build:server
