@@ -463,6 +463,10 @@ export default function ParcelDirectory({
 
   onBuy,
 
+  onBuyWithCyph,
+
+  cyphQuote,
+
   onReserve,
 
   onList,
