@@ -67,12 +67,12 @@ Set environment variables in the hosting provider's secret/configuration interfa
 | `R2_PUBLIC_URL` | Express object storage | Required public base URL for uploaded assets. |
 | `OPENAI_API_KEY` | AI server modules | Required by current AI service module; keep secret. |
 | `OPENAI_MODEL` | AI server modules | Optional; defaults to `gpt-4o-mini`. |
-| `OLLAMA_URL` | Optional local Ollama integration | Defaults to `http://localhost:11434`. |
-| `OLLAMA_MODEL` | Optional local Ollama integration | Optional model name. |
+| `OLLAMA_URL` | Ollama service used by StarterAI | Defaults to `http://127.0.0.1:11434`; the service must be reachable when the StarterAI route is used. |
+| `OLLAMA_MODEL` | Ollama model used by StarterAI | Defaults to `qwen3:1.7b`; ensure that model is available to the configured Ollama service. |
 | `ENABLE_TEST_PAYMENT_SIMULATION` | Express marketplace | Default false. Exact string `true` enables only outside Production. Production is denied regardless. |
 | `MARKETPLACE_SYSTEM_SELLER_EMAIL` | Marketplace primary inventory seller | Production requires a valid, explicitly configured, non-`.test` email for an already-provisioned User. This setting does not create that User. |
 
-The R2 module validates its configuration at import time, and the AI service module currently requires `OPENAI_API_KEY` at import time. Configure these before starting Express even if a deployment initially does not expose every related feature.
+The R2 module validates its configuration at import time, and the OpenAI scene-generation service currently requires `OPENAI_API_KEY` at import time. StarterAI uses Ollama rather than OpenAI; it requires a reachable Ollama service and an available configured model when that feature is used. Configure these before enabling the related features.
 
 ## Payment safety status
 
