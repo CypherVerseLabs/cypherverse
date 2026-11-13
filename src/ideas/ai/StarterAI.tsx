@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 
 type StarterAIResponse = {
-  response: string;
+  message: string;
+  link?: { label: string; href: string };
 };
 
 type StarterAIProps = {
@@ -97,7 +98,7 @@ export default function StarterAI({
 
         body: JSON.stringify({
           prompt,
-          messages: nextMessages,
+          history: messages,
           context: systemContext,
         }),
       });
@@ -116,8 +117,8 @@ export default function StarterAI({
       }
 
       if (
-        !("response" in data) ||
-        typeof data.response !== "string"
+        !("message" in data) ||
+        typeof data.message !== "string"
       ) {
         throw new Error(
           "The Cypherverse guide returned an invalid response."
@@ -128,7 +129,7 @@ export default function StarterAI({
         ...current,
         {
           role: "assistant",
-          content: data.response,
+          content: data.message,
         },
       ]);
     } catch (err) {
