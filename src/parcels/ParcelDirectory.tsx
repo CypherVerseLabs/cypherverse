@@ -383,7 +383,7 @@ function ParcelRow({
 
       {parcel.status === "for_sale" && onBuyWithCyph && (
         <Button position={[0.86, -0.39, 0]} fontSize={0.055} onClick={() => onBuyWithCyph(parcel)}>
-          {selected && cyphQuote ? `CONFIRM ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "QUOTE CYPH"}
+          {selected && cyphQuote ? `CONFIRM ${Number(cyphQuote.amount).toLocaleString()} CYPH` : "BUY CYPH"}
         </Button>
       )}
 
