@@ -1,4 +1,4 @@
-name: Release hardening
+name: Release validation
 
 on:
   push:
@@ -7,9 +7,6 @@ on:
   pull_request:
     branches:
       - production-release/2026-11-13
-
-permissions:
-  contents: write
 
 jobs:
   validate:
@@ -25,39 +22,38 @@ jobs:
       R2_BUCKET_NAME: ci-only-placeholder
       R2_PUBLIC_URL: https://example.invalid
       NEXT_PUBLIC_API_URL: http://127.0.0.1:5000
+      CORS_ORIGIN: http://127.0.0.1:3000
+      ENABLE_TEST_PAYMENT_SIMULATION: "false"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
-      - name: Commit regenerated root lockfile
-        run: |
-          if ! git diff --quiet -- package-lock.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Refresh root npm lockfile"
-            git push origin HEAD:release-hardening/2026-11-13
-          fi
-      - name: Export regenerated root lockfile for review
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerated-root-package-lock
-          path: package-lock.json
-          if-no-files-found: error
-          retention-days: 1
-      - name: Install backend dependencies
-        run: npm install --prefix server --no-audit --no-fund
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install web dependencies from lockfile
+        run: npm ci
+
+      - name: Install API dependencies from lockfile
+        run: npm --prefix server ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Run server unit tests
+        run: npm run test:server
+
       - name: Build Next.js web application
         run: npm run build:web
-      - name: Generate Prisma client
-        run: npm --prefix server run prisma:generate
-      - name: Validate Prisma schema
-        run: npm --prefix server run prisma:validate
+
       - name: Build Express API
         run: npm run build:server
-      - name: Run release-hardening tests
-        run: npm run test:server
