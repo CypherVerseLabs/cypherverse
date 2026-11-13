@@ -236,7 +236,7 @@ type EditorContextValue = {
   deployProject: (
     projectId: string,
     parcelId: string
-  ) => Promise<Project>;
+  ) => Promise<{ id: string; name: string; template: "editor" | "found"; slug?: string; publishedAt?: string }>;
 };
 
 /* =========================================
