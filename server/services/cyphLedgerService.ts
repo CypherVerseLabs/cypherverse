@@ -97,10 +97,10 @@ function normalizePostings(
       );
     }
 
-    if (amount.decimalPlaces() > 8 || amount.precision() > 24) {
+    if (amount.decimalPlaces() > 18 || amount.precision() > 36) {
       throw new CyphLedgerError(
         "CYPH_POSTING_PRECISION_EXCEEDED",
-        "Ledger posting amounts support up to 24 digits and 8 decimal places."
+        "Ledger posting amounts support up to 36 digits and 18 decimal places."
       );
     }
 
