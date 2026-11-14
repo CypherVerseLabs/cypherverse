@@ -334,6 +334,91 @@ export async function grantCyphFromPreset(input: {
           );
         }
 
+        // Distribution is fail-closed until the existing balances and legacy
+        // issuance history have been reconciled and a ceiling is explicitly set.
+        const control = await tx.cyphDistributionControl.findUnique({
+          where: { id: "primary" },
+        });
+        if (
+          !control ||
+          !control.enabled ||
+          !control.reconciledAt ||
+          !control.distributionCeiling
+        ) {
+          throw new CyphFundingError(
+            "CYPH_DISTRIBUTION_NOT_RECONCILED",
+            "CYPH distribution is disabled until supply reconciliation and a distribution ceiling are approved."
+          );
+        }
+
+        if (!preset.allocationId) {
+          throw new CyphFundingError(
+            "CYPH_PRESET_ALLOCATION_REQUIRED",
+            "This funding preset must be assigned to an enabled distribution allocation."
+          );
+        }
+
+        const allocation = await tx.cyphDistributionAllocation.findUnique({
+          where: { id: preset.allocationId },
+        });
+        if (!allocation || !allocation.enabled || !allocation.ceiling) {
+          throw new CyphFundingError(
+            "CYPH_ALLOCATION_UNAVAILABLE",
+            "The preset distribution allocation is missing, disabled, or has no approved ceiling."
+          );
+        }
+
+        const total = preset.baseAmount.plus(preset.bonusAmount);
+        const nextGlobalDistributed = control.distributedAmount.plus(total);
+        const nextAllocationDistributed = allocation.distributedAmount.plus(total);
+        if (nextGlobalDistributed.gt(control.distributionCeiling)) {
+          throw new CyphFundingError(
+            "CYPH_DISTRIBUTION_CEILING_EXCEEDED",
+            "This grant would exceed the approved global CYPH distribution ceiling."
+          );
+        }
+        if (nextAllocationDistributed.gt(allocation.ceiling)) {
+          throw new CyphFundingError(
+            "CYPH_ALLOCATION_CEILING_EXCEEDED",
+            "This grant would exceed the approved allocation ceiling."
+          );
+        }
+
+        // Conditional atomic increments make the ceilings safe under concurrent
+        // grants. Serializable isolation remains the outer transaction boundary.
+        const globalReservation = await tx.cyphDistributionControl.updateMany({
+          where: {
+            id: "primary",
+            enabled: true,
+            reconciledAt: { not: null },
+            distributionCeiling: { gte: nextGlobalDistributed },
+            distributedAmount: { lte: control.distributionCeiling.minus(total) },
+          },
+          data: { distributedAmount: { increment: total } },
+        });
+        if (globalReservation.count !== 1) {
+          throw new CyphFundingError(
+            "CYPH_DISTRIBUTION_CEILING_EXCEEDED",
+            "The global CYPH distribution budget changed or was exhausted. Retry after review."
+          );
+        }
+
+        const allocationReservation = await tx.cyphDistributionAllocation.updateMany({
+          where: {
+            id: allocation.id,
+            enabled: true,
+            ceiling: { gte: nextAllocationDistributed },
+            distributedAmount: { lte: allocation.ceiling.minus(total) },
+          },
+          data: { distributedAmount: { increment: total } },
+        });
+        if (allocationReservation.count !== 1) {
+          throw new CyphFundingError(
+            "CYPH_ALLOCATION_CEILING_EXCEEDED",
+            "The CYPH allocation budget changed or was exhausted. Retry after review."
+          );
+        }
+
         const account = await tx.cyphAccount.upsert({
           where: { userId: targetUserId },
           create: {
@@ -355,8 +440,6 @@ export async function grantCyphFromPreset(input: {
             "The CYPH issuance system account is missing. Apply the Phase 1 migration first."
           );
         }
-
-        const total = preset.baseAmount.plus(preset.bonusAmount);
 
         const ledger = await createCyphLedgerTransaction(tx, {
           type: "ADMIN_FUNDING",
@@ -406,6 +489,7 @@ export async function grantCyphFromPreset(input: {
             transactionId: ledger.transaction.id,
             targetUserId,
             presetId: preset.id,
+            allocationId: allocation.id,
             baseAmount: preset.baseAmount,
             bonusAmount: preset.bonusAmount,
             reason,
