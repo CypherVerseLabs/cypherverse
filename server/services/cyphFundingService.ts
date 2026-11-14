@@ -42,10 +42,10 @@ function parseAmount(value: unknown, field: string) {
 
   const raw = String(value).trim();
 
-  if (!/^\d{1,16}(\.\d{1,8})?$/.test(raw)) {
+  if (!/^\d{1,18}(\.\d{1,18})?$/.test(raw)) {
     throw new CyphFundingError(
       "INVALID_FUNDING_AMOUNT",
-      `${field} must be a non-negative amount with at most 8 decimal places.`
+      `${field} must be a non-negative amount with at most 18 decimal places.`
     );
   }
 
