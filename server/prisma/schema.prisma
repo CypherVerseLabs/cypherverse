@@ -324,9 +324,12 @@ model MarketplaceIdempotencyKey {
 model CyphDistributionControl {
   // Singleton control row for internal CYPH distributions. This is not the
   // blockchain token's supply authority; the deployed EVM contract is.
+  // Ceiling and reconciliation must be explicitly configured before grants.
   id                  String   @id @default("primary")
-  distributionCeiling Decimal  @db.Decimal(36, 18)
+  distributionCeiling Decimal? @db.Decimal(36, 18)
   distributedAmount   Decimal  @default(0) @db.Decimal(36, 18)
+  reconciledAt        DateTime?
+  enabled             Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
@@ -395,6 +398,21 @@ model CyphLedgerPosting {
   @@index([accountId])
 }
 
+model CyphDistributionAllocation {
+  id                String   @id @default(uuid())
+  code              String   @unique
+  label             String
+  ceiling           Decimal? @db.Decimal(36, 18)
+  distributedAmount Decimal  @default(0) @db.Decimal(36, 18)
+  enabled           Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  presets           CyphFundingPreset[]
+  grants            CyphFundingGrant[]
+
+  @@index([enabled])
+}
+
 model CyphFundingPreset {
   id              String             @id @default(uuid())
   code            String             @unique
@@ -407,9 +425,12 @@ model CyphFundingPreset {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   createdByUser   User?              @relation("CyphFundingPresetCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  allocationId    String?
+  allocation      CyphDistributionAllocation? @relation(fields: [allocationId], references: [id], onDelete: Restrict)
   grants          CyphFundingGrant[]
 
   @@index([enabled, sortOrder])
+  @@index([allocationId])
 }
 
 model CyphFundingGrant {
@@ -417,6 +438,7 @@ model CyphFundingGrant {
   transactionId String                @unique
   targetUserId  String
   presetId      String?
+  allocationId  String?
   baseAmount    Decimal               @db.Decimal(36, 18)
   bonusAmount   Decimal               @default(0) @db.Decimal(36, 18)
   reason        String
@@ -424,6 +446,7 @@ model CyphFundingGrant {
   transaction   CyphLedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
   targetUser    User                  @relation("CyphFundingTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
   preset        CyphFundingPreset?    @relation(fields: [presetId], references: [id], onDelete: Restrict)
+  allocation    CyphDistributionAllocation? @relation(fields: [allocationId], references: [id], onDelete: Restrict)
 
   @@index([targetUserId, createdAt])
   @@index([presetId])
