@@ -79,7 +79,7 @@ npm --prefix server run build:dist
 npm --prefix server start
 ```
 
-For local development, install the root and server dependencies separately. The backend currently has no committed `server/package-lock.json`; therefore `npm install --prefix server` is not yet a fully reproducible/frozen install. Do not claim backend dependency reproducibility until a reviewed server lockfile is generated and committed. Root frontend installs are reproducible through the committed `package-lock.json` and `npm ci`.
+For local development and CI, install the root and server dependencies separately. Both `package-lock.json` and `server/package-lock.json` are committed in the release tree, so use `npm ci --legacy-peer-deps` at the repository root and `npm --prefix server ci` for the API dependencies. The Vercel project install command must be compatible with both lockfiles and the root build script.
 
 Prisma client generation writes to `server/generated/prisma`. It is generated build output and must be regenerated from `server/prisma/schema.prisma` after installing server dependencies; do not hand-edit it. The server TypeScript build writes `server/dist` from source using `server/tsconfig.build.json`. Treat `server/dist` as generated output and do not edit it manually. The current build configuration compiles the server entry point, routes, middleware, services, stores, libraries, and types.
 
@@ -90,3 +90,8 @@ Prisma validation and client generation do not connect to or modify a database. 
 The release-hardening workflow runs the frontend build, backend TypeScript build, Prisma client generation/validation, unit tests for payment gates and migration-directory structure, and does not connect to a database or apply migrations.
 
 A prior Vercel deployment for the TEST baseline was reported failed. Its deployment log command referenced deployment `dpl_Fn6S3XkRusjJoZKjVQKs3Hg8fohG`; provider logs were not accessible during this pass. This is not evidence that Vercel is the selected Production host. Choose and document the actual hosting provider before provisioning Production.
+
+
+## Current release hosting notes
+
+The current release setup uses a Vercel Next.js project for the web runtime and a separately hosted Express API. The source tree alone does not verify the live CyberPanel process, API origin, CORS allowlist, DNS, or external Ollama availability. Do not set `NEXT_PUBLIC_API_URL` to localhost in Production; it must identify the reachable Express API origin before the frontend build. The Next.js `/api/ai/starter` handler calls the configured Ollama endpoint, so `OLLAMA_URL` must be reachable from the Next.js runtime and must not use a loopback address unless Ollama is actually running in that same runtime. The Next.js `/api/ai/scene` handler imports the OpenAI-backed service and therefore requires `OPENAI_API_KEY` in the web runtime when that route is deployed. These requirements must be verified before removing or changing corresponding Vercel variables.
