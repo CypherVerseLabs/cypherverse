@@ -1,6 +1,6 @@
 > **Documentation status — historical / reference material**
 >
-> This file contains earlier design notes, implementation snapshots, or proposed work. It is not the authoritative description of the current production architecture. Verify every path, route, schema field, status, and workflow against the current source before using it to guide implementation. For current product and deployment invariants, start with the repository [README](../README.md), [Technology architecture](TECHNOLOGY.md), and [Release and deployment guide](RELEASE_AND_DEPLOYMENT.md).
+> This file contains earlier design notes, implementation snapshots, or proposed work. It is not the authoritative description of the current production architecture. Verify every path, route, schema field, status, and workflow against the current source before using it to guide implementation. For current product and deployment invariants, start with the repository [README](README.md), [Technology architecture](docs/TECHNOLOGY.md), and [Release and deployment guide](docs/RELEASE_AND_DEPLOYMENT.md).
 
 ---
 
