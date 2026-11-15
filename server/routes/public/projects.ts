@@ -8,6 +8,10 @@ import {
   getPublicProject,
 } from "../../stores/projectStore.js";
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const router =
   Router();
 
@@ -23,7 +27,7 @@ router.get(
   ) => {
     try {
       const slug =
-        req.params.slug;
+        singleRouteParam(req.params.slug);
 
       if (!slug) {
         return res.status(400).json({
