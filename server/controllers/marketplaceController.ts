@@ -149,6 +149,10 @@ function sendMarketplaceError(
  * =========================================================
  */
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 export async function createParcelOrderController(
   req: AuthenticatedRequest,
   res: Response
@@ -231,7 +235,7 @@ export async function getMarketplaceOrderController(
   }
 
   const orderId =
-    req.params.orderId;
+    singleRouteParam(req.params.orderId);
 
   try {
     const order =
@@ -324,7 +328,7 @@ export async function cancelMarketplaceOrderController(
   try {
     const order =
       await cancelMarketplaceOrder(
-        req.params.orderId,
+        singleRouteParam(req.params.orderId),
         userId
       );
 
@@ -374,7 +378,7 @@ export async function createMarketplacePaymentController(
   try {
     const payment =
       await createMarketplacePayment(
-        req.params.orderId,
+        singleRouteParam(req.params.orderId),
         userId
       );
 
@@ -415,7 +419,7 @@ export async function getMarketplacePaymentController(
   try {
     const payment =
       await getMarketplacePaymentById(
-        req.params.paymentId,
+        singleRouteParam(req.params.paymentId),
         userId
       );
 
@@ -468,7 +472,7 @@ export async function confirmTestPaymentController(
   try {
     const result =
       await confirmTestMarketplacePayment(
-        req.params.paymentId,
+        singleRouteParam(req.params.paymentId),
         userId
       );
 
@@ -504,7 +508,7 @@ export async function failTestPaymentController(
   try {
     const result =
       await failTestMarketplacePayment(
-        req.params.paymentId,
+        singleRouteParam(req.params.paymentId),
         userId
       );
 
@@ -540,7 +544,7 @@ export async function cancelTestPaymentController(
   try {
     const result =
       await cancelTestMarketplacePayment(
-        req.params.paymentId,
+        singleRouteParam(req.params.paymentId),
         userId
       );
 
@@ -579,7 +583,7 @@ export async function payMarketplaceOrderWithCyphController(
   try {
     const result =
       await payMarketplaceOrderWithCyph(
-        req.params.orderId,
+        singleRouteParam(req.params.orderId),
         userId
       );
 
@@ -611,7 +615,7 @@ export async function getMarketplaceOrderCyphQuoteController(
 
   try {
     const quote = await getMarketplaceOrderCyphQuote(
-      req.params.orderId,
+      singleRouteParam(req.params.orderId),
       userId
     );
 
