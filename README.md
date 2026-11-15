@@ -116,3 +116,5 @@ See [Development](docs/DEVELOPMENT.md), [API reference](docs/CYPHERVERSE-API.md)
 - [CyEngine](https://github.com/CypherVerseLabs/cyengine) — 3D runtime.
 - [CypherVerse](https://cypherverse.space) — product.
 - [CypherVerseLabs](https://github.com/CypherVerseLabs) — GitHub organization.
+
+The earlier, longer project overview is preserved as a [historical reference](docs/legacy-project-overview-2026-11-13.md); it is not the current architecture authority.
