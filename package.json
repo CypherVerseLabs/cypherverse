@@ -3,7 +3,14 @@
   "version": "0.0.4",
   "private": false,
   "description": "A visual scene builder for the 3D Web.",
-  "keywords": ["react", "3d", "cyengine", "webxr", "threejs", "cyengine"],
+  "keywords": [
+    "react",
+    "3d",
+    "cyengine",
+    "webxr",
+    "threejs",
+    "cyengine"
+  ],
   "license": "MIT",
   "homepage": "https://cypherverse.space",
   "repository": {
@@ -40,7 +47,7 @@
     "cyengine": "^2.1.0",
     "ethers": "6.15.0",
     "jszip": "^3.10.1",
-    "next": "^12.1.6",
+    "next": "15.5.29",
     "posthog-js": "^1.257.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
