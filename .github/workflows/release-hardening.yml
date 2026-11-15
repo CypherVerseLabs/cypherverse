@@ -49,6 +49,11 @@ jobs:
       - name: Install API dependencies from lockfile
         run: npm --prefix server ci
 
+      - name: Apply non-breaking dependency security fixes
+        run: |
+          npm audit fix --legacy-peer-deps
+          npm --prefix server audit fix
+
       - name: Audit web dependencies
         run: npm audit --json > root-audit.json || true
 
