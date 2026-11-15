@@ -57,9 +57,9 @@ jobs:
       - name: Sync server Yarn lockfile with audited npm lock
         working-directory: server
         run: |
-          rm -f yarn.lock
-          npx --yes yarn@1.22.22 import
+          npx --yes yarn@1.22.22 upgrade
           npx --yes yarn@1.22.22 install --frozen-lockfile --ignore-scripts
+          npx --yes yarn@1.22.22 audit --groups dependencies
 
       - name: Inspect Three.js dependency resolution
         run: |
