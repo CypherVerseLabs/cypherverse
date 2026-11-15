@@ -1,814 +1,118 @@
-<br/> <p align="center"> <img width="500" src="https://lbemedia.net/images/android-chrome-192x192.ico" alt="CypherVerse logo" /> </p> <h3 align="center"> CypherVerse </h3> <h5 align="center"> A platform for building, creating, managing, publishing, and experiencing the 3D Web. </h5> <div align="center">
+# CypherVerse
 
+CypherVerse is a platform for creating, managing, publishing, and experiencing interactive 3D websites and worlds. It combines creator accounts, persistent Projects, templates, a 3D Builder, publishing, Parcel ownership, and public experiences.
 
+CypherVerse is the platform and product layer. [CyEngine](https://github.com/CypherVerseLabs/cyengine) is the spatial runtime used to render and operate interactive 3D experiences.
 
+## Product model
 
-</div> <p align="center"> <a href="https://cypherverse.space">www.cypherverse.space</a> · <a href="https://github.com/CypherVerseLabs">github</a> · <a href="https://discord.gg/CrbfwhVVq">discord</a> </p> <br/>
-CypherVerse
+The primary creator workflow is:
 
-CypherVerse is a platform for creating, managing, publishing, and experiencing interactive 3D worlds on the Web.
-
-It combines:
-
-user accounts and authentication
-persistent projects
-website templates
-database-backed project ownership
-a 3D editor
-scene persistence
-asset uploading
-publishing
-public project experiences
-website management
-the cyengine runtime
-
-into one platform for creating 3D experiences.
-
-The goal is simple:
-
-Make creating and publishing a 3D website as accessible as creating a traditional website.
-
-What CypherVerse Provides
-Accounts & Authentication
-
-Creators can have persistent accounts and identity.
-
-Authentication supports both:
-
-wallet-based login
-email/password authentication
-
-Authenticated users receive ownership of the projects they create.
-
-Project ownership is determined server-side from the authenticated user rather than from client-supplied ownership information.
-
-This prevents one user from simply submitting another user's ID when accessing project data.
-
-Websites & Worlds
-
-CypherVerse treats websites and interactive worlds as persistent projects.
-
-Projects are stored in the database and can contain information such as:
-
-project ID
-project name
-description
-owner
-template
-scene data
-URL slug
-publishing state
-uploaded assets
-timestamps
-
-Projects can be:
-
-created
-loaded
-updated
-deleted
-published
-managed by their authenticated owner
-
-The project system is backed by the application's existing project store and database layer.
-
-Templates
-
-Creators can begin with different starting experiences.
-
-Current templates include:
-
-Editor
-
-Start with a blank world and build it yourself.
-
-/editor
-
-Found
-
-Begin with a ready-made world and make it your own.
-
-/found
-
-
-The Found template is currently represented by an idea definition containing its initial scene.
-
-For example, the Found world can contain:
-
-a sky
-rain
-ground
-title text
-3D models
-links to other experiences
-audio
-
-Template data is stored separately from user-created projects so templates can act as starting points rather than becoming a second project-management system.
-
-Template System
-
-Templates are represented by server-side idea definitions.
-
-An idea contains:
-
-id
-name
-description
-route
-previewImage
-scene
-
-
-The current server-side catalog includes:
-
-editor
-found
-
-
-The idea loader reads the corresponding:
-
-ideas/<id>/idea.json
-
-
-file and validates the required fields before returning it.
-
-This keeps template definitions centralized and prevents arbitrary template IDs from being loaded from the filesystem.
-
-Website Creation
-
-The general creation flow is:
-
+```text
 Choose Template
-      ↓
-Name Website
       ↓
 Create Project
       ↓
-Persist Project
+Edit Project in Builder
       ↓
-Open Editor
+Save Project to Account
       ↓
-Build
+Browse / Own Parcel
       ↓
-Save
+Deploy Project to Owned Parcel
       ↓
-Publish
-
-
-A project can be created with a supported template:
-
-editor
-found
-
-
-The project API validates the template before creating the project.
-
-Project names and descriptions are also validated and size-limited by the server.
-
-Website Management
-
-Authenticated creators can access their existing projects through the account dialogue.
-
-The dialogue flow currently works like this:
-
-Account Menu
+Persistent World on Parcel
       ↓
-Manage My Websites
-      ↓
-manage_websites
-      ↓
-"Visit the Website Manager."
-      ↓
-Continue
-      ↓
-Back to Menu
+Edit the same Project and publish updates
+```
 
+A Project is the authoritative source of its scene data. Publishing a Project and deploying it to a Parcel are separate operations.
 
-The dialogue button itself does not perform application routing.
+**Parcel relationship rules:**
 
-The same applies to the template-selector dialogue:
+- One Parcel has at most one active Project.
+- A Project can be attached to at most one Parcel.
+- The relationship is represented by the singular `Project.parcelId` association.
+- Deploying a different Project to an occupied Parcel is rejected; it does not replace or detach the existing Project.
+- There is no separate Deployment model or copied World scene in this architecture.
 
-Create a Website
-      ↓
-visit_template_selector
-      ↓
-"Go visit the Template Selector."
-      ↓
-Continue
-      ↓
-Back to Menu
+## Main responsibilities
 
+| Area | Responsibility |
+| --- | --- |
+| Accounts and authentication | User identity, sessions, and server-side ownership checks |
+| Projects | Persistent creator-owned project metadata and authoritative scene |
+| Templates / Ideas | Starting points used to create Projects |
+| Builder / Editor | Editing a Project's scene |
+| Publishing | Publishing a Project's scene and associated assets for public access |
+| Parcels | Virtual land ownership and parcel lifecycle |
+| Deployment | Attaching one owned Project to one owned Parcel under the one-project-per-parcel rule |
+| Marketplace | Parcel listings, orders, payment records, and entitlement/ownership processing |
+| CyEngine | Spatial behavior and 3D runtime |
 
-The dialogue system provides the conversational UI state.
+CypherVerse is not currently documented as a general 3D asset marketplace. Do not treat proposed WorldTemplate, ComponentTemplate, or asset-library marketplace concepts in older notes as implemented product functionality.
 
-Actual application navigation is handled separately by the application components.
+## Runtime architecture
 
-This separation prevents dialogue buttons from unexpectedly becoming navigation controls.
+The repository contains two server-side runtimes:
 
-Project API
+- **Next.js web application** at the repository root. It serves the frontend and the Pages API routes under `src/pages/api`.
+- **Express application** under `server/`. It serves authenticated application APIs, including authentication, Projects, Parcels, marketplace, and related services.
 
-Authenticated projects are exposed through:
+The browser's `NEXT_PUBLIC_API_URL` points to the externally reachable Express API origin. It is a public build-time setting, not a secret. Next.js API routes remain part of the web runtime; this is not a static-export application.
 
-/api/projects
+The Express server uses Prisma and PostgreSQL. Project asset publishing uses the configured Cloudflare R2-compatible object storage integration.
 
+## Development
 
-The project API currently provides:
+Requirements: Node.js 20+ and npm.
 
-GET    /api/projects
-POST   /api/projects
-GET    /api/projects/:id
-PATCH  /api/projects/:id
-DELETE /api/projects/:id
-POST   /api/projects/:id/publish
+Install both dependency sets from the repository root:
 
+```sh
+npm ci --legacy-peer-deps
+npm --prefix server ci
+npm run prisma:generate
+npm run prisma:validate
+```
 
-All authenticated project routes require the authentication middleware.
+Run the web application:
 
-Project Ownership
-
-Project ownership is always determined from the authenticated request.
-
-Conceptually:
-
-JWT
- ↓
-authenticateToken
- ↓
-req.user.id
- ↓
-Project Store
- ↓
-Owned Project
-
-
-The client does not get to choose the ownerId used by project operations.
-
-This applies to:
-
-creating projects
-listing projects
-loading projectsc
-updating projects
-deleting projects
-publishing projects
-Project Creation
-
-A project can be created using:
-
-POST /api/projects
-
-
-The server validates:
-
-authentication
-project name
-project description
-template
-
-Project names are limited to 200 characters.
-
-Project descriptions are limited to 5000 characters.
-
-Supported templates are:
-
-editor
-found
-
-
-The authenticated user's ID becomes the project's owner.
-
-Project Updates
-
-Projects can be updated using:
-
-PATCH /api/projects/:id
-
-
-Supported fields include:
-
-name
-description
-scene
-slug
-
-
-Project names and descriptions are validated before being stored.
-
-Scene data is serialized and checked against a 10 MB size limit.
-
-Project URLs
-
-Projects can have a URL slug.
-
-Slugs are normalized by:
-
-trimming whitespace
-converting to lowercase
-removing leading/trailing slashes
-
-Valid characters are:
-
-a-z
-0-9
--
-
-
-A slug can contain multiple words separated by hyphens.
-
-The maximum slug length is 60 characters.
-
-For example:
-
-my-world
-my-first-website
-cypherverse-world
-
-
-The database enforces slug uniqueness.
-
-If a requested slug is already being used, the API returns:
-
-409 Conflict
-
-
-with:
-
-That project URL is already in use
-
-Publishing
-
-Publishing is handled through:
-
-POST /api/projects/:id/publish
-
-
-The publish request uses multipart form data.
-
-The request can contain:
-
-scene
-assetManifest
-asset-<assetId>
-
-
-The server:
-
-authenticates the user
-verifies project ownership
-validates the scene
-validates the asset manifest
-receives uploaded assets
-uploads assets to R2
-generates storage keys
-rewrites scene asset references
-stores the published project state
-returns the published project
-Scene Publishing
-
-Scenes must contain an object collection.
-
-The publish route validates that the scene contains:
-
-objects
-
-
-and that it is an array.
-
-Scene JSON is limited to 10 MB.
-
-This prevents unexpectedly large project scenes from being persisted.
-
-Asset Publishing
-
-Published assets are uploaded using the project's asset namespace.
-
-Storage keys follow the general structure:
-
-projects/<projectId>/assets/<generated-id>-<filename>
-
-
-Uploaded filenames are sanitized before being used in storage keys.
-
-The server records information such as:
-
-original filename
-storage key
-MIME type
-file size
-
-The published scene's original asset references are then replaced with the resulting public asset URLs.
-
-Conceptually:
-
-Editor Asset
-     ↓
-assetManifest
-     ↓
-Upload
-     ↓
-R2
-     ↓
-Public URL
-     ↓
-Rewrite Scene
-     ↓
-Published Project
-
-Cloud Asset Storage
-
-Project publishing uses the application's R2 storage integration.
-
-Assets are uploaded through the server rather than directly trusting arbitrary client-provided public URLs.
-
-This allows the server to control:
-
-storage paths
-asset ownership
-filenames
-MIME information
-published scene references
-Public Projects
-
-CypherVerse also contains a separate public project route layer.
-
-The server mounts:
-
-/api/public/projects
-
-
-This is separate from authenticated project management.
-
-The distinction is intentional:
-
-Authenticated Project API
-        ↓
-Private project management
-        ↓
-Ownership required
-
-
-Public Project API
-        ↓
-Published project access
-        ↓
-Public experience
-
-
-This allows a project to have a private editing/management lifecycle while still becoming publicly accessible after publishing.
-
-3D Editor
-
-Creators can build and modify interactive 3D experiences.
-
-The editor works with scene data that can contain objects, transforms, properties, models, links, environments, audio, and other interactive elements.
-
-A scene is fundamentally data describing a world.
-
-For example:
-
-Scene
- ├── Objects
- │    ├── Transform
- │    ├── Type
- │    └── Props
- │
- ├── Models
- ├── Environment
- ├── Audio
- ├── Links
- └── Interactive Content
-
-
-The scene can be persisted as part of a project and later loaded back into the editor or published experience.
-
-cyengine
-
-CypherVerse uses cyengine as its 3D runtime.
-
-cyengine provides the underlying runtime systems for the 3D Web experience, including things such as:
-
-worlds
-players
-environments
-models
-UI
-interaction
-scene composition
-
-CypherVerse is the platform surrounding the runtime.
-
-CypherVerse
-     ↓
-Accounts
-     ↓
-Projects
-     ↓
-Templates
-     ↓
-Editor
-     ↓
-Publishing
-     ↓
-cyengine
-     ↓
-3D Experience
-
-Architecture
-                         CypherVerse
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-       Accounts            Projects           Templates
-          │                   │                   │
-          │                   ↓                   │
-          │              Project Store            │
-          │                   │                   │
-          └───────────────────┼───────────────────┘
-                              │
-                         Database
-                              │
-                    Website / World Data
-                              │
-                         3D Editor
-                              │
-                         Publishing
-                              │
-                         R2 Assets
-                              │
-                           cyengine
-                              │
-                    React Three Fiber
-                              │
-                          Three.js
-
-
-The application is intentionally separated into platform, data, editor, publishing, and runtime responsibilities.
-
-Backend Architecture
-
-The backend is an Express application.
-
-Major backend responsibilities include:
-
-Express
- ├── Authentication
- ├── User Profiles
- ├── Projects
- ├── Public Projects
- ├── Ideas / Templates
- ├── AI
- └── Publishing
-
-
-Important project-related modules include:
-
-routes/auth/projects.ts
-stores/projectStore.ts
-routes/public/projects.ts
-routes/ideas.ts
-
-
-The project route layer is responsible for HTTP/API validation and authentication.
-
-The project store is responsible for interacting with persistent project data.
-
-The idea system is responsible for loading predefined template/world definitions.
-
-API Security
-
-Authenticated API routes use:
-
-authenticateToken
-
-
-The backend does not rely on the browser to identify the project owner.
-
-Instead:
-
-Authenticated Token
-        ↓
-Authenticated User
-        ↓
-req.user.id
-        ↓
-Project Ownership
-
-
-Project access is therefore scoped to the authenticated user.
-
-Validation & Limits
-
-The backend intentionally validates incoming project data.
-
-Current limits include:
-
-Data	Limit
-Project name	200 characters
-Project description	5001 characters
-Project URL slug	60 characters
-Scene	10 MB
-JSON request body	12 MB
-Published asset count	100
-Published asset size	20 MB
-Multipart field size	12 MB
-
-These limits help prevent accidental or uncontrolled resource usage.
-
-Authentication Routes
-
-The backend includes authentication endpoints for:
-
-POST /auth/nonce
-POST /auth/verify
-POST /auth/refresh
-GET  /auth/me
-POST /auth/profile
-POST /auth/logout
-
-
-Email authentication is also mounted through the API authentication layer.
-
-Wallet authentication and email authentication are both part of the creator account system.
-
-Development
-
-Install dependencies:
-
-npm install
-
-
-Start development:
-
+```sh
 npm run dev
+```
 
+Run the Express API in a second terminal:
 
-The application will normally be available at:
-
-http://localhost:3000
-
+```sh
+npm --prefix server run server
+```
 
 Build:
 
-npm run build
+```sh
+npm run build:web
+npm run build:server
+```
 
+Run server tests:
 
-Start the production application:
+```sh
+npm run test:server
+```
 
-npm run start
+See [Development](docs/DEVELOPMENT.md), [API reference](docs/CYPHERVERSE-API.md), [Parcel and marketplace architecture](docs/Parcels%20%26%20Marketplace.md), and [Release and deployment](docs/RELEASE_AND_DEPLOYMENT.md).
 
-Start the production server:
+## Production safety
 
-cd/server
+- Never run `server/prisma/seed.ts` against Production.
+- Review pending migrations against the intended database before applying any migration.
+- Keep test-payment simulation disabled in Production. The current payment flow is not a verified real-money payment-provider integration.
+- Production marketplace primary inventory requires an explicitly provisioned, non-`.test` system-seller User configured through `MARKETPLACE_SYSTEM_SELLER_EMAIL`.
+- Do not claim Production readiness from a successful frontend build alone; verify both runtimes, their network routing, database compatibility, object storage, and smoke tests.
 
-Prisma (your database/ORM)
+## Related projects
 
-cd server  
-yarn server
-
-yarn prisma studio
-
-http://localhost:51212
-
-The backend runs independently according to the project's server configuration.
-
-Project Structure
-
-A simplified structure:
-
-src/
-│
-├── app/
-│   ├── editor/
-│   ├── found/
-│   └── ...
-│
-├── ideas/
-│   ├── Dialogues/
-│   ├── TemplateSelector.tsx
-│   ├── ManageSite.tsx
-│   ├── WorldCard.tsx
-│   ├── Title.tsx
-│   └── ...
-│
-├── components/
-│   └── ...
-│
-├── database/
-│   └── ...
-│
-├── auth/
-│   └── ...
-│
-└── ...
-
-server/
-│
-├── index.ts
-│
-├── routes/
-│   ├── auth/
-│   │   ├── projects.ts
-│   │   ├── nonce.ts
-│   │   ├── verify.ts
-│   │   ├── refresh.ts
-│   │   └── emailAuth.ts
-│   │
-│   ├── public/
-│   │   └── projects.ts
-│   │
-│   ├── ideas.ts
-│   └── ...
-│
-├── stores/
-│   ├── projectStore.ts
-│   ├── userStore.ts
-│   └── ...
-│
-├── middleware/
-│   └── authMiddleware.ts
-│
-└── lib/
-    └── r2.ts
-
-ideas/
-│
-├── editor/
-│   └── idea.json
-│
-└── found/
-    └── idea.json
-
-
-The exact structure can evolve.
-
-The important architectural separation is:
-
-CypherVerse
-    ↓
-Platform
-    ↓
-Accounts / Projects / Database / Templates
-    ↓
-Editor / Management / Publishing
-    ↓
-Asset Storage
-    ↓
-cyengine
-    ↓
-3D Runtime
-
-Related Projects
-cyengine
-
-The standardized 3D Web runtime used by CypherVerse.
-
-https://www.npmjs.com/package/cyengine
-
-CypherVerse
-
-https://cypherverse.space
-
-GitHub
-
-https://github.com/CypherVerseLabs
-
-Discord
-
-https://discord.gg/CrbfwhVVq
-
-Philosophy
-
-The Web made it possible for anyone to publish a page.
-
-CypherVerse is building toward a Web where anyone can publish a world.
-
-Components
-    ↓
-Data
-    ↓
-Composition
-    ↓
-Interaction
-    ↓
-World
-    ↓
-Persistence
-    ↓
-Publishing
-    ↓
-Experience
-
-
-CypherVerse provides the platform.
-
-The project system provides persistence and ownership.
-
-The template system provides starting worlds.
-
-The editor provides creation tools.
-
-The publishing system turns project data and assets into a public experience.
-
-cyengine provides the reality.
-
-Creators provide the worlds.
+- [CyEngine](https://github.com/CypherVerseLabs/cyengine) — 3D runtime.
+- [CypherVerse](https://cypherverse.space) — product.
+- [CypherVerseLabs](https://github.com/CypherVerseLabs) — GitHub organization.
