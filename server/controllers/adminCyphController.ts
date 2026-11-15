@@ -58,9 +58,17 @@ export async function updateCyphFundingPresetController(
   res: Response
 ) {
   try {
+    const presetId = Array.isArray(req.params.presetId)
+      ? req.params.presetId[0]
+      : req.params.presetId;
+
+    if (typeof presetId !== "string" || presetId.length === 0) {
+      return res.status(400).json({ error: "INVALID_FUNDING_PRESET_ID" });
+    }
+
     const preset = await updateCyphFundingPreset(
       req.user!.id,
-      req.params.presetId,
+      presetId,
       req.body ?? {}
     );
     return res.json({ preset });
