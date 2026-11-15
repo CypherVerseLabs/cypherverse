@@ -45,5 +45,11 @@
     "prisma:validate": "prisma validate --schema ./prisma/schema.prisma",
     "test": "tsx --test tests/*.test.ts",
     "migrate:estate1": "tsx prisma/migrateEstate1.ts"
+  },
+  "overrides": {
+    "minimatch": "11.0.1"
+  },
+  "resolutions": {
+    "minimatch": "11.0.1"
   }
 }
