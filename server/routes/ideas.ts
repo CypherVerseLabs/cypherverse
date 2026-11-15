@@ -9,6 +9,10 @@ import {
   getIdeaById,
 } from "../stores/ideaStore.js";
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const router = Router();
 
 /*
@@ -63,7 +67,7 @@ router.get(
     try {
       const idea =
         await getIdeaById(
-          req.params.id
+          singleRouteParam(req.params.id)
         );
 
       if (!idea) {
