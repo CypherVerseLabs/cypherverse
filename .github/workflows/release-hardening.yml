@@ -57,7 +57,7 @@ jobs:
 
       - name: Print dependency audit summary
         run: |
-          node -e 'for (const file of ["root-audit.json", "server-audit.json"]) { const a = require("./" + file); console.log("\\n" + file, a.metadata?.vulnerabilities); for (const [name, v] of Object.entries(a.vulnerabilities || {})) console.log(name, v.severity, "range=" + v.range, "fix=" + JSON.stringify(v.fixAvailable)); }'
+          node -e 'for (const file of ["root-audit.json", "server-audit.json"]) { const a = require("./" + file); console.log("\\n" + file, a.metadata?.vulnerabilities); for (const [name, v] of Object.entries(a.vulnerabilities || {})) { const via = (v.via || []).map(x => typeof x === "string" ? x : { name: x.name, title: x.title, url: x.url, range: x.range, severity: x.severity }); console.log(name, v.severity, "range=" + v.range, "fix=" + JSON.stringify(v.fixAvailable), "via=" + JSON.stringify(via)); } }'
 
       - name: Upload dependency audit reports
         uses: actions/upload-artifact@v4
