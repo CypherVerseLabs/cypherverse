@@ -97,6 +97,8 @@ The Preview build's dependency installation reported the following full-tree npm
 
 The root lockfile resolves **Next.js 12.3.7**. The Next.js maintainers published critical advisory **GHSA-2464-fhr4-w9xw / CVE-2026-96889** for unauthenticated remote code execution in the Image Optimization API; affected versions include Next.js 12.3.7. The advisory lists patched releases 15.5.28 and 16.4.1. This is a Production release blocker until the framework and related image-processing dependencies are upgraded to a patched, compatible release, or a maintainer-documented mitigation is verified against this application. Do not treat a successful Preview build as resolving this issue.
 
+The same locked Next.js version is also inside the affected range for critical AVIF image-optimization RCE advisory **GHSA-2xp9-vwfh-vxw4**, fixed from 15.5.24. The later 15.5.28 patch floor covers both advisories. The checked-in root lockfile does not contain a `sharp` package, so the advisory's `sharp >= 0.35.5` workaround is not verified by the lockfile; the actual Vercel runtime image decoder has not been inspected. Do not assume the workaround is active.
+
 The install log also reported lifecycle scripts not yet covered by npm's `allowScripts` policy, including `@prisma/engines`, `bcrypt`, and `esbuild` in the server tree. Review and explicitly approve only the scripts required by the application; do not bypass npm's policy with a blanket allow-all setting.
 
 A major Next.js upgrade is not included in this release-hardening branch. It requires a separate compatibility pass over the Pages Router API routes, React version, image usage, build output, and runtime behavior, followed by fresh tests and Preview deployment.
