@@ -49,10 +49,15 @@ jobs:
       - name: Install API dependencies from lockfile
         run: npm --prefix server ci
 
-      - name: Apply non-breaking dependency security fixes
+      - name: Apply web dependency security fixes
+        run: npm audit fix --legacy-peer-deps
+
+      - name: Apply API dependency security fixes
+        working-directory: server
         run: |
           npm audit fix --legacy-peer-deps
-          npm --prefix server audit fix
+          npm update --package-lock-only --ignore-scripts
+          npm ci --ignore-scripts
 
       - name: Sync server Yarn lockfile with audited npm lock
         working-directory: server
@@ -70,7 +75,8 @@ jobs:
         run: npm audit --json > root-audit.json || true
 
       - name: Audit API dependencies
-        run: npm --prefix server audit --json > server-audit.json || true
+        working-directory: server
+        run: npm audit --json > ../server-audit.json || true
 
       - name: Print dependency audit summary
         run: |
@@ -105,7 +111,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
+          git add package.json package-lock.json server/package.json server/package-lock.json server/yarn.lock
           if ! git diff --cached --quiet; then
             git commit -m "Patch Next.js image optimizer security vulnerabilities"
             git push origin "HEAD:${GITHUB_REF_NAME}"
