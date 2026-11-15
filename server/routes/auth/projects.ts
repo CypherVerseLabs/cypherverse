@@ -31,6 +31,10 @@ import {
   Prisma,
 } from "../../generated/prisma/client.js";
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const router = Router();
 
 /**
@@ -202,7 +206,7 @@ router.post(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const projectId = req.params.id;
+      const projectId = singleRouteParam(req.params.id);
       const { parcelId } = req.body ?? {};
 
       if (!projectId) {
@@ -319,7 +323,7 @@ router.post(
       "🔥 PUBLISH ROUTE HIT:",
       req.method,
       req.originalUrl,
-      req.params.id
+      singleRouteParam(req.params.id)
     );
 
     try {
@@ -338,7 +342,7 @@ router.post(
       ----------------------------------------------- */
 
       const projectId =
-        req.params.id;
+        singleRouteParam(req.params.id);
 
       console.log(
         "🔥 PUBLISH PROJECT ID:",
@@ -862,7 +866,7 @@ router.get(
       }
 
       const projectId =
-        req.params.id;
+        singleRouteParam(req.params.id);
 
       if (!projectId) {
         return res.status(400).json({
@@ -920,7 +924,7 @@ router.patch(
       }
 
       const projectId =
-        req.params.id;
+        singleRouteParam(req.params.id);
 
       if (!projectId) {
         return res.status(400).json({
@@ -1159,7 +1163,7 @@ router.delete(
       }
 
       const projectId =
-        req.params.id;
+        singleRouteParam(req.params.id);
 
       if (!projectId) {
         return res.status(400).json({
