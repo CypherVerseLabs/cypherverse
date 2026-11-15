@@ -8,6 +8,9 @@ on:
     branches:
       - security-hardening/nextjs-patched-release-2026-11-15
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -31,11 +34,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: |
             package-lock.json
             server/package-lock.json
+
+      - name: Upgrade Next.js to patched 15.5 release
+        run: npm install next@15.5.29 --save-exact --legacy-peer-deps
 
       - name: Install web dependencies from lockfile
         run: npm ci --legacy-peer-deps
@@ -72,3 +78,13 @@ jobs:
 
       - name: Build Express API
         run: npm run build:server
+
+      - name: Commit tested Next.js dependency update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Patch Next.js image optimizer security vulnerabilities"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
