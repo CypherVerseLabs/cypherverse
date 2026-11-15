@@ -25,7 +25,7 @@ These route observations are not evidence that a reverse proxy or hosting rewrit
 
 ## Reproducible install and build
 
-Use Node.js 20 or newer and npm. The repository has separate npm lockfiles for the root web application and Express server. Install each independently:
+Use Node.js 24.x for the current Vercel project and npm. The repository has separate npm lockfiles for the root web application and Express server. Although both lockfiles are present, the current root lockfile fails Vercel's `npm ci --legacy-peer-deps` check because required optional platform packages and Next SWC entries are missing. The Vercel project is temporarily configured to use `npm install --legacy-peer-deps && npm --prefix server install` so the Preview build can proceed while lockfiles are reconciled. This is a workaround, not a reproducible frozen install. Regenerate and commit both lockfiles with the intended npm version, verify clean `npm ci` commands, then restore the frozen install command.
 
 ```sh
 npm ci --legacy-peer-deps
