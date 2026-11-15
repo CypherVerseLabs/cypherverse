@@ -14,6 +14,10 @@ import {
   getParcelsByOwnerId,
 } from "../stores/parcelStore.js";
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const router = Router();
 
 // =========================================================
@@ -259,7 +263,7 @@ router.get(
   ) => {
     try {
       const parcelId =
-        req.params.id;
+        singleRouteParam(req.params.id);
 
       if (!parcelId) {
         return res.status(400).json({
