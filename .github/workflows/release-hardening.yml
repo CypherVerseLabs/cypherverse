@@ -84,6 +84,7 @@ jobs:
         run: npm run build:server
 
       - name: Commit tested Next.js dependency update
+        if: github.event_name == 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
