@@ -18,6 +18,10 @@ import {
 
 
 
+function singleRouteParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const router = Router();
 
 
@@ -56,7 +60,7 @@ router.post(
     res: Response
   ) => {
     const parcelId =
-      req.params.id;
+      singleRouteParam(req.params.id);
 
     const userId =
       req.user?.id;
@@ -151,7 +155,7 @@ router.post(
     res: Response
   ) => {
     const parcelId =
-      req.params.id;
+      singleRouteParam(req.params.id);
 
     const sellerId =
       req.user?.id;
@@ -316,7 +320,7 @@ router.post(
     res: Response
   ) => {
     const parcelId =
-      req.params.id;
+      singleRouteParam(req.params.id);
 
     const userId =
       req.user?.id;
