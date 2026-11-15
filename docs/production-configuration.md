@@ -20,7 +20,7 @@ The repository contains both Next API handlers and Express AI routes. The Next A
 
 ## Environment variables
 
-Never commit real values. Supply secrets through the chosen hosting provider's secret manager. The root `.env.example` contains blank placeholders only.
+Never commit real values. Supply secrets through the chosen hosting provider's secret manager. The root `.env.example` contains safe local-development defaults and blank secret placeholders; it is not a Production configuration file.
 
 | Variable | Purpose |
 | --- | --- |
@@ -42,7 +42,7 @@ Never commit real values. Supply secrets through the chosen hosting provider's s
 | `ENABLE_TEST_PAYMENT_SIMULATION` | Explicit opt-in for simulated payment routes; must be `false`/unset in Production |
 | `MARKETPLACE_SYSTEM_SELLER_EMAIL` | Email of the existing User row used as the system seller in Production |
 
-The current Express startup imports R2 and AI service modules, which validate their required configuration during module initialization. Configure R2 and OpenAI values before starting the API. The AI credential must also be available to the Next.js server runtime for the retained Next API handlers.
+The Express startup imports R2 and AI service modules, which validate required configuration during module initialization. Configure R2 and OpenAI values before starting the API. The Next.js `/api/ai/scene` handler also imports the OpenAI-backed service, so its Vercel runtime needs `OPENAI_API_KEY` when that handler is deployed. The `/api/ai/starter` handler uses Ollama; its `OLLAMA_URL` must be reachable from the Next.js runtime, not a localhost address on a separate host.
 
 ## Marketplace payment safety
 
