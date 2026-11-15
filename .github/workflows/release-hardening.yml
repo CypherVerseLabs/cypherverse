@@ -6,7 +6,7 @@ on:
       - security-hardening/nextjs-patched-release-2026-11-15
   pull_request:
     branches:
-      - release-fix/production-readiness-2026-11-15
+      - security-hardening/nextjs-patched-release-2026-11-15
 
 jobs:
   validate:
@@ -42,6 +42,21 @@ jobs:
 
       - name: Install API dependencies from lockfile
         run: npm --prefix server ci
+
+      - name: Audit web dependencies
+        run: npm audit --json > root-audit.json || true
+
+      - name: Audit API dependencies
+        run: npm --prefix server audit --json > server-audit.json || true
+
+      - name: Upload dependency audit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-reports
+          path: |
+            root-audit.json
+            server-audit.json
+          if-no-files-found: error
 
       - name: Generate Prisma client
         run: npm run prisma:generate
