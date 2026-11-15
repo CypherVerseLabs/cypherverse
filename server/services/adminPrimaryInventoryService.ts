@@ -1,10 +1,10 @@
 import { Prisma, ParcelStatus, ParcelType } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
 import {
-  PRIMARY_MARKETPLACE_SELLER_EMAIL,
   PRIMARY_MIN_PRICE,
   PRIMARY_MAX_PRICE,
 } from "./marketplaceOrderService.js";
+import { getPrimaryMarketplaceSellerEmail } from "../config/marketplaceConfig.js";
 
 export class PrimaryInventoryError extends Error {
   public readonly code: string;
@@ -45,7 +45,7 @@ export async function activatePrimaryInventory(
   return prisma.$transaction(
     async (tx) => {
       const seller = await tx.user.findUnique({
-        where: { email: PRIMARY_MARKETPLACE_SELLER_EMAIL },
+        where: { email: getPrimaryMarketplaceSellerEmail() },
         select: { id: true },
       });
 
