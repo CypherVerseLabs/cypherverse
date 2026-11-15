@@ -65,14 +65,14 @@ Set environment variables in the hosting provider's secret/configuration interfa
 | `R2_SECRET_ACCESS_KEY` | Express object storage | Required secret credential. |
 | `R2_BUCKET_NAME` | Express object storage | Required bucket name. |
 | `R2_PUBLIC_URL` | Express object storage | Required public base URL for uploaded assets. |
-| `OPENAI_API_KEY` | AI server modules | Required by current AI service module; keep secret. |
+| `OPENAI_API_KEY` | Express AI service and Next.js `/api/ai/scene` runtime | Required by the imported scene-generation module; keep secret in both runtimes where that route is deployed. |
 | `OPENAI_MODEL` | AI server modules | Optional; defaults to `gpt-4o-mini`. |
-| `OLLAMA_URL` | Ollama service used by StarterAI | Defaults to `http://127.0.0.1:11434`; the service must be reachable when the StarterAI route is used. |
+| `OLLAMA_URL` | Next.js `/api/ai/starter` runtime | Defaults to `http://127.0.0.1:11434`. On Vercel, loopback refers to the function container, not the separate Express host or an external Ollama server. Production requires a reachable Ollama endpoint or a deliberately implemented API proxy. |
 | `OLLAMA_MODEL` | Ollama model used by StarterAI | Defaults to `qwen3:1.7b`; ensure that model is available to the configured Ollama service. |
 | `ENABLE_TEST_PAYMENT_SIMULATION` | Express marketplace | Default false. Exact string `true` enables only outside Production. Production is denied regardless. |
 | `MARKETPLACE_SYSTEM_SELLER_EMAIL` | Marketplace primary inventory seller | Production requires a valid, explicitly configured, non-`.test` email for an already-provisioned User. This setting does not create that User. |
 
-The R2 module validates its configuration at import time, and the OpenAI scene-generation service currently requires `OPENAI_API_KEY` at import time. StarterAI uses Ollama rather than OpenAI; it requires a reachable Ollama service and an available configured model when that feature is used. Configure these before enabling the related features.
+The R2 module validates its configuration at import time, and the OpenAI scene-generation service currently requires `OPENAI_API_KEY` at import time. The Next.js `/api/ai/scene` route imports that module, so the key must exist in the Vercel web runtime as well as any Express runtime that imports the service. StarterAI uses Ollama rather than OpenAI; its Next.js route requires an Ollama endpoint reachable from Vercel. A `127.0.0.1` or `localhost` default does not reach an Ollama process on CyberPanel or another host. Configure and test these independently before enabling the related features.
 
 ## Payment safety status
 
@@ -87,6 +87,19 @@ There is no verified real-money payment provider integration in this release sna
 ## Primary marketplace seller blocker
 
 Production marketplace primary-inventory fulfillment looks up the seller using `MARKETPLACE_SYSTEM_SELLER_EMAIL`. Production must set this to a real, already-existing User email that is not a `.test` identity. The application does not provision the User. Historical migration `20261030120000_add_marketplace_order_seller` also contains a TEST fallback identity for backfilling legacy rows; changing that historical migration is not part of release hardening. Before Production marketplace operation, an authorized operator must establish the intended system-seller account and confirm migrated order seller references. This guide performs no account or database changes.
+
+## Current security release gate
+
+The Preview build's dependency installation reported the following full-tree npm audit counts (including transitive and development dependencies):
+
+- Root web dependency tree: 2 critical, 10 high, 2 moderate.
+- Express dependency tree: 1 critical, 13 high, 2 moderate, 1 low.
+
+The root lockfile resolves **Next.js 12.3.7**. The Next.js maintainers published critical advisory **GHSA-2464-fhr4-w9xw / CVE-2026-96889** for unauthenticated remote code execution in the Image Optimization API; affected versions include Next.js 12.3.7. The advisory lists patched releases 15.5.28 and 16.4.1. This is a Production release blocker until the framework and related image-processing dependencies are upgraded to a patched, compatible release, or a maintainer-documented mitigation is verified against this application. Do not treat a successful Preview build as resolving this issue.
+
+The install log also reported lifecycle scripts not yet covered by npm's `allowScripts` policy, including `@prisma/engines`, `bcrypt`, and `esbuild` in the server tree. Review and explicitly approve only the scripts required by the application; do not bypass npm's policy with a blanket allow-all setting.
+
+A major Next.js upgrade is not included in this release-hardening branch. It requires a separate compatibility pass over the Pages Router API routes, React version, image usage, build output, and runtime behavior, followed by fresh tests and Preview deployment.
 
 ## Release checklist
 
