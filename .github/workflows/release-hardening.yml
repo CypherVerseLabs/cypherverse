@@ -46,6 +46,10 @@ jobs:
       - name: Install web dependencies from lockfile
         run: npm ci --legacy-peer-deps
 
+      - name: Reconcile API lockfile with security overrides
+        working-directory: server
+        run: npm install --package-lock-only --ignore-scripts
+
       - name: Install API dependencies from lockfile
         run: npm --prefix server ci
 
