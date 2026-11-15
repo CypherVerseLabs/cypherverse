@@ -40,8 +40,16 @@ export async function activatePrimaryInventoryController(
   req: AuthenticatedRequest,
   res: Response
 ) {
-  const parcelId = req.params.parcelId;
+  const rawParcelId = req.params.parcelId;
+  const parcelId = Array.isArray(rawParcelId) ? rawParcelId[0] : rawParcelId;
   const rawPrice = req.body?.price;
+
+  if (typeof parcelId !== "string" || parcelId.length === 0) {
+    return res.status(400).json({
+      error: "PARCEL_ID_REQUIRED",
+      message: "A parcel ID is required.",
+    });
+  }
 
   if (typeof rawPrice !== "string" && typeof rawPrice !== "number") {
     return res.status(400).json({
