@@ -54,6 +54,11 @@ jobs:
           npm audit fix --legacy-peer-deps
           npm --prefix server audit fix
 
+      - name: Inspect Three.js dependency resolution
+        run: |
+          npm ls three @types/three @react-three/drei cyengine typescript || true
+          node -e 'const t = require("three"); console.log("three runtime:", require.resolve("three"), "BufferGeometry:", typeof t.BufferGeometry); console.log("@types/three:", require.resolve("@types/three/package.json")); console.log("TypeScript:", require("typescript/package.json").version);'
+
       - name: Audit web dependencies
         run: npm audit --json > root-audit.json || true
 
