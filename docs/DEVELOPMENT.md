@@ -1,3 +1,7 @@
+> **Development guide status:** This guide describes the intended component and state-management practices. Exact paths and component ownership can change as the application evolves; inspect the current source before implementing a change. CypherVerse owns platform/data workflows, while CyEngine owns spatial runtime behavior. For the current Project–Parcel model and deployment boundaries, see [Technology](TECHNOLOGY.md), the [repository README](../README.md), and [Release and deployment](RELEASE_AND_DEPLOYMENT.md).
+
+---
+
 ````md
 # CypherVerse Development Guide
 
