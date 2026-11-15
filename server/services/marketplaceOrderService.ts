@@ -1,9 +1,9 @@
 import { Prisma, ParcelStatus, ParcelType, MarketplaceOrderStatus } from "../generated/prisma/client.js";
 import { prisma } from "../lib/prisma.js";
+import { getPrimaryMarketplaceSellerEmail } from "../config/marketplaceConfig.js";
 
 export const MARKETPLACE_OPERATION = { CREATE_PARCEL_ORDER: "CREATE_PARCEL_ORDER" } as const;
 export const MARKETPLACE_CURRENCY = "USD";
-export const PRIMARY_MARKETPLACE_SELLER_EMAIL = "marketplace@cypherverse.test";
 export const PRIMARY_MIN_PRICE = new Prisma.Decimal("20.00");
 export const PRIMARY_MAX_PRICE = new Prisma.Decimal("50.00");
 
@@ -30,7 +30,8 @@ async function getExistingIdempotentOrder(userId: string, operation: string, key
 }
 
 async function getPrimarySeller(tx: Prisma.TransactionClient) {
-  const seller = await tx.user.findUnique({ where: { email: PRIMARY_MARKETPLACE_SELLER_EMAIL }, select: { id: true } });
+  const sellerEmail = getPrimaryMarketplaceSellerEmail();
+  const seller = await tx.user.findUnique({ where: { email: sellerEmail }, select: { id: true } });
   if (!seller) throw new MarketplaceError("PRIMARY_MARKETPLACE_SELLER_NOT_CONFIGURED", "The primary marketplace seller identity is not configured.");
   return seller.id;
 }
