@@ -1,3 +1,7 @@
+> **API reference status:** This is a detailed application API reference, but it is a point-in-time document. Treat the checked-in Express and Next.js route implementations as authoritative when details differ. The current runtime split and release gates are summarized in [Technology](TECHNOLOGY.md) and [Release and deployment](RELEASE_AND_DEPLOYMENT.md).
+
+---
+
 # CypherVerse Application API
 
 `docs/CYPHERVERSE-API.md`
