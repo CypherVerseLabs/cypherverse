@@ -3,10 +3,10 @@ name: Release validation
 on:
   push:
     branches:
-      - release-hardening/2026-11-13
+      - security-hardening/nextjs-patched-release-2026-11-15
   pull_request:
     branches:
-      - production-release/2026-11-13
+      - release-fix/production-readiness-2026-11-15
 
 jobs:
   validate:
