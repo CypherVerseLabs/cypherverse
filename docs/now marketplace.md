@@ -1,3 +1,9 @@
+> **Implementation snapshot — verify against current source**
+>
+> This file describes a marketplace milestone at the time it was written. It is useful as a testing/handoff record, but its route names, service file paths, and feature-status statements may have changed. The current checked-in Express routes and services are authoritative. Current marketplace scope is parcel-focused; the payment service in this release uses TEST payment records and the CYPH ledger path, not a verified external real-money provider. See [Technology](TECHNOLOGY.md) and [Release and deployment](RELEASE_AND_DEPLOYMENT.md).
+
+---
+
 Cypherverse Marketplace
 Overview
 The Cypherverse marketplace provides authenticated parcel marketplace operations.
