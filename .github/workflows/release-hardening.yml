@@ -57,7 +57,7 @@ jobs:
         run: |
           npm audit fix --legacy-peer-deps
           npm update --package-lock-only --ignore-scripts
-          npm ci --ignore-scripts
+          npm ci
 
       - name: Sync server Yarn lockfile with audited npm lock
         working-directory: server
