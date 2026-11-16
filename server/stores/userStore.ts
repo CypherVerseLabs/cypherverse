@@ -162,13 +162,23 @@ export async function createWalletUser(
     return toUser(existing);
   }
 
-  const user =
-    await prisma.user.create({
-      data: {
-        address: normalizedAddress,
-      },
-      select: userSelect,
-    });
+  await prisma.user.createMany({
+    data: {
+      address: normalizedAddress,
+    },
+    skipDuplicates: true,
+  });
+
+  const user = await prisma.user.findUnique({
+    where: {
+      address: normalizedAddress,
+    },
+    select: userSelect,
+  });
+
+  if (!user) {
+    throw new Error("Unable to load wallet user after creation.");
+  }
 
   return toUser(user);
 }
@@ -290,14 +300,24 @@ export async function createEmailUser(
     return toUser(existing);
   }
 
-  const user =
-    await prisma.user.create({
-      data: {
-        email: normalizedEmail,
-        passwordHash,
-      },
-      select: userSelect,
-    });
+  await prisma.user.createMany({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+    },
+    skipDuplicates: true,
+  });
+
+  const user = await prisma.user.findUnique({
+    where: {
+      email: normalizedEmail,
+    },
+    select: userSelect,
+  });
+
+  if (!user) {
+    throw new Error("Unable to load email user after creation.");
+  }
 
   return toUser(user);
 }
