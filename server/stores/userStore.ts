@@ -12,6 +12,16 @@ import { prisma } from "../lib/prisma.js";
  * to the rest of the application.
  */
 
+const userSelect = {
+  id: true,
+  address: true,
+  email: true,
+  passwordHash: true,
+  username: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 export interface User {
   id: string;
 
@@ -86,6 +96,7 @@ export async function getUserById(
       where: {
         id,
       },
+      select: userSelect,
     });
 
   if (!user) {
@@ -116,6 +127,7 @@ export async function getUserByAddress(
       where: {
         address: normalizedAddress,
       },
+      select: userSelect,
     });
 
   if (!user) {
@@ -143,6 +155,7 @@ export async function createWalletUser(
       where: {
         address: normalizedAddress,
       },
+      select: userSelect,
     });
 
   if (existing) {
@@ -154,6 +167,7 @@ export async function createWalletUser(
       data: {
         address: normalizedAddress,
       },
+      select: userSelect,
     });
 
   return toUser(user);
@@ -175,6 +189,7 @@ export async function updateUserByAddress(
       where: {
         address: normalizedAddress,
       },
+      select: userSelect,
     });
 
   if (!existing) {
@@ -186,6 +201,7 @@ export async function updateUserByAddress(
       where: {
         id: existing.id,
       },
+      select: userSelect,
 
       data: {
         ...(updates.email !== undefined
@@ -241,6 +257,7 @@ export async function getUserByEmail(
       where: {
         email: normalizedEmail,
       },
+      select: userSelect,
     });
 
   if (!user) {
@@ -266,6 +283,7 @@ export async function createEmailUser(
       where: {
         email: normalizedEmail,
       },
+      select: userSelect,
     });
 
   if (existing) {
@@ -278,6 +296,7 @@ export async function createEmailUser(
         email: normalizedEmail,
         passwordHash,
       },
+      select: userSelect,
     });
 
   return toUser(user);
@@ -299,6 +318,7 @@ export async function updateUserByEmail(
       where: {
         email: normalizedEmail,
       },
+      select: userSelect,
     });
 
   if (!existing) {
@@ -310,6 +330,7 @@ export async function updateUserByEmail(
       where: {
         id: existing.id,
       },
+      select: userSelect,
 
       data: {
         ...(updates.email !== undefined
@@ -359,6 +380,7 @@ export async function updateUserById(
       where: {
         id,
       },
+      select: userSelect,
     });
 
   if (!existing) {
@@ -370,6 +392,7 @@ export async function updateUserById(
       where: {
         id,
       },
+      select: userSelect,
 
       data: {
         ...(updates.email !== undefined
