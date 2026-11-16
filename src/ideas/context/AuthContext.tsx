@@ -807,7 +807,8 @@ export function AuthProvider({
 
         if (!response.ok) {
           throw new Error(
-            data?.message ||
+            data?.error ||
+              data?.message ||
               "Login failed."
           );
         }
