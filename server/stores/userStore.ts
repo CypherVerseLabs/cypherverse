@@ -300,24 +300,17 @@ export async function createEmailUser(
     return toUser(existing);
   }
 
-  await prisma.user.createMany({
+  // Use an explicit select so Prisma does not request columns
+  // that are absent from the production User table (such as role).
+  // A concurrent registration for the same email must fail on the
+  // unique constraint rather than returning the other request's user.
+  const user = await prisma.user.create({
     data: {
       email: normalizedEmail,
       passwordHash,
     },
-    skipDuplicates: true,
-  });
-
-  const user = await prisma.user.findUnique({
-    where: {
-      email: normalizedEmail,
-    },
     select: userSelect,
   });
-
-  if (!user) {
-    throw new Error("Unable to load email user after creation.");
-  }
 
   return toUser(user);
 }
