@@ -2488,9 +2488,9 @@ split2@^4.1.0:
   integrity sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==
 
 sql-escaper@^1.5.1:
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/sql-escaper/-/sql-escaper-1.6.0.tgz#1eca367fd316bd144883811072915fb4be58c2a0"
-  integrity sha512-I+WA4xb3mprpxUbLFtraZRY8L4vI0+xEOPLxHSI4wOuZ8cSpjVBzeuQpnPjW6PfdjeSkD9n/IBoYzH0LGTVSoQ==
+  version "1.7.0"
+  resolved "https://registry.yarnpkg.com/sql-escaper/-/sql-escaper-1.7.0.tgz#cd732e93732050ab30c550775f6884b9ee22a10c"
+  integrity sha512-ZgP6E9SPnhrhWXxd8+nLKPot3Euzyo3Rpxe6EFAYz2Ffaq9Xg2SH+6d4yJi7vsQDHaQlhzQ1phAopgE6+a1UCQ==
 
 statuses@^2.0.1, statuses@^2.0.2, statuses@~2.0.2:
   version "2.0.2"
