@@ -32,6 +32,7 @@ function createAuthenticatedResponse(
     address?: string | null;
     email?: string | null;
     username?: string | null;
+    role: "USER" | "ADMIN";
     createdAt: Date | string;
     updatedAt?: Date | string | null;
   }
@@ -90,6 +91,9 @@ function createAuthenticatedResponse(
 
       username:
         user.username,
+
+      role:
+        user.role,
 
       createdAt:
         user.createdAt,

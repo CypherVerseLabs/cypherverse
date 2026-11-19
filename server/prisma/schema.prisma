@@ -13,6 +13,7 @@ model User {
   email                      String?                     @unique
   passwordHash               String?
   username                   String?
+  role                       UserRole                    @default(USER)
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
   cyphWallet                 CyphWallet?
@@ -389,6 +390,11 @@ model CyphTransfer {
   @@index([fromWalletId])
   @@index([toWalletId])
   @@index([createdAt])
+}
+
+enum UserRole {
+  USER
+  ADMIN
 }
 
 enum ProjectTemplate {

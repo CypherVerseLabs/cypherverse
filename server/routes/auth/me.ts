@@ -132,6 +132,9 @@ router.get(
           username:
             user.username,
 
+          role:
+            user.role,
+
           createdAt:
             user.createdAt,
 

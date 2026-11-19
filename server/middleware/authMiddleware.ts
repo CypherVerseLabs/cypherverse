@@ -10,6 +10,10 @@ import {
   verifyAuthToken,
 } from "../utils/auth.js";
 
+import {
+  getUserById,
+} from "../stores/userStore.js";
+
 /*
  * =========================================================
  * AUTHENTICATED REQUEST
@@ -166,6 +170,51 @@ export function authenticateToken(
     return res.status(401).json({
       error:
         "Invalid or expired access token",
+    });
+  }
+}
+
+/*
+ * =========================================================
+ * REQUIRE ADMIN ROLE
+ * =========================================================
+ *
+ * Always read the role from the database rather than trusting
+ * a JWT claim, so role changes take effect without waiting
+ * for an access token to expire.
+ */
+export async function requireAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  if (!req.user?.id) {
+    return res.status(401).json({
+      error: "Unauthorized",
+    });
+  }
+
+  try {
+    const user = await getUserById(req.user.id);
+
+    if (!user) {
+      return res.status(401).json({
+        error: "User account not found",
+      });
+    }
+
+    if (user.role !== "ADMIN") {
+      return res.status(403).json({
+        error: "Administrator access required",
+      });
+    }
+
+    return next();
+  } catch (error) {
+    console.error("Admin authorization error:", error);
+
+    return res.status(500).json({
+      error: "Unable to verify administrator access",
     });
   }
 }
