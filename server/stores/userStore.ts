@@ -25,6 +25,9 @@ export interface User {
   // Profile
   username?: string;
 
+  // Authorization role
+  role: "USER" | "ADMIN";
+
   // Timestamps
   createdAt: string;
   updatedAt: string;
@@ -42,6 +45,7 @@ function toUser(user: {
   email: string | null;
   passwordHash: string | null;
   username: string | null;
+  role: "USER" | "ADMIN";
   createdAt: Date;
   updatedAt: Date;
 }): User {
@@ -63,6 +67,8 @@ function toUser(user: {
     ...(user.username
       ? { username: user.username }
       : {}),
+
+    role: user.role,
 
     createdAt:
       user.createdAt.toISOString(),
