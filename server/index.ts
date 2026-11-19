@@ -399,6 +399,7 @@ app.get(
           address: user.address,
           email: user.email,
           username: user.username,
+          role: user.role,
           createdAt:
             user.createdAt,
           updatedAt:
@@ -561,6 +562,8 @@ app.post(
             updatedUser.email,
           username:
             updatedUser.username,
+          role:
+            updatedUser.role,
           createdAt:
             updatedUser.createdAt,
           updatedAt:
