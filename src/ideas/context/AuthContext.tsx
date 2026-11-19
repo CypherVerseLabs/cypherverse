@@ -48,6 +48,8 @@ export interface User {
 
   username?: string;
 
+  role: "USER" | "ADMIN";
+
   createdAt: string;
 
   updatedAt?: string;
