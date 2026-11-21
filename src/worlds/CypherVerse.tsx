@@ -45,6 +45,8 @@ import {
 import type { CyphPaymentQuote } from "../marketplace/types";
 import { useAuthContext } from "../ideas/context/AuthContext";
 import LandmarkLayer from "./LandmarkLayer";
+import CypherVerseMapLayer from "./CypherVerseMapLayer";
+import { CITY_CENTER } from "../parcels/parcelCoordinates";
 import { Html } from "@react-three/drei";
 
 
@@ -84,11 +86,19 @@ interface WorldBounds {
  * Change these values as the playable world expands.
  */
 
+const CHUNK_SIZE = 512;
+
+const INITIAL_WORLD_MIN =
+  CITY_CENTER - CHUNK_SIZE / 2;
+
+const INITIAL_WORLD_MAX =
+  CITY_CENTER + CHUNK_SIZE / 2;
+
 const WORLD_BOUNDS: WorldBounds = {
-  minX: 0,
-  maxX: 2384,
-  minY: 0,
-  maxY: 2384,
+  minX: INITIAL_WORLD_MIN,
+  maxX: INITIAL_WORLD_MAX,
+  minY: INITIAL_WORLD_MIN,
+  maxY: INITIAL_WORLD_MAX,
 };
 
 /**
@@ -163,6 +173,7 @@ export default function CypherVerse() {
     loading,
     error,
     refresh,
+    loadChunk,
   } = useParcels({
     enabled: true,
 
@@ -177,6 +188,9 @@ export default function CypherVerse() {
 
     maxY:
       worldBounds.maxY,
+
+    chunkSize:
+      CHUNK_SIZE,
   });
 
 
@@ -903,6 +917,20 @@ useEffect(() => {
   actionError={
     actionError
   }
+
+  onRequestBounds={({
+    minX,
+    maxX,
+    minY,
+    maxY,
+  }) => {
+    void loadChunk(
+      minX,
+      maxX,
+      minY,
+      maxY
+    );
+  }}
 />
 
 <ParcelLayer
@@ -958,7 +986,23 @@ useEffect(() => {
   actionError={
     actionError
   }
+
+  onRequestBounds={({
+    minX,
+    maxX,
+    minY,
+    maxY,
+  }) => {
+    void loadChunk(
+      minX,
+      maxX,
+      minY,
+      maxY
+    );
+  }}
 />
+
+<CypherVerseMapLayer showLabels={true} />
 
 <LandmarkLayer
   parcels={parcels}
