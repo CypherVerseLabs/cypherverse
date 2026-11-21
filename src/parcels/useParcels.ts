@@ -329,12 +329,11 @@ export function useParcels(
           /**
            * Only remove this request's bookkeeping.
            */
-          loadingChunksRef.current.delete(chunkKey);
-
           if (
             controllersRef.current.get(chunkKey) ===
             controller
           ) {
+            loadingChunksRef.current.delete(chunkKey);
             controllersRef.current.delete(chunkKey);
           }
 
