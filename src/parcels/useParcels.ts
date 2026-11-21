@@ -166,6 +166,10 @@ export function useParcels(
         return;
       }
 
+      const previouslyLoadedChunks = Array.from(
+        loadedChunksRef.current.values()
+      );
+
       /**
        * Normalize bounds.
        */
@@ -391,13 +395,8 @@ export function useParcels(
       loadingChunksRef.current.clear();
       loadedChunksRef.current.clear();
 
-      setParcels([]);
       setError(null);
       setLoading(false);
-
-      const previouslyLoadedChunks = Array.from(
-        loadedChunksRef.current.values()
-      );
 
       loadedChunksRef.current.clear();
 
