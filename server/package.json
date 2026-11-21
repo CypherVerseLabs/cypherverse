@@ -36,12 +36,12 @@
     "typescript": "^5.8.3"
   },
   "scripts": {
-  "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
-  "frontend": "next dev -p 3000",
-  "dev": "concurrently \"yarn server\" \"yarn frontend\"",
-  "build": "tsc --noEmit",
-  "migrate:estate1": "tsx prisma/migrateEstate1.ts"
-}
-
-
+    "server": "nodemon --watch . --ext ts --exec tsx ./index.ts",
+    "frontend": "next dev -p 3000",
+    "dev": "concurrently \"yarn server\" \"yarn frontend\"",
+    "build": "tsc --noEmit",
+    "migrate:estate1": "tsx prisma/migrateEstate1.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma"
+  }
 }
