@@ -1,22 +1,45 @@
-import {
-  useMemo,
-} from "react";
+import { useMemo } from "react";
+
+import { Text } from "@react-three/drei";
+
+import type { Parcel } from "../parcels/types";
 
 import {
-  Text,
-} from "@react-three/drei";
-
-import type {
-  Parcel,
-} from "../parcels/types";
-
-import {
-  parcelToWorldPosition,
+  landmarkToWorldPosition,
+  worldPositionToDatabaseCoordinates,
 } from "../parcels/parcelCoordinates";
 
-import {
-  CITY_LANDMARKS,
-} from "./CityLandmarks";
+import { CITY_LANDMARKS } from "./CityLandmarks";
+
+/**
+ * =========================================================
+ * LANDMARK LAYER
+ * =========================================================
+ *
+ * Displays the configured CypherVerse landmarks.
+ *
+ * Landmark coordinates are offsets from Genesis.
+ *
+ * Genesis:
+ *
+ *     Three.js (0, 0)
+ *
+ * Database Genesis/world center:
+ *
+ *     (2400, 2400)
+ *
+ * Landmark positions are visual overlays only.
+ *
+ * They do not:
+ *
+ * - create database parcels
+ * - modify parcel coordinates
+ * - reserve land
+ * - purchase land
+ * - change ownership
+ * - execute marketplace actions
+ * =========================================================
+ */
 
 interface LandmarkLayerProps {
   parcels: Parcel[];
@@ -26,144 +49,90 @@ interface LandmarkLayerProps {
   origin?: [
     number,
     number,
-    number
+    number,
   ];
 }
 
-/**
- * =========================================================
- * LANDMARK LAYER
- * =========================================================
- *
- * Renders the major named locations of CypherVerse.
- *
- * Landmarks are NOT separate parcels.
- *
- * Instead, each landmark points at an existing parcel
- * using its x/y coordinate.
- *
- * This means the backend remains authoritative for:
- *
- *   - estate ID
- *   - ownership
- *   - parcel status
- *   - project
- *
- * =========================================================
- */
-
 export default function LandmarkLayer({
-  parcels,
-  tileSize = 16,
+  parcels = [],
+  tileSize: _tileSize = 16,
   origin = [0, 0, 0],
 }: LandmarkLayerProps) {
-
-  /**
-   * =======================================================
-   * RESOLVE LANDMARK PARCELS
-   * =======================================================
-   */
-
   const resolvedLandmarks =
     useMemo(() => {
-
       return CITY_LANDMARKS.map(
         (landmark) => {
+          const [
+            worldX,
+            ,
+            worldZ,
+          ] =
+            landmarkToWorldPosition(
+              landmark.x,
+              landmark.y,
+              origin,
+            );
+
+          const database =
+            worldPositionToDatabaseCoordinates(
+              worldX,
+              worldZ,
+            );
 
           const parcel =
             parcels.find(
               (candidate) =>
                 candidate.x ===
-                  landmark.x &&
+                  database.x &&
                 candidate.y ===
-                  landmark.y
-            );
+                  database.y,
+            ) ?? null;
 
           return {
             landmark,
             parcel,
+            worldX,
+            worldZ,
           };
-        }
+        },
       );
-
-    }, [
-      parcels,
-    ]);
-
-
-  /**
-   * =======================================================
-   * RENDER
-   * =======================================================
-   */
+    }, [parcels, origin]);
 
   return (
     <group
       name="city-landmarks"
     >
-
       {resolvedLandmarks.map(
         ({
           landmark,
           parcel,
+          worldX,
+          worldZ,
         }) => {
-
-          /**
-           * Genesis is the central landmark and receives
-           * the larger beacon treatment.
-           */
-
           const isGenesis =
             landmark.estateId ===
             "landmark-genesis";
 
-          /**
-           * The landmark can still be positioned even
-           * when its parcel hasn't been loaded yet.
-           */
-
-          const position =
-            parcelToWorldPosition(
-              landmark.x,
-              landmark.y,
-              tileSize,
-              origin
-            );
-
-          const [
-            worldX,
-            worldY,
-            worldZ,
-          ] = position;
-
           const height =
-            isGenesis
-              ? 10
-              : 6;
-
+            isGenesis ? 10 : 6;
 
           return (
             <group
-              key={`${landmark.x}-${landmark.y}-${landmark.name}`}
+              key={landmark.estateId}
               position={[
                 worldX,
-                worldY,
+                origin[1],
                 worldZ,
               ]}
             >
-
-              {/* =================================================
-                  LANDMARK BASE
-                  ================================================= */}
-
               <mesh
                 position={[
                   0,
                   0.35,
                   0,
                 ]}
+                raycast={() => null}
               >
-
                 <cylinderGeometry
                   args={[
                     2.5,
@@ -179,22 +148,14 @@ export default function LandmarkLayer({
                       ? "#ffd166"
                       : "#38bdf8"
                   }
-
                   emissive={
                     isGenesis
                       ? "#ff9f1c"
                       : "#0369a1"
                   }
-
                   emissiveIntensity={1.5}
                 />
-
               </mesh>
-
-
-              {/* =================================================
-                  LANDMARK BEACON
-                  ================================================= */}
 
               <mesh
                 position={[
@@ -202,8 +163,8 @@ export default function LandmarkLayer({
                   height / 2,
                   0,
                 ]}
+                raycast={() => null}
               >
-
                 <cylinderGeometry
                   args={[
                     0.35,
@@ -219,22 +180,14 @@ export default function LandmarkLayer({
                       ? "#fff3b0"
                       : "#7dd3fc"
                   }
-
                   emissive={
                     isGenesis
                       ? "#f59e0b"
                       : "#0ea5e9"
                   }
-
                   emissiveIntensity={2}
                 />
-
               </mesh>
-
-
-              {/* =================================================
-                  LANDMARK LIGHT
-                  ================================================= */}
 
               <pointLight
                 position={[
@@ -254,11 +207,6 @@ export default function LandmarkLayer({
                 }
                 distance={40}
               />
-
-
-              {/* =================================================
-                  LANDMARK NAME
-                  ================================================= */}
 
               <Text
                 position={[
@@ -281,11 +229,6 @@ export default function LandmarkLayer({
                 {landmark.name}
               </Text>
 
-
-              {/* =================================================
-                  DEBUG / PARCEL CONNECTION
-                  ================================================= */}
-
               {parcel && (
                 <Text
                   position={[
@@ -302,13 +245,10 @@ export default function LandmarkLayer({
                   {`Parcel ${parcel.id}`}
                 </Text>
               )}
-
             </group>
           );
-        }
+        },
       )}
-
     </group>
   );
 }
-
