@@ -17,7 +17,11 @@ import type {
 } from "./types";
 
 import {
+  PARCEL_SIZE,
+  WORLD_MIN,
+  WORLD_MAX,
   parcelToWorldPosition,
+  worldPositionToDatabaseCoordinates,
 } from "./parcelCoordinates";
 
 import ParcelTile from "./ParcelTile";
@@ -26,6 +30,16 @@ import ParcelPanel from "./ParcelPanel";
 const DEFAULT_RENDER_DISTANCE = 256;
 
 const CAMERA_UPDATE_INTERVAL = 150;
+const LOAD_CHUNK_SIZE = 512;
+
+interface ExtendedParcelLayerProps extends ParcelLayerProps {
+  onRequestBounds?: (bounds: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  }) => void;
+}
 
 export default function ParcelLayer({
   parcels = [],
@@ -44,7 +58,8 @@ export default function ParcelLayer({
   actionParcelId,
   actionType,
   actionError,
-}: ParcelLayerProps) {
+  onRequestBounds,
+}: ExtendedParcelLayerProps) {
 
   const camera =
     useThree(
@@ -92,6 +107,37 @@ export default function ParcelLayer({
   const lastCameraUpdate =
     useRef(0);
 
+  const requestedChunksRef = useRef<Set<string>>(
+    new Set()
+  );
+
+  const requestChunk = useCallback(
+    (chunkX: number, chunkY: number) => {
+      if (!onRequestBounds) return;
+
+      const minX = Math.floor(chunkX / LOAD_CHUNK_SIZE) * LOAD_CHUNK_SIZE;
+      const minY = Math.floor(chunkY / LOAD_CHUNK_SIZE) * LOAD_CHUNK_SIZE;
+      const maxX = minX + LOAD_CHUNK_SIZE;
+      const maxY = minY + LOAD_CHUNK_SIZE;
+
+      if (
+        maxX <= WORLD_MIN ||
+        maxY <= WORLD_MIN ||
+        minX > WORLD_MAX ||
+        minY > WORLD_MAX
+      ) {
+        return;
+      }
+
+      const key = [minX, maxX, minY, maxY].join(":");
+      if (requestedChunksRef.current.has(key)) return;
+
+      requestedChunksRef.current.add(key);
+      onRequestBounds({ minX, maxX, minY, maxY });
+    },
+    [onRequestBounds]
+  );
+
 
   /**
    * =======================================================
@@ -101,120 +147,94 @@ export default function ParcelLayer({
 
   const calculateNearby =
     useCallback(() => {
+      const cameraX = camera.position.x;
+      const cameraZ = camera.position.z;
 
-      if (
-        parcels.length === 0
-      ) {
-        setNearbyParcels([]);
-        return;
-      }
+      const databasePosition =
+        worldPositionToDatabaseCoordinates(
+          cameraX - origin[0],
+          cameraZ - origin[2]
+        );
 
-      const cameraX =
-        camera.position.x;
+      const distance = DEFAULT_RENDER_DISTANCE;
+      const minWorldX = cameraX - distance;
+      const maxWorldX = cameraX + distance;
+      const minWorldZ = cameraZ - distance;
+      const maxWorldZ = cameraZ + distance;
 
-      const cameraZ =
-        camera.position.z;
+      const minDatabase =
+        worldPositionToDatabaseCoordinates(
+          minWorldX - origin[0],
+          minWorldZ - origin[2]
+        );
 
-      const distance =
-        DEFAULT_RENDER_DISTANCE;
+      const maxDatabase =
+        worldPositionToDatabaseCoordinates(
+          maxWorldX - origin[0],
+          maxWorldZ - origin[2]
+        );
 
-      const minWorldX =
-        cameraX - distance;
-
-      const maxWorldX =
-        cameraX + distance;
-
-      const minWorldZ =
-        cameraZ - distance;
-
-      const maxWorldZ =
-        cameraZ + distance;
-
-      const minParcelX =
-        Math.floor(
-          (minWorldX -
-            origin[0]) /
-            tileSize
-        ) *
-        tileSize;
-
-      const maxParcelX =
-        Math.ceil(
-          (maxWorldX -
-            origin[0]) /
-            tileSize
-        ) *
-        tileSize;
-
-      const minParcelY =
-        Math.floor(
-          (minWorldZ -
-            origin[2]) /
-            tileSize
-        ) *
-        tileSize;
-
-      const maxParcelY =
-        Math.ceil(
-          (maxWorldZ -
-            origin[2]) /
-            tileSize
-        ) *
-        tileSize;
+      const minParcelX = Math.max(
+        WORLD_MIN,
+        Math.floor(minDatabase.x / PARCEL_SIZE) * PARCEL_SIZE
+      );
+      const maxParcelX = Math.min(
+        WORLD_MAX,
+        Math.ceil(maxDatabase.x / PARCEL_SIZE) * PARCEL_SIZE
+      );
+      const minParcelY = Math.max(
+        WORLD_MIN,
+        Math.floor(minDatabase.y / PARCEL_SIZE) * PARCEL_SIZE
+      );
+      const maxParcelY = Math.min(
+        WORLD_MAX,
+        Math.ceil(maxDatabase.y / PARCEL_SIZE) * PARCEL_SIZE
+      );
 
       const visibleParcels =
         parcels.filter(
           (parcel) =>
-            parcel.x >=
-              minParcelX &&
-            parcel.x <=
-              maxParcelX &&
-            parcel.y >=
-              minParcelY &&
-            parcel.y <=
-              maxParcelY
+            parcel.x >= minParcelX &&
+            parcel.x <= maxParcelX &&
+            parcel.y >= minParcelY &&
+            parcel.y <= maxParcelY
         );
 
-      /**
-       * Keep the selected parcel rendered even when
-       * the player is far away from it.
-       */
-
-      if (
-        activeSelectedId
-      ) {
-
-        const selected =
-          parcels.find(
-            (parcel) =>
-              parcel.id ===
-              activeSelectedId
-          );
+      if (activeSelectedId) {
+        const selected = parcels.find(
+          (parcel) => parcel.id === activeSelectedId
+        );
 
         if (
           selected &&
-          !visibleParcels.some(
-            (parcel) =>
-              parcel.id ===
-              selected.id
-          )
+          !visibleParcels.some((parcel) => parcel.id === selected.id)
         ) {
-          visibleParcels.push(
-            selected
-          );
+          visibleParcels.push(selected);
         }
       }
 
-      setNearbyParcels(
-        visibleParcels
-      );
+      setNearbyParcels(visibleParcels);
 
+      const chunkX =
+        Math.floor(databasePosition.x / LOAD_CHUNK_SIZE) * LOAD_CHUNK_SIZE;
+      const chunkY =
+        Math.floor(databasePosition.y / LOAD_CHUNK_SIZE) * LOAD_CHUNK_SIZE;
+
+      requestChunk(chunkX, chunkY);
+      requestChunk(chunkX - LOAD_CHUNK_SIZE, chunkY);
+      requestChunk(chunkX + LOAD_CHUNK_SIZE, chunkY);
+      requestChunk(chunkX, chunkY - LOAD_CHUNK_SIZE);
+      requestChunk(chunkX, chunkY + LOAD_CHUNK_SIZE);
+      requestChunk(chunkX - LOAD_CHUNK_SIZE, chunkY - LOAD_CHUNK_SIZE);
+      requestChunk(chunkX + LOAD_CHUNK_SIZE, chunkY - LOAD_CHUNK_SIZE);
+      requestChunk(chunkX - LOAD_CHUNK_SIZE, chunkY + LOAD_CHUNK_SIZE);
+      requestChunk(chunkX + LOAD_CHUNK_SIZE, chunkY + LOAD_CHUNK_SIZE);
     }, [
       parcels,
       camera,
-      tileSize,
       origin,
       activeSelectedId,
+      requestChunk,
     ]);
 
 
