@@ -93,6 +93,15 @@ export function useParcels(
     }>
   >(new Map());
 
+  const requestedChunksRef = useRef<
+    Map<string, {
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+    }>
+  >(new Map());
+
   /**
    * Requests currently in progress.
    *
@@ -200,6 +209,13 @@ export function useParcels(
         normalizedMinY,
         normalizedMaxY,
       ].join(":");
+
+      requestedChunksRef.current.set(chunkKey, {
+        minX: normalizedMinX,
+        maxX: normalizedMaxX,
+        minY: normalizedMinY,
+        maxY: normalizedMaxY,
+      });
 
       /**
        * Do not reload a successfully loaded chunk.
@@ -378,7 +394,7 @@ export function useParcels(
       }
 
       const previouslyLoadedChunks = Array.from(
-        loadedChunksRef.current.values()
+        requestedChunksRef.current.values()
       );
 
       generationRef.current += 1;
@@ -454,6 +470,7 @@ export function useParcels(
       controllersRef.current.clear();
       loadingChunksRef.current.clear();
       loadedChunksRef.current.clear();
+      requestedChunksRef.current.clear();
     };
   }, [
     enabled,
