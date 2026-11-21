@@ -29,11 +29,11 @@ const router = Router();
 // Optional query parameters:
 //
 //   ?minX=0
-//   ?maxX=2384
+//   ?maxX=4784
 //   ?minY=0
-//   ?maxY=2384
+//   ?maxY=4784
 //
-// The world can contain 22,500 parcels.
+// The world can contain 90,000 parcels.
 //
 // This endpoint intentionally returns lightweight parcel
 // data. Detailed owner/listing/project information should
