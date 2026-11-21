@@ -83,10 +83,10 @@ interface WorldBounds {
 const CHUNK_SIZE = 512;
 
 const INITIAL_WORLD_MIN =
-  CITY_CENTER - CHUNK_SIZE / 2;
+  Math.floor(CITY_CENTER / CHUNK_SIZE) * CHUNK_SIZE;
 
 const INITIAL_WORLD_MAX =
-  CITY_CENTER + CHUNK_SIZE / 2;
+  INITIAL_WORLD_MIN + CHUNK_SIZE;
 
 const WORLD_BOUNDS: WorldBounds = {
   minX: INITIAL_WORLD_MIN,
