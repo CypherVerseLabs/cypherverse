@@ -33,7 +33,10 @@
     "eslint": "eslint --fix 'src/**/*.{js,jsx,ts,tsx}'",
     "prettier": "prettier --list-different 'src/**/*.{js,jsx,ts,tsx,md}'",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "build:web": "npm run generate:ideas && next build",
+    "test:server": "npm --prefix server test",
+    "prisma:generate": "npm --prefix server run prisma:generate"
   },
   "dependencies": {
     "@react-spring/core": "^10.0.1",
