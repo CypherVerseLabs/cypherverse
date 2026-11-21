@@ -84,9 +84,14 @@ export function useParcels(
   /**
    * Successfully loaded chunks.
    */
-  const loadedChunksRef = useRef<Set<string>>(
-    new Set()
-  );
+  const loadedChunksRef = useRef<
+    Map<string, {
+      minX: number;
+      maxX: number;
+      minY: number;
+      maxY: number;
+    }>
+  >(new Map());
 
   /**
    * Requests currently in progress.
@@ -290,7 +295,12 @@ export function useParcels(
           /**
            * Mark the chunk loaded only after success.
            */
-          loadedChunksRef.current.add(chunkKey);
+          loadedChunksRef.current.set(chunkKey, {
+            minX: normalizedMinX,
+            maxX: normalizedMaxX,
+            minY: normalizedMinY,
+            maxY: normalizedMaxY,
+          });
         } catch (requestError) {
           if (
             requestError instanceof Error &&
@@ -385,19 +395,31 @@ export function useParcels(
       setError(null);
       setLoading(false);
 
-      const startMinX = minX ?? 0;
-      const startMaxX =
-        maxX ?? startMinX + chunkSize;
+      const previouslyLoadedChunks = Array.from(
+        loadedChunksRef.current.values()
+      );
 
-      const startMinY = minY ?? 0;
-      const startMaxY =
-        maxY ?? startMinY + chunkSize;
+      loadedChunksRef.current.clear();
 
-      await loadChunk(
-        startMinX,
-        startMaxX,
-        startMinY,
-        startMaxY
+      const chunksToReload =
+        previouslyLoadedChunks.length > 0
+          ? previouslyLoadedChunks
+          : [{
+              minX: minX ?? 0,
+              maxX: maxX ?? (minX ?? 0) + chunkSize,
+              minY: minY ?? 0,
+              maxY: maxY ?? (minY ?? 0) + chunkSize,
+            }];
+
+      await Promise.all(
+        chunksToReload.map((chunk) =>
+          loadChunk(
+            chunk.minX,
+            chunk.maxX,
+            chunk.minY,
+            chunk.maxY
+          )
+        )
       );
     },
     [
