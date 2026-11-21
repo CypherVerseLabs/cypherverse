@@ -69,21 +69,15 @@ interface WorldBounds {
  * WORLD CONFIGURATION
  * =========================================================
  *
- * These bounds define the initial parcel region loaded from
- * the backend.
+ * The initial 512 × 512 database-coordinate chunk is centered
+ * around Genesis (2400, 2400). ParcelLayer requests neighboring
+ * chunks as the player moves through the 300 × 300 parcel grid.
  *
- * IMPORTANT:
+ * The backend /api/parcels endpoint filters each chunk by:
+ *   minX, maxX, minY, maxY
  *
- * The backend /api/parcels endpoint now accepts:
- *
- *   minX
- *   maxX
- *   minY
- *   maxY
- *
- * so only parcels inside this region are requested.
- *
- * Change these values as the playable world expands.
+ * This keeps the full 90,000-parcel world from being downloaded
+ * in one request.
  */
 
 const CHUNK_SIZE = 512;
