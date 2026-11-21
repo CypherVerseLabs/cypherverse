@@ -29,6 +29,7 @@ import aiRouter from "./routes/auth/ai.js";
 import aiAgentsRouter from "./routes/auth/aiAgents.js";
 import publicProjectRouter from "./routes/public/projects.js";
 import parcelRouter from "./routes/parcels.js";
+import roadRouter from "./routes/roads.js";
 import marketplaceRouter from "./routes/marketplace.js";
 import marketplaceRoutes from "./routes/marketplaceRoutes.js";
 
@@ -299,6 +300,11 @@ app.use(
 app.use(
   "/api/parcels",
   parcelRouter
+);
+
+app.use(
+  "/api/roads",
+  roadRouter
 );
 
 console.log(
