@@ -69,9 +69,9 @@ interface WorldBounds {
  * WORLD CONFIGURATION
  * =========================================================
  *
- * The initial 512 × 512 database-coordinate chunk is centered
- * around Genesis (2400, 2400). ParcelLayer requests neighboring
- * chunks as the player moves through the 300 × 300 parcel grid.
+ * The initial 512 × 512 database-coordinate chunk is grid-aligned
+ * and contains Genesis (2400, 2400). ParcelLayer requests the
+ * neighboring chunks as the player moves through the 300 × 300 grid.
  *
  * The backend /api/parcels endpoint filters each chunk by:
  *   minX, maxX, minY, maxY
