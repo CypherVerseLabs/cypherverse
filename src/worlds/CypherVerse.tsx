@@ -32,6 +32,7 @@ import {
 } from "../editor/context/EditorContext";
 
 import Scene from "../editor/scene/Scene";
+import Link from "../ideas/inputs/Link";
 
 import {
   fetchPublicProject,
@@ -750,6 +751,17 @@ export default function CypherVerse() {
 
 
       {loading && null}
+
+      {/* CYPH ACCOUNT ACTIVITY */}
+      <EditorProvider editorActive={false}>
+        <Link
+          href="/account"
+          position-x={-1.5}
+          position-z={0.75}
+        >
+          CYPH Activity
+        </Link>
+      </EditorProvider>
 
     </StandardReality>
   );
