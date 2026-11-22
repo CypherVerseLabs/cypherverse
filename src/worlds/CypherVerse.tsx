@@ -47,7 +47,7 @@ import { useAuthContext } from "../ideas/context/AuthContext";
 import LandmarkLayer from "./LandmarkLayer";
 import CypherVerseMapLayer from "./CypherVerseMapLayer";
 import { CITY_CENTER } from "../parcels/parcelCoordinates";
-import { Html } from "@react-three/drei";
+import Link from "../ideas/inputs/Link";
 
 
 /**
@@ -1083,29 +1083,15 @@ useEffect(() => {
 
       {loading && null}
 
-      <Html fullscreen>
-        <a
+      <EditorProvider editorActive={false}>
+        <Link
           href="/account"
-          style={{
-            position: "fixed",
-            top: 16,
-            right: 16,
-            zIndex: 20,
-            padding: "10px 14px",
-            borderRadius: 8,
-            border: "1px solid rgba(148, 163, 184, 0.45)",
-            background: "rgba(8, 13, 24, 0.88)",
-            color: "#e8eef8",
-            fontSize: 13,
-            fontWeight: 600,
-            textDecoration: "none",
-            fontFamily: "Inter, system-ui, sans-serif",
-            pointerEvents: "auto",
-          }}
+          position-x={-1.5}
+          position-z={0.75}
         >
-          CYPH Activity ↗
-        </a>
-      </Html>
+          CYPH Activity
+        </Link>
+      </EditorProvider>
 
     </StandardReality>
   );
